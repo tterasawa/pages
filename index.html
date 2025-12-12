@@ -56,10 +56,11 @@
             color: #00f3ff;
             touch-action: manipulation;
             overscroll-behavior: none;
-            background-image: 
-                linear-gradient(rgba(0, 243, 255, 0.03) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
-            background-size: 40px 40px;
+            /* 背景画像を設定 */
+            background-image: url('https://raw.githubusercontent.com/tterasawa/pages/main/background.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
             overflow: hidden;
         }
 
@@ -111,10 +112,42 @@
             opacity: 0.3;
         }
 
+        /* ブラー切り替えアニメーション */
+        .blur-transition {
+            animation: cyber-blur-snap 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+
+        @keyframes cyber-blur-snap {
+            0% { 
+                filter: blur(0px) brightness(1);
+                opacity: 1;
+                transform: scale(1);
+            }
+            40% {
+                filter: blur(10px) brightness(2) contrast(150%);
+                opacity: 0.5;
+                transform: scale(1.02);
+            }
+            50% { 
+                filter: blur(20px) brightness(3);
+                opacity: 0;
+                transform: scale(1.1);
+            }
+            60% {
+                filter: blur(10px) brightness(2) contrast(150%);
+                opacity: 0.5;
+                transform: scale(0.98);
+            }
+            100% { 
+                filter: blur(0px) brightness(1);
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
         /* ボタン */
         .cyber-btn {
             position: relative;
-            /* text-transform: uppercase; アルファベットを使わないので削除 */
             letter-spacing: 2px;
             transition: all 0.2s;
             clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
@@ -171,7 +204,7 @@
 
     <!-- 走査線オーバーレイ -->
     <div class="scanline-overlay"></div>
-
+    
     <!-- メインメニュー -->
     <div id="menuScreen" class="w-full max-w-md p-4 flex flex-col items-center gap-6 relative z-10">
         <div class="text-center animate-appear">
@@ -202,7 +235,7 @@
     </div>
 
     <!-- ゲーム画面 -->
-    <div id="gameScreen" class="hidden w-full max-w-md p-4 flex flex-col h-full relative z-10">
+    <div id="gameScreen" class="hidden w-full max-w-md p-4 flex flex-col h-full relative z-10 origin-center">
         <!-- ヘッダー -->
         <div class="flex justify-between items-center mb-6">
             <button onclick="backToMenu()" class="border border-gray-600 bg-gray-900 text-gray-400 px-4 py-2 text-xs font-digital hover:text-white hover:border-white transition-colors clip-path-polygon">
@@ -240,7 +273,7 @@
                     autocomplete="off">
             </div>
             
-            <!-- アクションボタンエリア（正解時に隠れる） -->
+            <!-- アクションボタンエリア -->
             <div id="readActionBtns" class="flex gap-4 w-full mb-auto">
                 <button onclick="startSpeechRecognition()" id="micBtn" class="cyber-btn flex-1 bg-gray-800 border border-neon-green text-neon-green py-4 font-bold text-xl hover:bg-neon-green hover:text-black">
                     <i class="fas fa-microphone-alt mb-1 block text-2xl"></i>
@@ -252,11 +285,6 @@
                 </button>
             </div>
             
-            <!-- 次へボタン（初期は非表示、正解時にアクションボタンと入れ替わる） -->
-            <button id="readNextBtn" onclick="nextQuestion()" class="hidden cyber-btn w-full bg-neon-pink text-white py-4 font-bold text-2xl shadow-[0_0_20px_#ff00ff] hover:bg-fuchsia-400 mb-auto">
-                つぎの もんだい <i class="fas fa-angle-double-right"></i>
-            </button>
-
             <p id="micStatus" class="text-neon-pink mt-4 h-6 text-sm font-digital animate-pulse"></p>
         </div>
 
@@ -281,14 +309,9 @@
                 </div>
             </div>
             
-            <!-- 実行ボタン（正解時に隠れる） -->
+            <!-- 実行ボタン -->
             <button onclick="checkAnswerWrite()" id="writeCheckBtn" class="cyber-btn w-full bg-gradient-to-r from-neon-blue to-blue-600 text-black py-4 font-bold text-xl border-none shadow-[0_0_15px_#00f3ff]">
                 <i class="fas fa-fingerprint mr-2"></i> かけた！
-            </button>
-            
-            <!-- 次へボタン（初期は非表示、正解時に実行ボタンと入れ替わる） -->
-            <button id="writeNextBtn" onclick="nextQuestion()" class="hidden cyber-btn w-full bg-neon-pink text-white py-4 font-bold text-2xl shadow-[0_0_20px_#ff00ff] hover:bg-fuchsia-400">
-                つぎの もんだい <i class="fas fa-angle-double-right"></i>
             </button>
 
             <p class="text-gray-500 text-xs mt-3 font-digital">マスの中に おおきく かいてね</p>
@@ -313,7 +336,6 @@
 <script>
 /**
  * 漢字データセット (小学1年生レベル)
- * ロジックはオリジナルと同様
  */
 const questionsData = [
     { type: 'read', q: 'おこづかいは【千円】。', a: 'せんえん', kanji: '千円' },
@@ -597,6 +619,22 @@ function backToMenu() {
     document.getElementById('menuScreen').classList.remove('hidden');
 }
 
+// ---------------- トランジション制御 ----------------
+function playTransitionAndNext() {
+    const screen = document.getElementById('gameScreen');
+    screen.classList.add('blur-transition');
+
+    // アニメーションの中間（見えなくなったタイミング）で次へ
+    setTimeout(() => {
+        nextQuestion();
+    }, 250); // 0.5sアニメーションの半分
+
+    // 終了後にクラス削除
+    setTimeout(() => {
+        screen.classList.remove('blur-transition');
+    }, 500);
+}
+
 function showQuestion() {
     const q = currentQuestions[currentQuestionIndex];
     document.getElementById('currentQuestionNum').textContent = (currentQuestionIndex + 1).toString().padStart(2, '0');
@@ -609,7 +647,7 @@ function showQuestion() {
     document.getElementById('feedbackOverlay').innerHTML = '';
     document.getElementById('feedbackOverlay').classList.add('hidden');
 
-    // ボタンの状態をリセット（次へボタンを隠し、操作ボタンを表示）
+    // ボタンの状態をリセット
     if (currentMode === 'read') {
         const input = document.getElementById('readInput');
         input.value = '';
@@ -618,7 +656,6 @@ function showQuestion() {
         document.getElementById('micStatus').textContent = "";
         
         document.getElementById('readActionBtns').classList.remove('hidden');
-        document.getElementById('readNextBtn').classList.add('hidden');
         
         input.focus();
     } else {
@@ -628,7 +665,6 @@ function showQuestion() {
         
         document.getElementById('writeCheckBtn').disabled = false;
         document.getElementById('writeCheckBtn').classList.remove('hidden');
-        document.getElementById('writeNextBtn').classList.add('hidden');
     }
 }
 
@@ -931,14 +967,17 @@ function showFeedback(isCorrect) {
             </div>
         `;
         
-        // ボタンを入れ替える処理
+        // 操作ボタンを隠す
         if (currentMode === 'read') {
             document.getElementById('readActionBtns').classList.add('hidden');
-            document.getElementById('readNextBtn').classList.remove('hidden');
         } else {
             document.getElementById('writeCheckBtn').classList.add('hidden');
-            document.getElementById('writeNextBtn').classList.remove('hidden');
         }
+
+        // 0.5秒待機後、トランジションエフェクトと遷移を実行
+        setTimeout(() => {
+            playTransitionAndNext();
+        }, 500);
 
     } else {
         playSound('wrong');
