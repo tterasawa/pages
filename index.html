@@ -784,7 +784,18 @@ function startSpeechRecognition() {
     recognition.start();
 
     recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
+        let transcript = event.results[0][0].transcript;
+        
+        // カタカナをひらがなに変換
+        transcript = toHiragana(transcript);
+
+        // 認識結果に、いまの問題の漢字が含まれていたら、正解のひらがなに置き換える
+        // (例: 音声認識が「千円」と返してきたら「せんえん」に直す)
+        const q = currentQuestions[currentQuestionIndex];
+        if (q.type === 'read' && q.kanji && transcript.includes(q.kanji)) {
+            transcript = transcript.replace(q.kanji, q.a);
+        }
+
         document.getElementById('readInput').value = transcript;
         micStatus.textContent = 'きこえました！';
         micStatus.className = 'text-neon-green mt-4 h-6 text-sm font-digital';
