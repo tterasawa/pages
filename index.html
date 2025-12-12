@@ -198,6 +198,29 @@
         input::placeholder {
             color: rgba(0, 243, 255, 0.3);
         }
+        
+        /* スライダーのカスタマイズ */
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #00f3ff;
+            cursor: pointer;
+            box-shadow: 0 0 10px #00f3ff;
+            margin-top: -6px;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #333;
+            border-radius: 2px;
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col items-center justify-center">
@@ -205,6 +228,11 @@
     <!-- 走査線オーバーレイ -->
     <div class="scanline-overlay"></div>
     
+    <!-- BGM用オーディオタグ (srcは任意のmp3ファイルに変更してください) -->
+    <audio id="bgmAudio" loop>
+        <source src="bgm.mp3" type="audio/mpeg">
+    </audio>
+
     <!-- メインメニュー -->
     <div id="menuScreen" class="w-full max-w-md p-4 flex flex-col items-center gap-6 relative z-10">
         <div class="text-center animate-appear">
@@ -238,9 +266,21 @@
     <div id="gameScreen" class="hidden w-full max-w-md p-4 flex flex-col h-full relative z-10 origin-center">
         <!-- ヘッダー -->
         <div class="flex justify-between items-center mb-6">
-            <button onclick="backToMenu()" class="border border-gray-600 bg-gray-900 text-gray-400 px-4 py-2 text-xs font-digital hover:text-white hover:border-white transition-colors clip-path-polygon">
-                <i class="fas fa-chevron-left"></i> もどる
-            </button>
+            <div class="flex items-center gap-3">
+                <button onclick="backToMenu()" class="border border-gray-600 bg-gray-900 text-gray-400 px-4 py-2 text-xs font-digital hover:text-white hover:border-white transition-colors clip-path-polygon">
+                    <i class="fas fa-chevron-left"></i> もどる
+                </button>
+                
+                <!-- BGMコントローラー -->
+                <div class="flex items-center gap-2 bg-black/60 border border-neon-blue/30 px-2 py-1 rounded clip-path-polygon">
+                    <button onclick="toggleMute()" id="muteBtn" class="text-neon-blue hover:text-white w-6 text-center transition-colors">
+                        <i class="fas fa-volume-up"></i>
+                    </button>
+                    <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.3" 
+                        class="w-16 cursor-pointer" oninput="changeVolume(this.value)">
+                </div>
+            </div>
+
             <div class="flex flex-col items-end">
                 <div class="text-xs text-neon-green font-digital">もんだい</div>
                 <div class="text-xl font-bold text-neon-blue font-cyber">
@@ -539,6 +579,11 @@ let lastY = 0;
 // Audio
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
+// BGM関連変数
+let isMuted = false;
+const bgm = document.getElementById('bgmAudio');
+bgm.volume = 0.3; // 初期音量
+
 // SF風サウンドエフェクト
 function playSound(type) {
     if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -601,6 +646,13 @@ function startMode(mode) {
     
     document.getElementById('totalQuestionNum').textContent = currentQuestions.length;
     
+    // BGM再生
+    try {
+        bgm.play().catch(e => console.log("BGM再生エラー: ユーザーアクションがないかファイルがありません"));
+    } catch (e) {
+        console.log(e);
+    }
+
     if (mode === 'read') {
         document.getElementById('readInputArea').classList.remove('hidden');
         document.getElementById('writeInputArea').classList.add('hidden');
@@ -617,7 +669,32 @@ function backToMenu() {
     document.getElementById('gameScreen').classList.add('hidden');
     document.getElementById('resultScreen').classList.add('hidden');
     document.getElementById('menuScreen').classList.remove('hidden');
+    
+    // BGM停止
+    bgm.pause();
+    bgm.currentTime = 0;
 }
+
+// BGMコントロール
+function toggleMute() {
+    isMuted = !isMuted;
+    bgm.muted = isMuted;
+    const btn = document.getElementById('muteBtn');
+    if (isMuted) {
+        btn.innerHTML = '<i class="fas fa-volume-mute text-gray-500"></i>';
+    } else {
+        btn.innerHTML = '<i class="fas fa-volume-up"></i>';
+    }
+}
+
+function changeVolume(val) {
+    bgm.volume = val;
+    // スライダー操作時にミュート中なら解除する等の処理はお好みで
+    if (val > 0 && isMuted) {
+        toggleMute();
+    }
+}
+
 
 // ---------------- トランジション制御 ----------------
 function playTransitionAndNext() {
@@ -681,6 +758,8 @@ function showResult() {
     document.getElementById('gameScreen').classList.add('hidden');
     document.getElementById('resultScreen').classList.remove('hidden');
     playSound('correct');
+    bgm.pause(); // 結果画面でもBGM停止（お好みで再生継続も可）
+    bgm.currentTime = 0;
 }
 
 // ---------------- 読みモード ----------------
