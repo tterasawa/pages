@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>かんじドリル 1ねんせい</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Zen Maru Gothic (丸文字で子供向け) -->
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Handwriting.js (手書き認識ライブラリ) -->
+    <script src="handwriting.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Zen Maru Gothic', sans-serif;
+            background-color: #FFF8E1; /* クリーム色 */
+            touch-action: manipulation;
+            overscroll-behavior: none;
+        }
+        
+        /* チョークボード風スタイル */
+        .blackboard {
+            background-color: #2F5D62;
+            border: 8px solid #8D6E63;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            color: white;
+        }
+
+        /* 書き取り用キャンバス */
+        #drawingCanvas {
+            background-color: white;
+            border: 4px dashed #FFB74D;
+            border-radius: 16px;
+            cursor: crosshair;
+            touch-action: none; /* スクロール防止 */
+            background-image: linear-gradient(#eee .1em, transparent .1em), linear-gradient(90deg, #eee .1em, transparent .1em);
+            background-size: 50px 50px;
+        }
+
+        /* はなまるアニメーション */
+        @keyframes stamp {
+            0% { transform: scale(2); opacity: 0; }
+            50% { transform: scale(0.9); opacity: 1; }
+            70% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .hanamaru {
+            animation: stamp 0.5s ease-out forwards;
+        }
+
+        /* ふるえるアニメーション（不正解時） */
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            50% { transform: translateX(10px); }
+            75% { transform: translateX(-10px); }
+            100% { transform: translateX(0); }
+        }
+        .shake {
+            animation: shake 0.4s ease-in-out;
+        }
+
+        .btn-push {
+            transition: transform 0.1s;
+        }
+        .btn-push:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<!-- 修正: h-screen overflow-hidden を削除し、min-h-screen overflow-y-auto に変更してスクロール可能に -->
+<body class="min-h-screen flex flex-col items-center justify-center overflow-y-auto pb-10">
+
+    <!-- メインメニュー -->
+    <div id="menuScreen" class="w-full max-w-md p-4 flex flex-col items-center gap-6 my-auto">
+        <h1 class="text-4xl font-black text-orange-500 tracking-wider mb-4 drop-shadow-sm">
+            <i class="fas fa-pencil-alt mr-2"></i>かんじドリル
+        </h1>
+        
+        <div class="bg-white p-6 rounded-2xl shadow-lg w-full text-center">
+            <p class="text-xl text-gray-600 mb-6 font-bold">モードをえらんでね</p>
+            
+            <button onclick="startMode('read')" class="btn-push w-full bg-blue-400 hover:bg-blue-500 text-white text-2xl font-bold py-6 rounded-2xl shadow-md mb-4 flex items-center justify-center gap-3">
+                <i class="fas fa-book-open"></i>
+                よみ モード
+            </button>
+            
+            <button onclick="startMode('write')" class="btn-push w-full bg-red-400 hover:bg-red-500 text-white text-2xl font-bold py-6 rounded-2xl shadow-md flex items-center justify-center gap-3">
+                <i class="fas fa-pen"></i>
+                かき モード
+            </button>
+        </div>
+        <p class="text-gray-400 text-sm mt-4">1ねんせい むけ</p>
+    </div>
+
+    <!-- ゲーム画面 -->
+    <div id="gameScreen" class="hidden w-full max-w-md p-4 flex flex-col min-h-screen justify-center">
+        <!-- ヘッダー -->
+        <div class="flex justify-between items-center mb-4">
+            <button onclick="backToMenu()" class="bg-gray-200 text-gray-600 px-4 py-2 rounded-full font-bold shadow-sm">
+                <i class="fas fa-arrow-left"></i> もどる
+            </button>
+            <div class="text-xl font-bold text-orange-600">
+                もん <span id="currentQuestionNum">1</span> / <span id="totalQuestionNum">5</span>
+            </div>
+        </div>
+
+        <!-- 問題表示エリア -->
+        <div class="blackboard p-6 mb-4 text-center relative min-h-[160px] flex items-center justify-center">
+            <p id="questionText" class="text-3xl font-bold leading-relaxed whitespace-pre-wrap">もんだい</p>
+            <!-- はなまる・ばつ 表示用 -->
+            <div id="feedbackOverlay" class="absolute inset-0 flex items-center justify-center pointer-events-none z-10 hidden">
+                <!-- JSで動的にSVG等を挿入 -->
+            </div>
+        </div>
+
+        <!-- 読みモード用入力エリア -->
+        <div id="readInputArea" class="hidden flex-1 flex flex-col items-center w-full">
+            <div class="w-full mb-4">
+                <input type="text" id="readInput" placeholder="ひらがなで かいてね" 
+                    class="w-full text-center text-3xl p-4 border-4 border-blue-200 rounded-2xl focus:border-blue-400 outline-none placeholder-gray-300"
+                    autocomplete="off">
+            </div>
+            
+            <!-- ボタンエリアID追加 -->
+            <div id="readButtons" class="flex gap-4 w-full mb-auto">
+                <button onclick="startSpeechRecognition()" id="micBtn" class="btn-push flex-1 bg-green-400 text-white py-4 rounded-xl font-bold text-xl shadow-md">
+                    <i class="fas fa-microphone text-2xl mb-1 block"></i>
+                    はなす
+                </button>
+                <button onclick="checkAnswerRead()" class="btn-push flex-1 bg-orange-400 text-white py-4 rounded-xl font-bold text-xl shadow-md">
+                    <i class="fas fa-check text-2xl mb-1 block"></i>
+                    こたえる
+                </button>
+            </div>
+            <p id="micStatus" class="text-gray-500 mt-2 h-6 text-sm"></p>
+        </div>
+
+        <!-- 書きモード用入力エリア -->
+        <div id="writeInputArea" class="hidden flex-1 flex flex-col items-center w-full">
+            <div class="relative w-full max-w-[300px] aspect-square mb-4">
+                <canvas id="drawingCanvas" width="300" height="300" class="w-full h-full shadow-inner"></canvas>
+                <div class="absolute top-2 right-2 flex gap-2">
+                    <button onclick="clearCanvas()" class="bg-gray-200 p-2 rounded-full text-gray-600 shadow hover:bg-gray-300">
+                        <i class="fas fa-eraser"></i> けす
+                    </button>
+                </div>
+                <!-- 判定中ローディング -->
+                <div id="checkingLoader" class="hidden absolute inset-0 bg-white/50 flex items-center justify-center rounded-2xl">
+                    <i class="fas fa-circle-notch fa-spin text-4xl text-orange-500"></i>
+                </div>
+            </div>
+            
+            <button onclick="checkAnswerWrite()" id="writeCheckBtn" class="btn-push w-full bg-orange-400 text-white py-4 rounded-xl font-bold text-xl shadow-md">
+                <i class="fas fa-pencil-alt text-2xl mb-1 mr-2"></i>
+                かけた！
+            </button>
+            <p class="text-gray-400 text-xs mt-2">マスの中に おおきく かいてね</p>
+        </div>
+        
+        <!-- 次へボタン（正解後に表示） -->
+        <!-- アクションボタンと同じ位置に表示されるように制御 -->
+        <button id="nextBtn" onclick="nextQuestion()" class="hidden w-full bg-pink-500 text-white py-4 rounded-xl font-bold text-2xl shadow-lg mt-0 animate-bounce">
+            つぎの もんだい <i class="fas fa-arrow-right"></i>
+        </button>
+    </div>
+
+    <!-- 完了画面 -->
+    <div id="resultScreen" class="hidden w-full max-w-md p-6 text-center my-auto">
+        <h2 class="text-4xl font-black text-pink-500 mb-6">よくできました！</h2>
+        <div class="text-9xl mb-8 text-yellow-400 drop-shadow-md">
+            <i class="fas fa-medal"></i>
+        </div>
+        <p class="text-2xl text-gray-700 font-bold mb-8">
+            ぜんぶ おわったよ！<br>すごいね！
+        </p>
+        <button onclick="backToMenu()" class="btn-push w-full bg-blue-400 text-white py-4 rounded-xl font-bold text-xl shadow-md">
+            もういちど やる
+        </button>
+    </div>
+
+<script>
+/**
+ * 漢字データセット (小学1年生レベル)
+ * すきるまドリル掲載の80字を中心に構成
+ * type: read (読み問題) | write (書き問題)
+ * q: 問題文
+ * a: 正解
+ */
+const questionsData = [
+    // --- 読み問題 (Read) ---
+    { type: 'read', q: 'おこづかいは【千円】。', a: 'せんえん', kanji: '千円' },
+    { type: 'read', q: 'きれいな【空気】。', a: 'くうき', kanji: '空気' },
+    { type: 'read', q: '【お手玉】であそぶ。', a: 'おてだま', kanji: 'お手玉' },
+    { type: 'read', q: '【村人】をたずねる。', a: 'むらびと', kanji: '村人' },
+    { type: 'read', q: '【白い】はなをかざる。', a: 'しろい', kanji: '白い' },
+    { type: 'read', q: '【大きな】音がする。', a: 'おおきな', kanji: '大きな' },
+    { type: 'read', q: '【目】がさめる。', a: 'め', kanji: '目' },
+    { type: 'read', q: '【赤い】ふうせん。', a: 'あかい', kanji: '赤い' },
+    { type: 'read', q: 'もうすぐ【一年生】。', a: 'いちねんせい', kanji: '一年生' },
+    { type: 'read', q: '【早口】ではなす。', a: 'はやくち', kanji: '早口' },
+    { type: 'read', q: '【草むしり】をする。', a: 'くさむしり', kanji: '草むしり' },
+    { type: 'read', q: '【耳】をすます。', a: 'みみ', kanji: '耳' },
+    { type: 'read', q: '【一月】に生まれる。', a: 'いちがつ', kanji: '一月' },
+    { type: 'read', q: 'どうぶつの【王さま】。', a: 'おうさま', kanji: '王さま' },
+    { type: 'read', q: '【町ない】のおまつり。', a: 'ちょうない', kanji: '町ない' },
+    { type: 'read', q: 'はこの【中】にいれる。', a: 'なか', kanji: '中' },
+    { type: 'read', q: 'うみべで【貝】をひろう。', a: 'かい', kanji: '貝' },
+    { type: 'read', q: 'いえの【中】に入る。', a: 'なか', kanji: '中' },
+    { type: 'read', q: 'いきいきと【生きる】。', a: 'いきる', kanji: '生きる' },
+    { type: 'read', q: '【右】にまがる。', a: 'みぎ', kanji: '右' },
+    { type: 'read', q: '【足】がない。', a: 'あし', kanji: '足' },
+    { type: 'read', q: '【大きな】石をもつ。', a: 'おおきな', kanji: '大きな' },
+    { type: 'read', q: '【左手】を上げる。', a: 'ひだりて', kanji: '左手' },
+    { type: 'read', q: 'はたを【立てる】。', a: 'たてる', kanji: '立てる' },
+    { type: 'read', q: 'きれいな【花】がさく。', a: 'はな', kanji: '花' },
+    { type: 'read', q: '【先生】がはなす。', a: 'せんせい', kanji: '先生' },
+    { type: 'read', q: '【玉入れ】をする。', a: 'たまいれ', kanji: '玉入れ' },
+    { type: 'read', q: '【白ちょう】がとぶ。', a: 'しろちょう', kanji: '白ちょう' },
+    { type: 'read', q: 'だいの【上】に立つ。', a: 'うえ', kanji: '上' },
+    { type: 'read', q: '【入学】しきにでる。', a: 'にゅうがく', kanji: '入学' },
+    { type: 'read', q: '【花だん】に水をまく。', a: 'かだん', kanji: '花だん' },
+    { type: 'read', q: '【先】にならぶ。', a: 'さき', kanji: '先' },
+    { type: 'read', q: '【木せい】のいす。', a: 'もくせい', kanji: '木せい' },
+    { type: 'read', q: '【林】のなかであそぶ。', a: 'はやし', kanji: '林' },
+    { type: 'read', q: 'どうぶつたちの【森】。', a: 'もり', kanji: '森' },
+    { type: 'read', q: '【空】に月がでる。', a: 'そら', kanji: '空' },
+    { type: 'read', q: '【車】であそびにいく。', a: 'くるま', kanji: '車' },
+    { type: 'read', q: '【人】がたくさんいる。', a: 'ひと', kanji: '人' },
+    { type: 'read', q: '【力】をあわせる。', a: 'ちから', kanji: '力' },
+    { type: 'read', q: '【森林】にはいる。', a: 'しんりん', kanji: '森林' },
+    { type: 'read', q: '【じてん車】にのる。', a: 'じてんしゃ', kanji: 'じてん車' },
+    { type: 'read', q: 'かわいい【人ぎょう】。', a: 'にんぎょう', kanji: '人ぎょう' },
+    { type: 'read', q: '【竹うま】であそぶ。', a: 'たけうま', kanji: '竹うま' },
+    { type: 'read', q: 'そとに【出る】。', a: 'でる', kanji: '出る' },
+    { type: 'read', q: '【月よう日】。', a: 'げつようび', kanji: '月よう日' },
+    { type: 'read', q: '【火】がよくもえる。', a: 'ひ', kanji: '火' },
+    { type: 'read', q: '【学校】を休む。', a: 'がっこう', kanji: '学校' },
+    { type: 'read', q: '【休日】をすごす。', a: 'きゅうじつ', kanji: '休日' },
+    { type: 'read', q: '【火よう日】。', a: 'かようび', kanji: '火よう日' },
+    { type: 'read', q: '【金いろ】にかがやく。', a: 'きんいろ', kanji: '金いろ' },
+    { type: 'read', q: 'うえきばちの【土】。', a: 'つち', kanji: '土' },
+    { type: 'read', q: '【本】をたくさんよむ。', a: 'ほん', kanji: '本' },
+    { type: 'read', q: '【犬】のなきごえ。', a: 'いぬ', kanji: '犬' },
+    { type: 'read', q: '【竹やぶ】にはいる。', a: 'たけやぶ', kanji: '竹やぶ' },
+    { type: 'read', q: 'かえりが【早い】。', a: 'はやい', kanji: '早い' },
+    { type: 'read', q: '【目ひょう】をたてる。', a: 'もくひょう', kanji: '目ひょう' },
+    { type: 'read', q: 'お【金】をはらう。', a: 'かね', kanji: '金' },
+    { type: 'read', q: '【名ふだ】をつける。', a: 'なふだ', kanji: '名ふだ' },
+    { type: 'read', q: '【夕がた】まであそんだ。', a: 'ゆうがた', kanji: '夕がた' },
+    { type: 'read', q: '【小さな】町。', a: 'ちいさな', kanji: '小さな' },
+    { type: 'read', q: '【百円】だま。', a: 'ひゃくえん', kanji: '百円' },
+    { type: 'read', q: 'よそうが【てき中】する。', a: 'てきちゅう', kanji: 'てき中' },
+    { type: 'read', q: '【糸】をまく。', a: 'いと', kanji: '糸' },
+    { type: 'read', q: '【子ども】のようす。', a: 'こども', kanji: '子ども' },
+    { type: 'read', q: 'あおい【空】のむこう。', a: 'そら', kanji: '空' },
+    { type: 'read', q: 'げんきな【男の子】。', a: 'おとこのこ', kanji: '男の子' },
+    { type: 'read', q: '小さな【女の子】。', a: 'おんなのこ', kanji: '女の子' },
+    { type: 'read', q: '【手ぶくろ】をはめる。', a: 'てぶくろ', kanji: '手ぶくろ' },
+    { type: 'read', q: '【天気】がよくなる。', a: 'てんき', kanji: '天気' },
+    { type: 'read', q: '【青しんごう】でわたる。', a: 'あおしんごう', kanji: '青しんごう' },
+    { type: 'read', q: '大きな【山】が見える。', a: 'やま', kanji: '山' },
+    { type: 'read', q: '【男子】のチーム。', a: 'だんし', kanji: '男子' },
+    { type: 'read', q: '【女子】のチーム。', a: 'じょし', kanji: '女子' },
+    { type: 'read', q: 'やきゅうの【選手】。', a: 'せんしゅ', kanji: '選手' },
+    { type: 'read', q: 'こうじょうを【見学】。', a: 'けんがく', kanji: '見学' },
+    { type: 'read', q: '【字】をかく。', a: 'じ', kanji: '字' },
+    { type: 'read', q: '【虫】をしらべる。', a: 'むし', kanji: '虫' },
+    { type: 'read', q: '【さく文】をかく。', a: 'さくぶん', kanji: 'さく文' },
+    { type: 'read', q: '【学校】にいく。', a: 'がっこう', kanji: '学校' },
+    { type: 'read', q: '【大きな】こえ。', a: 'おおきな', kanji: '大きな' },
+    { type: 'read', q: '【小さい】むし。', a: 'ちいさい', kanji: '小さい' },
+    { type: 'read', q: '【一ばん】になる。', a: 'いちばん', kanji: '一ばん' },
+    { type: 'read', q: '【二かい】だてのいえ。', a: 'にかい', kanji: '二かい' },
+    { type: 'read', q: '【三びき】のこぶた。', a: 'さんびき', kanji: '三びき' },
+    { type: 'read', q: '【四がつ】はおはなみ。', a: 'しがつ', kanji: '四がつ' },
+    { type: 'read', q: '【五じかん】め。', a: 'ごじかん', kanji: '五じかん' },
+    { type: 'read', q: '【六だい】のくるま。', a: 'ろくだい', kanji: '六だい' },
+    { type: 'read', q: '【七いろ】のにじ。', a: 'なないろ', kanji: '七いろ' },
+    { type: 'read', q: '【八じ】までにおきる。', a: 'はちじ', kanji: '八じ' },
+    { type: 'read', q: '【九さい】のたんじょうび。', a: 'きゅうさい', kanji: '九さい' },
+    { type: 'read', q: '【十えん】だま。', a: 'じゅうえん', kanji: '十えん' },
+    { type: 'read', q: '【大じ】なたからもの。', a: 'だいじ', kanji: '大じ' },
+    { type: 'read', q: '【小がく】一年せい。', a: 'しょうがく', kanji: '小がく' },
+    { type: 'read', q: '【三つご】がうまれる。', a: 'みつご', kanji: '三つご' },
+    { type: 'read', q: '【八おや】におつかい。', a: 'やおや', kanji: '八おや' },
+    
+    // --- 書き問題 (Write) ---
+    // 自然・植物
+    { type: 'write', q: '【くさ】むしりをする。', a: '草' },
+    { type: 'write', q: '【はな】をかざる。', a: '花' },
+    { type: 'write', q: '【あめ】がふる。', a: '雨' },
+    { type: 'write', q: '【たけ】やぶにはいる。', a: '竹' },
+    { type: 'write', q: '【はやし】のなかであそぶ。', a: '林' },
+    { type: 'write', q: '【もり】ばやしにはいる。', a: '森' },
+    { type: 'write', q: '【そら】に【つき】がでる。', a: '空' },
+    { type: 'write', q: 'そらに【つき】がでる。', a: '月' },
+    { type: 'write', q: '【ゆう】がたまであそぶ。', a: '夕' },
+    { type: 'write', q: '【いし】ころ。', a: '石' },
+    { type: 'write', q: '【かわ】のなか。', a: '川' },
+    { type: 'write', q: '【た】んぼのあぜみち。', a: '田' },
+    { type: 'write', q: '【やま】にのぼる。', a: '山' },
+    // 動物・生き物
+    { type: 'write', q: '【いぬ】のなきごえ。', a: '犬' },
+    { type: 'write', q: '【かい】がらをひろう。', a: '貝' },
+    { type: 'write', q: '【むし】をつかまえる。', a: '虫' },
+    // 人・体
+    { type: 'write', q: '【ひと】がたくさんいる。', a: '人' },
+    { type: 'write', q: '【め】がさめる。', a: '目' },
+    { type: 'write', q: '【みみ】をすます。', a: '耳' },
+    { type: 'write', q: '【くち】ぶえをならす。', a: '口' },
+    { type: 'write', q: '【て】をあらう。', a: '手' },
+    { type: 'write', q: '【あし】がない。', a: '足' },
+    { type: 'write', q: '【おとこ】のこ。', a: '男' },
+    { type: 'write', q: '【おんな】のこ。', a: '女' },
+    { type: 'write', q: '【こ】どものようす。', a: '子' },
+    { type: 'write', q: '【ちから】をあわせる。', a: '力' },
+    // 学校・生活
+    { type: 'write', q: '【がっ】こうをやすむ。', a: '学' },
+    { type: 'write', q: '【せん】せいがはなす。', a: '先' },
+    { type: 'write', q: '【じ】をかく。', a: '字' },
+    { type: 'write', q: '【ぶん】をかく。', a: '文' },
+    { type: 'write', q: '【ほん】をたくさんよむ。', a: '本' },
+    { type: 'write', q: '【な】まえをかく。', a: '名' },
+    { type: 'write', q: '【くるま】であそびにいく。', a: '車' },
+    { type: 'write', q: '【むら】びとをたずねる。', a: '村' },
+    { type: 'write', q: '【まち】たんけんをする。', a: '町' },
+    { type: 'write', q: '【おと】がする。', a: '音' },
+    { type: 'write', q: '【やす】みじかん。', a: '休' },
+    { type: 'write', q: '【はや】おき。', a: '早' },
+    { type: 'write', q: '【ただ】しいこたえ。', a: '正' },
+    { type: 'write', q: '【こう】ちょうせんせい。', a: '校' },
+    // 色・形容詞・動詞
+    { type: 'write', q: '【あか】いふうせん。', a: '赤' },
+    { type: 'write', q: '【しろ】いはな。', a: '白' },
+    { type: 'write', q: '【あお】いそら。', a: '青' },
+    { type: 'write', q: '【おお】きな。', a: '大' },
+    { type: 'write', q: '【ちい】さな。', a: '小' },
+    { type: 'write', q: '【うえ】をむく。', a: '上' },
+    { type: 'write', q: '【した】をむく。', a: '下' },
+    { type: 'write', q: '【ひだり】て。', a: '左' },
+    { type: 'write', q: '【みぎ】にまがる。', a: '右' },
+    { type: 'write', q: '【なか】にいれる。', a: '中' },
+    { type: 'write', q: 'そとに【で】る。', a: '出' },
+    { type: 'write', q: '【い】る。', a: '入' },
+    { type: 'write', q: 'はたを【た】てる。', a: '立' },
+    { type: 'write', q: '【み】る。', a: '見' },
+    // 数・曜日
+    { type: 'write', q: '【いち】ねんせい。', a: '一' },
+    { type: 'write', q: '【に】ひきのこぶた。', a: '二' },
+    { type: 'write', q: '【さん】びきのこぶた。', a: '三' },
+    { type: 'write', q: '【し】がつ。', a: '四' },
+    { type: 'write', q: '【ご】じかんめ。', a: '五' },
+    { type: 'write', q: '【ろく】だいのくるま。', a: '六' },
+    { type: 'write', q: '【なな】いろのにじ。', a: '七' },
+    { type: 'write', q: '【はち】じまでにおきる。', a: '八' },
+    { type: 'write', q: '【きゅう】さい。', a: '九' },
+    { type: 'write', q: '【じゅう】えんだま。', a: '十' },
+    { type: 'write', q: '【ひゃく】えん。', a: '百' },
+    { type: 'write', q: '【せん】えん。', a: '千' },
+    { type: 'write', q: '【えん】。', a: '円' },
+    { type: 'write', q: '【げつ】ようび。', a: '月' },
+    { type: 'write', q: '【か】ようび。', a: '火' },
+    { type: 'write', q: '【すい】ようび。', a: '水' },
+    { type: 'write', q: '【もく】ようび。', a: '木' },
+    { type: 'write', q: '【きん】ようび。', a: '金' },
+    { type: 'write', q: '【ど】ようび。', a: '土' },
+    { type: 'write', q: '【にち】ようび。', a: '日' },
+    // その他
+    { type: 'write', q: '【おう】さま。', a: '王' },
+    { type: 'write', q: '【たま】いれ。', a: '玉' },
+    { type: 'write', q: '【いと】をまく。', a: '糸' }
+];
+
+// 問題をランダムにシャッフルする関数
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+let currentMode = '';
+let currentQuestions = [];
+let currentQuestionIndex = 0;
+
+// Handwriting.js 用のトレースデータ
+let trace = []; 
+let currentStrokeX = [];
+let currentStrokeY = [];
+
+// キャンバス設定
+const canvas = document.getElementById('drawingCanvas');
+const ctx = canvas.getContext('2d');
+let isDrawing = false;
+let lastX = 0;
+let lastY = 0;
+
+// 効果音 (AudioContext)
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playSound(type) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    if (type === 'correct') {
+        // ピロリン♪
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
+        osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); 
+        gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.4);
+    } else {
+        // ブブー
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+        gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.3);
+    }
+}
+
+// ---------------- 初期化 ----------------
+
+function init() {
+    setupCanvas();
+}
+
+// ---------------- 画面遷移 ----------------
+
+function startMode(mode) {
+    currentMode = mode;
+    
+    // 問題をフィルタリングしてシャッフル
+    let rawQuestions = questionsData.filter(q => q.type === mode);
+    currentQuestions = shuffleArray([...rawQuestions]).slice(0, 10); 
+    currentQuestionIndex = 0;
+
+    document.getElementById('menuScreen').classList.add('hidden');
+    document.getElementById('resultScreen').classList.add('hidden');
+    document.getElementById('gameScreen').classList.remove('hidden');
+    
+    document.getElementById('totalQuestionNum').textContent = currentQuestions.length;
+    
+    if (mode === 'read') {
+        document.getElementById('readInputArea').classList.remove('hidden');
+        document.getElementById('writeInputArea').classList.add('hidden');
+    } else {
+        document.getElementById('readInputArea').classList.add('hidden');
+        document.getElementById('writeInputArea').classList.remove('hidden');
+        resizeCanvas();
+    }
+
+    showQuestion();
+}
+
+function backToMenu() {
+    document.getElementById('gameScreen').classList.add('hidden');
+    document.getElementById('resultScreen').classList.add('hidden');
+    document.getElementById('menuScreen').classList.remove('hidden');
+}
+
+function showQuestion() {
+    const q = currentQuestions[currentQuestionIndex];
+    document.getElementById('currentQuestionNum').textContent = currentQuestionIndex + 1;
+    
+    const formattedQ = q.q.replace(/【(.*?)】/g, '<span class="inline-block border-4 border-dotted border-pink-400 bg-white/10 text-pink-300 px-3 py-1 rounded-lg mx-2 align-middle">$1</span>');
+    document.getElementById('questionText').innerHTML = formattedQ;
+
+    document.getElementById('feedbackOverlay').innerHTML = '';
+    document.getElementById('feedbackOverlay').classList.add('hidden');
+    
+    // 次へボタンを隠し、入力ボタンを表示
+    document.getElementById('nextBtn').classList.add('hidden');
+    document.getElementById('readButtons').classList.remove('hidden');
+    document.getElementById('writeCheckBtn').classList.remove('hidden');
+
+    if (currentMode === 'read') {
+        const input = document.getElementById('readInput');
+        input.value = '';
+        input.disabled = false;
+        document.getElementById('micBtn').disabled = false;
+        input.focus();
+    } else {
+        clearCanvas();
+        canvas.style.pointerEvents = 'auto';
+        document.getElementById('writeCheckBtn').disabled = false;
+        document.getElementById('checkingLoader').classList.add('hidden');
+    }
+}
+
+function nextQuestion() {
+    currentQuestionIndex++;
+    if (currentQuestionIndex >= currentQuestions.length) {
+        showResult();
+    } else {
+        showQuestion();
+    }
+}
+
+function showResult() {
+    document.getElementById('gameScreen').classList.add('hidden');
+    document.getElementById('resultScreen').classList.remove('hidden');
+    playSound('correct');
+}
+
+// ---------------- 読みモード ロジック ----------------
+
+function startSpeechRecognition() {
+    const micStatus = document.getElementById('micStatus');
+    
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        alert('このブラウザは音声認識に対応していません。キーボードで入力してね。');
+        return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+
+    recognition.lang = 'ja-JP';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    micStatus.textContent = 'きいています...';
+    micStatus.classList.add('text-red-500', 'font-bold');
+
+    recognition.start();
+
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById('readInput').value = transcript;
+        micStatus.textContent = 'きこえました！';
+        setTimeout(() => checkAnswerRead(), 500); 
+    };
+
+    recognition.onerror = (event) => {
+        micStatus.textContent = 'うまくきこえませんでした。もういちどおしてね。';
+        micStatus.classList.remove('text-red-500');
+    };
+
+    recognition.onend = () => {
+        if (micStatus.textContent === 'きいています...') {
+            micStatus.textContent = '';
+        }
+    };
+}
+
+function toHiragana(str) {
+    return str.replace(/[\u30a1-\u30f6]/g, function(match) {
+        var chr = match.charCodeAt(0) - 0x60;
+        return String.fromCharCode(chr);
+    });
+}
+
+function checkAnswerRead() {
+    const input = document.getElementById('readInput');
+    const userAns = toHiragana(input.value.trim());
+    const correctAns = currentQuestions[currentQuestionIndex].a;
+
+    if (userAns === correctAns || (userAns.length > correctAns.length && userAns.includes(correctAns))) {
+        showFeedback(true);
+        input.disabled = true;
+        document.getElementById('micBtn').disabled = true;
+        // 正解時、読み入力ボタンを隠して次へボタンを表示（入れ替え）
+        document.getElementById('readButtons').classList.add('hidden');
+    } else {
+        showFeedback(false);
+        input.parentElement.classList.add('shake');
+        setTimeout(() => input.parentElement.classList.remove('shake'), 500);
+    }
+}
+
+// ---------------- 書きモード ロジック (Handwriting.js) ----------------
+
+function setupCanvas() {
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseleave', stopDrawing);
+
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const mouseEvent = new MouseEvent('mousedown', {
+            clientX: touch.clientX,
+            clientY: touch.clientY
+        });
+        canvas.dispatchEvent(mouseEvent);
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const mouseEvent = new MouseEvent('mousemove', {
+            clientX: touch.clientX,
+            clientY: touch.clientY
+        });
+        canvas.dispatchEvent(mouseEvent);
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', () => {
+        const mouseEvent = new MouseEvent('mouseup', {});
+        canvas.dispatchEvent(mouseEvent);
+    });
+}
+
+function resizeCanvas() {
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+}
+
+function getCanvasPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+    };
+}
+
+function startDrawing(e) {
+    isDrawing = true;
+    const pos = getCanvasPos(e);
+    lastX = pos.x;
+    lastY = pos.y;
+    
+    // ストローク開始：X配列、Y配列、時間配列（空でOK）
+    currentStrokeX = [lastX];
+    currentStrokeY = [lastY];
+}
+
+function draw(e) {
+    if (!isDrawing) return;
+    const pos = getCanvasPos(e);
+
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    lastX = pos.x;
+    lastY = pos.y;
+    
+    // 座標記録
+    currentStrokeX.push(lastX);
+    currentStrokeY.push(lastY);
+}
+
+function stopDrawing() {
+    if (isDrawing) {
+        isDrawing = false;
+        // トレースにストロークを追加
+        if (currentStrokeX.length > 0) {
+            trace.push([currentStrokeX, currentStrokeY, []]);
+        }
+    }
+}
+
+function clearCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    trace = [];
+    currentStrokeX = [];
+    currentStrokeY = [];
+}
+
+/**
+ * 画数チェック関数（精度向上用）
+ * 1年生の漢字の画数データベース
+ */
+function getExpectedStrokes(char) {
+    const map = {
+        '一': 1, '二': 2, '三': 3, '四': 5, '五': 4, '六': 4, '七': 2, '八': 2, '九': 2, '十': 2,
+        '右': 5, '左': 5, '上': 3, '下': 3, '中': 4, '大': 3, '小': 3,
+        '月': 4, '火': 4, '水': 4, '木': 4, '金': 8, '土': 3, '日': 4,
+        '年': 6, '早': 6, '気': 6, '空': 8, '赤': 7, '青': 8, '白': 5,
+        '天': 4, '雨': 8, '川': 3, '山': 3, '田': 5, '石': 5, '花': 7,
+        '竹': 6, '草': 9, '虫': 6, '犬': 4, '貝': 7, '耳': 6, '目': 5,
+        '口': 3, '手': 4, '足': 7, '見': 7, '音': 9, '力': 2, '男': 7,
+        '女': 3, '子': 3, '学': 8, '校': 10, '先': 6, '生': 5, '名': 6,
+        '字': 6, '文': 4, '本': 5, '正': 5, '立': 5, '休': 6, '夕': 3,
+        '千': 3, '百': 6, '円': 4, '玉': 5, '王': 4, '村': 7, '町': 7,
+        '森': 12, '林': 8, '人': 2, '入': 2, '出': 5 
+    };
+    return map[char] || 0;
+}
+
+/**
+ * 画数の妥当性をチェック
+ */
+function isValidStrokeCount(targetChar, userStrokeCount) {
+    const expected = getExpectedStrokes(targetChar);
+    if (expected === 0) return true; // データがない場合はスルー
+
+    // 1画の漢字（一）などは厳密にチェック
+    if (expected === 1) {
+        // 1画か2画（勢いで離れちゃった場合考慮）まで
+        return userStrokeCount <= 2;
+    }
+    
+    // 2画〜3画の漢字
+    if (expected <= 3) {
+        return Math.abs(userStrokeCount - expected) <= 1;
+    }
+
+    // それ以上は少し甘く（±2画）
+    return Math.abs(userStrokeCount - expected) <= 2;
+}
+
+
+/**
+ * 簡易判定ロジック（画数判定のみ：フォールバック用）
+ */
+function fallbackCheck(targetChar, strokeCount) {
+    return isValidStrokeCount(targetChar, strokeCount);
+}
+
+/**
+ * Handwriting.js を使用した判定
+ */
+function checkAnswerWrite() {
+    const q = currentQuestions[currentQuestionIndex];
+    const targetChar = q.a;
+    const strokeCount = trace.length;
+    
+    if (strokeCount === 0) {
+        showFeedback(false);
+        return;
+    }
+
+    const runFallback = (reason) => {
+        console.warn("Using fallback logic:", reason);
+        const overlay = document.getElementById('feedbackOverlay');
+        overlay.classList.remove('hidden');
+        overlay.innerHTML = '<div class="bg-white/90 p-2 rounded text-red-500 text-sm font-bold border border-red-500 shadow-md">かんいモードで<br>はんてい します</div>';
+        
+        setTimeout(() => {
+            if (fallbackCheck(targetChar, strokeCount)) {
+                showFeedback(true);
+                canvas.style.pointerEvents = 'none';
+                document.getElementById('writeCheckBtn').classList.add('hidden');
+            } else {
+                showFeedback(false);
+                canvas.parentElement.classList.add('shake');
+                setTimeout(() => canvas.parentElement.classList.remove('shake'), 500);
+            }
+        }, 1200);
+    };
+
+    if (typeof handwriting === 'undefined') {
+        runFallback("Library not loaded");
+        return;
+    }
+
+    document.getElementById('checkingLoader').classList.remove('hidden');
+    document.getElementById('writeCheckBtn').disabled = true;
+
+    try {
+        handwriting.recognize(trace, {language: "ja", numOfReturn: 10}, function(results, err) {
+            document.getElementById('checkingLoader').classList.add('hidden');
+            document.getElementById('writeCheckBtn').disabled = false;
+
+            if (err) {
+                runFallback("API Error: " + err);
+                return;
+            }
+
+            console.log("Recognition results:", results);
+            console.log(`Target: ${targetChar}, User Strokes: ${strokeCount}, Expected: ${getExpectedStrokes(targetChar)}`);
+            
+            // 精度向上のための追加ロジック
+            // 1. 画数チェック
+            if (!isValidStrokeCount(targetChar, strokeCount)) {
+                console.log("Rejected by Stroke Count Check");
+                showFeedback(false);
+                canvas.parentElement.classList.add('shake');
+                setTimeout(() => canvas.parentElement.classList.remove('shake'), 500);
+                return;
+            }
+
+            // 2. 候補順位チェック (Rank Filter)
+            const topResults = results.slice(0, 3); 
+            
+            if (topResults.includes(targetChar)) {
+                showFeedback(true);
+                canvas.style.pointerEvents = 'none';
+                // 正解時、かけたボタンを隠して次へボタンを表示（入れ替え）
+                document.getElementById('writeCheckBtn').classList.add('hidden');
+            } else {
+                showFeedback(false);
+                canvas.parentElement.classList.add('shake');
+                setTimeout(() => canvas.parentElement.classList.remove('shake'), 500);
+            }
+        });
+    } catch (e) {
+        console.error(e);
+        document.getElementById('checkingLoader').classList.add('hidden');
+        document.getElementById('writeCheckBtn').disabled = false;
+        runFallback("Exception caught");
+    }
+}
+
+// ---------------- フィードバック表示 ----------------
+
+function showFeedback(isCorrect) {
+    const overlay = document.getElementById('feedbackOverlay');
+    overlay.classList.remove('hidden');
+    
+    if (isCorrect) {
+        playSound('correct');
+        overlay.innerHTML = `
+            <svg viewBox="0 0 200 200" width="200" height="200" class="hanamaru">
+                <path d="M100,20 C140,20 170,50 180,90 C190,130 160,170 120,180 C80,190 40,160 30,120 C20,80 50,40 90,30" 
+                      fill="none" stroke="#FF5252" stroke-width="8" stroke-linecap="round" />
+                <path d="M60,60 C40,40 20,60 30,80 M140,60 C160,40 180,60 170,80 M160,140 C180,160 160,180 140,170 M40,140 C20,160 40,180 60,170" 
+                      fill="none" stroke="#FF5252" stroke-width="8" stroke-linecap="round" opacity="0.6" />
+                <path d="M50,100 Q100,150 150,50" fill="none" stroke="#FF5252" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        `;
+        document.getElementById('nextBtn').classList.remove('hidden');
+    } else {
+        playSound('wrong');
+        overlay.innerHTML = `
+            <svg viewBox="0 0 100 100" width="150" height="150" style="animation: pop 0.2s;">
+                <line x1="20" y1="20" x2="80" y2="80" stroke="#5C6BC0" stroke-width="10" stroke-linecap="round" />
+                <line x1="80" y1="20" x2="20" y2="80" stroke="#5C6BC0" stroke-width="10" stroke-linecap="round" />
+            </svg>
+        `;
+        setTimeout(() => {
+            overlay.classList.add('hidden');
+            overlay.innerHTML = '';
+        }, 1000);
+    }
+}
+
+window.onload = init;
+
+</script>
+</body>
+</html>
