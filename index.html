@@ -228,9 +228,14 @@
     <!-- 走査線オーバーレイ -->
     <div class="scanline-overlay"></div>
     
-    <!-- BGM用オーディオタグ (srcは任意のmp3ファイルに変更してください) -->
+    <!-- BGM用オーディオタグ -->
     <audio id="bgmAudio" loop>
         <source src="bgm.mp3" type="audio/mpeg">
+    </audio>
+
+    <!-- クリア画面BGM用オーディオタグ (追加) -->
+    <audio id="clearAudio" loop>
+        <source src="clear.mp3" type="audio/mpeg">
     </audio>
 
     <!-- メインメニュー -->
@@ -239,7 +244,7 @@
             <h1 class="text-5xl font-black text-neon-blue tracking-wider mb-2 font-digital text-glow italic">
                 かんじ<br>ドリル
             </h1>
-            <div class="text-neon-pink font-bold tracking-[0.5em] text-sm">バージョン 1.0</div>
+            <div class="text-neon-pink font-bold tracking-[0.5em] text-sm">バージョン 1.1</div>
         </div>
         
         <div class="cyber-box w-full p-8 text-center bg-black/60 backdrop-blur-sm">
@@ -646,6 +651,11 @@ function startMode(mode) {
     
     document.getElementById('totalQuestionNum').textContent = currentQuestions.length;
     
+    // クリアBGMが鳴っていれば止める
+    const clearBgm = document.getElementById('clearAudio');
+    clearBgm.pause();
+    clearBgm.currentTime = 0;
+
     // BGM再生
     try {
         bgm.play().catch(e => console.log("BGM再生エラー: ユーザーアクションがないかファイルがありません"));
@@ -670,9 +680,14 @@ function backToMenu() {
     document.getElementById('resultScreen').classList.add('hidden');
     document.getElementById('menuScreen').classList.remove('hidden');
     
-    // BGM停止
+    // メインBGM停止
     bgm.pause();
     bgm.currentTime = 0;
+
+    // クリアBGM停止
+    const clearBgm = document.getElementById('clearAudio');
+    clearBgm.pause();
+    clearBgm.currentTime = 0;
 }
 
 // BGMコントロール
@@ -758,8 +773,15 @@ function showResult() {
     document.getElementById('gameScreen').classList.add('hidden');
     document.getElementById('resultScreen').classList.remove('hidden');
     playSound('correct');
-    bgm.pause(); // 結果画面でもBGM停止（お好みで再生継続も可）
+    
+    // メインBGM停止
+    bgm.pause(); 
     bgm.currentTime = 0;
+
+    // クリアBGM再生
+    const clearBgm = document.getElementById('clearAudio');
+    clearBgm.volume = bgm.volume; // メインBGMと同じ音量にする
+    clearBgm.play().catch(e => console.log("クリアBGM再生エラー:", e));
 }
 
 // ---------------- 読みモード ----------------
