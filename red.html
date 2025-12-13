@@ -11,7 +11,7 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Handwriting.js -->
-    <script src="handwriting.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/handwriting.js/1.2.4/handwriting.min.js"></script>
     
     <script>
         tailwind.config = {
@@ -240,7 +240,11 @@
     
     <!-- BGM用オーディオタグ -->
     <audio id="bgmAudio" loop>
-        <source src="bgm2.mp3" type="audio/mpeg">
+        <source src="bgm.mp3" type="audio/mpeg">
+    </audio>
+    <!-- クリア時BGM用オーディオタグ -->
+    <audio id="clearAudio" loop>
+        <source src="clear.mp3" type="audio/mpeg">
     </audio>
 
     <!-- メインメニュー -->
@@ -372,9 +376,12 @@
     <!-- 完了画面 -->
     <div id="resultScreen" class="hidden w-full max-w-md p-6 text-center z-10">
         <h2 class="text-4xl font-black text-neon-yellow mb-6 font-digital text-glow animate-pulse">よくできました！</h2>
+        
+        <!-- トロフィーアイコンに戻す -->
         <div class="text-9xl mb-8 text-neon-red drop-shadow-[0_0_30px_rgba(255,0,60,0.6)]">
             <i class="fas fa-trophy"></i>
         </div>
+
         <div class="cyber-box p-6 mb-8 bg-black/50">
             <p class="text-xl text-white font-bold mb-2">けっか</p>
             <p class="text-3xl text-orange-400 font-digital">たいへん よくできました</p>
@@ -684,6 +691,13 @@ function backToMenu() {
     // BGM停止
     bgm.pause();
     bgm.currentTime = 0;
+
+    // クリア音楽停止
+    const clearAudio = document.getElementById('clearAudio');
+    if (clearAudio) {
+        clearAudio.pause();
+        clearAudio.currentTime = 0;
+    }
 }
 
 // BGMコントロール
@@ -768,9 +782,18 @@ function nextQuestion() {
 function showResult() {
     document.getElementById('gameScreen').classList.add('hidden');
     document.getElementById('resultScreen').classList.remove('hidden');
-    playSound('correct');
-    bgm.pause(); // 結果画面でもBGM停止（お好みで再生継続も可）
+    
+    // 通常BGM停止
+    bgm.pause(); 
     bgm.currentTime = 0;
+
+    // クリア音楽再生
+    const clearAudio = document.getElementById('clearAudio');
+    if (clearAudio) {
+        clearAudio.volume = 0.5;
+        clearAudio.currentTime = 0;
+        clearAudio.play().catch(e => console.log("クリア音楽再生エラー:", e));
+    }
 }
 
 // ---------------- 読みモード ----------------
