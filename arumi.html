@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>さいばー かんじ ドリル</title>
+    <title>さいばー かんじ ドリル (RED MODE)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts: DotGothic16 (デジタル風), Orbitron (英数字用) -->
@@ -22,10 +22,11 @@
                         'cyber': ['Orbitron', 'sans-serif'],
                     },
                     colors: {
-                        'neon-blue': '#00f3ff',
+                        'neon-red': '#ff003c',  /* メインカラーを赤に変更 */
+                        'neon-yellow': '#ffd700', /* アクセント用 */
                         'neon-pink': '#ff00ff',
                         'neon-green': '#0aff00',
-                        'dark-bg': '#050510',
+                        'dark-bg': '#0a0005',     /* 背景色も少し赤みを含ませる */
                         'glass': 'rgba(255, 255, 255, 0.05)',
                     },
                     animation: {
@@ -52,23 +53,29 @@
     <style>
         body {
             font-family: 'DotGothic16', sans-serif;
-            background-color: #050510;
-            color: #00f3ff;
+            background-color: #050002;
+            color: #ff003c; /* テキスト色を赤に */
             touch-action: manipulation;
             overscroll-behavior: none;
-            /* 背景画像を設定 */
+            overflow: hidden;
+        }
+
+        /* 背景画像の調整レイヤー */
+        .bg-layer {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
             background-image: url('https://raw.githubusercontent.com/tterasawa/pages/main/arumi.png');
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
-            overflow: hidden;
+            z-index: -2;
         }
 
-        /* サイバーパンクな枠線 */
+        /* サイバーパンクな枠線（赤） */
         .cyber-box {
-            background: rgba(10, 20, 40, 0.8);
-            border: 1px solid #00f3ff;
-            box-shadow: 0 0 10px rgba(0, 243, 255, 0.2), inset 0 0 20px rgba(0, 243, 255, 0.1);
+            background: rgba(40, 10, 15, 0.8);
+            border: 1px solid #ff003c;
+            box-shadow: 0 0 10px rgba(255, 0, 60, 0.2), inset 0 0 20px rgba(255, 0, 60, 0.1);
             position: relative;
             clip-path: polygon(
                 0% 10px, 10px 0%, 
@@ -81,31 +88,31 @@
             content: '';
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: linear-gradient(180deg, rgba(0,243,255,0) 0%, rgba(0,243,255,0.05) 50%, rgba(0,243,255,0) 100%);
+            background: linear-gradient(180deg, rgba(255,0,60,0) 0%, rgba(255,0,60,0.05) 50%, rgba(255,0,60,0) 100%);
             pointer-events: none;
             z-index: -1;
         }
 
-        /* ホログラム入力エリア */
+        /* ホログラム入力エリア（赤） */
         #drawingCanvas {
-            background-color: rgba(0, 0, 0, 0.8);
-            border: 2px solid #00f3ff;
+            background-color: rgba(20, 0, 5, 0.8);
+            border: 2px solid #ff003c;
             border-radius: 4px;
             cursor: crosshair;
             touch-action: none;
-            box-shadow: inset 0 0 30px rgba(0, 243, 255, 0.2);
+            box-shadow: inset 0 0 30px rgba(255, 0, 60, 0.2);
             background-image: 
-                linear-gradient(rgba(0, 243, 255, 0.1) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0, 243, 255, 0.1) 1px, transparent 1px);
+                linear-gradient(rgba(255, 0, 60, 0.15) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 0, 60, 0.15) 1px, transparent 1px);
             background-size: 30px 30px;
         }
 
         /* 走査線エフェクト */
         .scanline-overlay {
             position: fixed;
-            top: 0; left: 0; w-full; h-full;
+            top: 0; left: 0; 
             width: 100vw; height: 100vh;
-            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2));
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(50,0,0,0.2) 50%, rgba(50,0,0,0.2));
             background-size: 100% 4px;
             pointer-events: none;
             z-index: 50;
@@ -124,7 +131,7 @@
                 transform: scale(1);
             }
             40% {
-                filter: blur(10px) brightness(2) contrast(150%);
+                filter: blur(10px) brightness(2) contrast(150%) sepia(1) hue-rotate(-50deg); /* 赤く光る */
                 opacity: 0.5;
                 transform: scale(1.02);
             }
@@ -160,12 +167,9 @@
             box-shadow: 0 0 15px currentColor;
         }
 
-        /* テキストのネオン発光 */
+        /* テキストのネオン発光（赤） */
         .text-glow {
-            text-shadow: 0 0 5px rgba(0, 243, 255, 0.8), 0 0 10px rgba(0, 243, 255, 0.5);
-        }
-        .text-glow-pink {
-            text-shadow: 0 0 5px rgba(255, 0, 255, 0.8), 0 0 10px rgba(255, 0, 255, 0.5);
+            text-shadow: 0 0 5px rgba(255, 0, 60, 0.8), 0 0 10px rgba(255, 0, 60, 0.5);
         }
 
         /* アニメーション：正解 */
@@ -196,10 +200,10 @@
 
         /* 入力フォームのカスタマイズ */
         input::placeholder {
-            color: rgba(0, 243, 255, 0.3);
+            color: rgba(255, 0, 60, 0.3);
         }
         
-        /* スライダーのカスタマイズ */
+        /* スライダーのカスタマイズ（赤） */
         input[type="range"] {
             -webkit-appearance: none;
             background: transparent;
@@ -209,9 +213,9 @@
             height: 16px;
             width: 16px;
             border-radius: 50%;
-            background: #00f3ff;
+            background: #ff003c;
             cursor: pointer;
-            box-shadow: 0 0 10px #00f3ff;
+            box-shadow: 0 0 10px #ff003c;
             margin-top: -6px;
         }
         input[type="range"]::-webkit-slider-runnable-track {
@@ -225,15 +229,17 @@
 </head>
 <body class="h-screen flex flex-col items-center justify-center">
 
+    <!-- 背景レイヤー（CSSフィルターで赤く調整） -->
+    <div class="bg-layer"></div>
+
     <!-- 走査線オーバーレイ -->
     <div class="scanline-overlay"></div>
     
     <!-- BGM用オーディオタグ -->
     <audio id="bgmAudio" loop>
-        <source src="bgm.mp3" type="audio/mpeg">
+        <source src="bgm2.mp3" type="audio/mpeg">
     </audio>
-
-    <!-- クリア画面BGM用オーディオタグ (追加) -->
+    <!-- クリア時BGM用オーディオタグ -->
     <audio id="clearAudio" loop>
         <source src="clear.mp3" type="audio/mpeg">
     </audio>
@@ -241,29 +247,30 @@
     <!-- メインメニュー -->
     <div id="menuScreen" class="w-full max-w-md p-4 flex flex-col items-center gap-6 relative z-10">
         <div class="text-center animate-appear">
-            <h1 class="text-5xl font-black text-neon-blue tracking-wider mb-2 font-digital text-glow italic">
-                かんじ<br>ドリル
+            <h1 class="text-5xl font-black text-neon-red tracking-wider mb-2 font-digital text-glow italic">
+                さいばー<br>かんじ ドリル
+                <div class="text-sm tracking-widest mt-1 opacity-80">RED PROTOCOL</div>
             </h1>
-            <div class="text-neon-pink font-bold tracking-[0.5em] text-sm">バージョン 1.1</div>
+            <div class="text-neon-yellow font-bold tracking-[0.5em] text-sm">バージョン 2.0</div>
         </div>
         
         <div class="cyber-box w-full p-8 text-center bg-black/60 backdrop-blur-sm">
-            <p class="text-xl text-neon-green mb-8 animate-pulse-fast">モードを えらんでね</p>
+            <p class="text-xl text-white mb-8 animate-pulse-fast">モードを えらんでね</p>
             
-            <button onclick="startMode('read')" class="cyber-btn w-full bg-cyan-900/80 border border-cyan-400 hover:bg-cyan-700 text-cyan-100 text-2xl font-bold py-6 mb-6 flex items-center justify-center gap-3 shadow-[0_0_10px_rgba(0,243,255,0.3)]">
+            <button onclick="startMode('read')" class="cyber-btn w-full bg-red-900/80 border border-red-500 hover:bg-red-700 text-red-100 text-2xl font-bold py-6 mb-6 flex items-center justify-center gap-3 shadow-[0_0_10px_rgba(255,0,60,0.3)]">
                 <i class="fas fa-eye"></i>
                 よみ モード
             </button>
             
-            <button onclick="startMode('write')" class="cyber-btn w-full bg-fuchsia-900/80 border border-fuchsia-400 hover:bg-fuchsia-700 text-fuchsia-100 text-2xl font-bold py-6 flex items-center justify-center gap-3 shadow-[0_0_10px_rgba(255,0,255,0.3)]">
+            <button onclick="startMode('write')" class="cyber-btn w-full bg-orange-900/80 border border-orange-500 hover:bg-orange-700 text-orange-100 text-2xl font-bold py-6 flex items-center justify-center gap-3 shadow-[0_0_10px_rgba(255,165,0,0.3)]">
                 <i class="fas fa-pen-fancy"></i>
                 かき モード
             </button>
         </div>
         
-        <div class="flex gap-2 text-xs text-gray-500 font-digital">
+        <div class="flex gap-2 text-xs text-gray-400 font-digital">
             <span>たいしょう:</span>
-            <span class="text-neon-blue">1ねんせい</span>
+            <span class="text-neon-red">1ねんせい</span>
         </div>
     </div>
 
@@ -272,13 +279,13 @@
         <!-- ヘッダー -->
         <div class="flex justify-between items-center mb-6">
             <div class="flex items-center gap-3">
-                <button onclick="backToMenu()" class="border border-gray-600 bg-gray-900 text-gray-400 px-4 py-2 text-xs font-digital hover:text-white hover:border-white transition-colors clip-path-polygon">
+                <button onclick="backToMenu()" class="border border-gray-600 bg-gray-900 text-gray-400 px-4 py-2 text-xs font-digital hover:text-white hover:border-red-500 hover:text-red-500 transition-colors clip-path-polygon">
                     <i class="fas fa-chevron-left"></i> もどる
                 </button>
                 
                 <!-- BGMコントローラー -->
-                <div class="flex items-center gap-2 bg-black/60 border border-neon-blue/30 px-2 py-1 rounded clip-path-polygon">
-                    <button onclick="toggleMute()" id="muteBtn" class="text-neon-blue hover:text-white w-6 text-center transition-colors">
+                <div class="flex items-center gap-2 bg-black/60 border border-red-500/30 px-2 py-1 rounded clip-path-polygon">
+                    <button onclick="toggleMute()" id="muteBtn" class="text-neon-red hover:text-white w-6 text-center transition-colors">
                         <i class="fas fa-volume-up"></i>
                     </button>
                     <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.3" 
@@ -287,8 +294,8 @@
             </div>
 
             <div class="flex flex-col items-end">
-                <div class="text-xs text-neon-green font-digital">もんだい</div>
-                <div class="text-xl font-bold text-neon-blue font-cyber">
+                <div class="text-xs text-neon-yellow font-digital">もんだい</div>
+                <div class="text-xl font-bold text-neon-red font-cyber">
                     <span id="currentQuestionNum">01</span><span class="text-gray-600 mx-1">/</span><span id="totalQuestionNum">10</span>
                 </div>
             </div>
@@ -296,10 +303,10 @@
 
         <!-- 問題表示エリア (HUDスタイル) -->
         <div class="cyber-box p-8 mb-6 text-center relative min-h-[160px] flex items-center justify-center bg-gray-900/80">
-            <div class="absolute top-2 left-2 w-2 h-2 bg-neon-blue"></div>
-            <div class="absolute top-2 right-2 w-2 h-2 bg-neon-blue"></div>
-            <div class="absolute bottom-2 left-2 w-2 h-2 bg-neon-blue"></div>
-            <div class="absolute bottom-2 right-2 w-2 h-2 bg-neon-blue"></div>
+            <div class="absolute top-2 left-2 w-2 h-2 bg-neon-red"></div>
+            <div class="absolute top-2 right-2 w-2 h-2 bg-neon-red"></div>
+            <div class="absolute bottom-2 left-2 w-2 h-2 bg-neon-red"></div>
+            <div class="absolute bottom-2 right-2 w-2 h-2 bg-neon-red"></div>
             
             <p id="questionText" class="text-3xl font-bold leading-relaxed whitespace-pre-wrap text-white drop-shadow-md z-10">じゅんび中...</p>
             
@@ -312,32 +319,32 @@
         <!-- 読みモードUI -->
         <div id="readInputArea" class="hidden flex-1 flex flex-col items-center">
             <div class="w-full mb-6 relative">
-                <i class="fas fa-terminal absolute left-4 top-1/2 transform -translate-y-1/2 text-neon-green"></i>
+                <i class="fas fa-terminal absolute left-4 top-1/2 transform -translate-y-1/2 text-neon-yellow"></i>
                 <input type="text" id="readInput" placeholder="こえで こたえてね" 
-                    class="w-full bg-black border-b-2 border-neon-green text-center text-2xl p-4 text-neon-green focus:border-white focus:outline-none font-digital tracking-widest"
+                    class="w-full bg-black border-b-2 border-neon-yellow text-center text-2xl p-4 text-neon-yellow focus:border-white focus:outline-none font-digital tracking-widest"
                     autocomplete="off">
             </div>
             
             <!-- アクションボタンエリア -->
             <div id="readActionBtns" class="flex gap-4 w-full mb-auto">
-                <button onclick="startSpeechRecognition()" id="micBtn" class="cyber-btn flex-1 bg-gray-800 border border-neon-green text-neon-green py-4 font-bold text-xl hover:bg-neon-green hover:text-black">
+                <button onclick="startSpeechRecognition()" id="micBtn" class="cyber-btn flex-1 bg-gray-800 border border-neon-yellow text-neon-yellow py-4 font-bold text-xl hover:bg-neon-yellow hover:text-black">
                     <i class="fas fa-microphone-alt mb-1 block text-2xl"></i>
                     はなす
                 </button>
-                <button onclick="checkAnswerRead()" class="cyber-btn flex-1 bg-gray-800 border border-neon-blue text-neon-blue py-4 font-bold text-xl hover:bg-neon-blue hover:text-black">
+                <button onclick="checkAnswerRead()" class="cyber-btn flex-1 bg-gray-800 border border-neon-red text-neon-red py-4 font-bold text-xl hover:bg-neon-red hover:text-black">
                     <i class="fas fa-paper-plane mb-1 block text-2xl"></i>
                     こたえる
                 </button>
             </div>
             
-            <p id="micStatus" class="text-neon-pink mt-4 h-6 text-sm font-digital animate-pulse"></p>
+            <p id="micStatus" class="text-white mt-4 h-6 text-sm font-digital animate-pulse"></p>
         </div>
 
         <!-- 書きモードUI -->
         <div id="writeInputArea" class="hidden flex-1 flex flex-col items-center w-full">
             <div class="relative w-full max-w-[300px] aspect-square mb-6 group">
                 <!-- グリッド装飾 -->
-                <div class="absolute -inset-1 bg-gradient-to-r from-neon-blue to-neon-pink opacity-30 blur group-hover:opacity-50 transition duration-1000"></div>
+                <div class="absolute -inset-1 bg-gradient-to-r from-neon-red to-orange-500 opacity-30 blur group-hover:opacity-50 transition duration-1000"></div>
                 
                 <canvas id="drawingCanvas" width="300" height="300" class="w-full h-full relative z-10"></canvas>
                 
@@ -348,14 +355,14 @@
                 </div>
                 
                 <!-- 解析中ローディング -->
-                <div id="checkingLoader" class="hidden absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-30 border border-neon-blue">
-                    <div class="w-16 h-16 border-4 border-neon-blue border-t-transparent rounded-full animate-spin mb-4"></div>
-                    <div class="text-neon-blue font-digital animate-pulse">しらべています...</div>
+                <div id="checkingLoader" class="hidden absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-30 border border-neon-red">
+                    <div class="w-16 h-16 border-4 border-neon-red border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <div class="text-neon-red font-digital animate-pulse">しらべています...</div>
                 </div>
             </div>
             
             <!-- 実行ボタン -->
-            <button onclick="checkAnswerWrite()" id="writeCheckBtn" class="cyber-btn w-full bg-gradient-to-r from-neon-blue to-blue-600 text-black py-4 font-bold text-xl border-none shadow-[0_0_15px_#00f3ff]">
+            <button onclick="checkAnswerWrite()" id="writeCheckBtn" class="cyber-btn w-full bg-gradient-to-r from-red-600 to-orange-600 text-white py-4 font-bold text-xl border-none shadow-[0_0_15px_rgba(255,0,60,0.6)]">
                 <i class="fas fa-fingerprint mr-2"></i> かけた！
             </button>
 
@@ -365,15 +372,18 @@
 
     <!-- 完了画面 -->
     <div id="resultScreen" class="hidden w-full max-w-md p-6 text-center z-10">
-        <h2 class="text-4xl font-black text-neon-green mb-6 font-digital text-glow animate-pulse">よくできました！</h2>
-        <div class="text-9xl mb-8 text-neon-blue drop-shadow-[0_0_30px_rgba(0,243,255,0.6)]">
+        <h2 class="text-4xl font-black text-neon-yellow mb-6 font-digital text-glow animate-pulse">よくできました！</h2>
+        
+        <!-- トロフィーアイコンに戻す -->
+        <div class="text-9xl mb-8 text-neon-red drop-shadow-[0_0_30px_rgba(255,0,60,0.6)]">
             <i class="fas fa-trophy"></i>
         </div>
+
         <div class="cyber-box p-6 mb-8 bg-black/50">
             <p class="text-xl text-white font-bold mb-2">けっか</p>
-            <p class="text-3xl text-neon-pink font-digital">たいへん よくできました</p>
+            <p class="text-3xl text-orange-400 font-digital">たいへん よくできました</p>
         </div>
-        <button onclick="backToMenu()" class="cyber-btn w-full border border-neon-blue text-neon-blue hover:bg-neon-blue hover:text-black py-4 font-bold text-xl">
+        <button onclick="backToMenu()" class="cyber-btn w-full border border-neon-red text-neon-red hover:bg-neon-red hover:text-black py-4 font-bold text-xl">
             もういちど やる
         </button>
     </div>
@@ -605,7 +615,7 @@ function playSound(type) {
     gainNode.connect(audioCtx.destination);
 
     if (type === 'correct') {
-        // レベルアップ音風 (アルペジオ)
+        // レベルアップ音風 (アルペジオ) - 少しキーを変える
         osc.type = 'square';
         const now = audioCtx.currentTime;
         osc.frequency.setValueAtTime(880, now);
@@ -651,11 +661,6 @@ function startMode(mode) {
     
     document.getElementById('totalQuestionNum').textContent = currentQuestions.length;
     
-    // クリアBGMが鳴っていれば止める
-    const clearBgm = document.getElementById('clearAudio');
-    clearBgm.pause();
-    clearBgm.currentTime = 0;
-
     // BGM再生
     try {
         bgm.play().catch(e => console.log("BGM再生エラー: ユーザーアクションがないかファイルがありません"));
@@ -680,14 +685,16 @@ function backToMenu() {
     document.getElementById('resultScreen').classList.add('hidden');
     document.getElementById('menuScreen').classList.remove('hidden');
     
-    // メインBGM停止
+    // BGM停止
     bgm.pause();
     bgm.currentTime = 0;
 
-    // クリアBGM停止
-    const clearBgm = document.getElementById('clearAudio');
-    clearBgm.pause();
-    clearBgm.currentTime = 0;
+    // クリア音楽停止
+    const clearAudio = document.getElementById('clearAudio');
+    if (clearAudio) {
+        clearAudio.pause();
+        clearAudio.currentTime = 0;
+    }
 }
 
 // BGMコントロール
@@ -731,8 +738,8 @@ function showQuestion() {
     const q = currentQuestions[currentQuestionIndex];
     document.getElementById('currentQuestionNum').textContent = (currentQuestionIndex + 1).toString().padStart(2, '0');
     
-    // サイバーパンク風ハイライト
-    const formattedQ = q.q.replace(/【(.*?)】/g, '<span class="inline-block border border-neon-pink text-neon-pink px-3 py-1 bg-neon-pink/10 mx-2 shadow-[0_0_10px_rgba(255,0,255,0.4)] clip-path-polygon">$1</span>');
+    // サイバーパンク風ハイライト（赤系）
+    const formattedQ = q.q.replace(/【(.*?)】/g, '<span class="inline-block border border-orange-500 text-orange-400 px-3 py-1 bg-orange-900/30 mx-2 shadow-[0_0_10px_rgba(255,165,0,0.4)] clip-path-polygon">$1</span>');
     
     document.getElementById('questionText').innerHTML = formattedQ;
 
@@ -772,16 +779,18 @@ function nextQuestion() {
 function showResult() {
     document.getElementById('gameScreen').classList.add('hidden');
     document.getElementById('resultScreen').classList.remove('hidden');
-    playSound('correct');
     
-    // メインBGM停止
+    // 通常BGM停止
     bgm.pause(); 
     bgm.currentTime = 0;
 
-    // クリアBGM再生
-    const clearBgm = document.getElementById('clearAudio');
-    clearBgm.volume = bgm.volume; // メインBGMと同じ音量にする
-    clearBgm.play().catch(e => console.log("クリアBGM再生エラー:", e));
+    // クリア音楽再生
+    const clearAudio = document.getElementById('clearAudio');
+    if (clearAudio) {
+        clearAudio.volume = 0.5;
+        clearAudio.currentTime = 0;
+        clearAudio.play().catch(e => console.log("クリア音楽再生エラー:", e));
+    }
 }
 
 // ---------------- 読みモード ----------------
@@ -801,7 +810,7 @@ function startSpeechRecognition() {
     recognition.maxAlternatives = 1;
 
     micStatus.textContent = 'きいています...';
-    micStatus.className = 'text-neon-pink mt-4 h-6 text-sm font-digital animate-pulse';
+    micStatus.className = 'text-neon-yellow mt-4 h-6 text-sm font-digital animate-pulse';
 
     recognition.start();
 
@@ -929,14 +938,14 @@ function draw(e) {
     ctx.moveTo(lastX, lastY);
     ctx.lineTo(pos.x, pos.y);
     
-    // サイバーパンク風描画設定
-    ctx.strokeStyle = '#00f3ff'; // ネオンブルー
+    // サイバーパンク風描画設定（赤）
+    ctx.strokeStyle = '#ff003c'; // ネオンレッド
     ctx.lineWidth = 6;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     // 光るエフェクト
     ctx.shadowBlur = 15;
-    ctx.shadowColor = '#00f3ff';
+    ctx.shadowColor = '#ff003c';
     
     ctx.stroke();
 
@@ -1006,7 +1015,7 @@ function checkAnswerWrite() {
         console.warn("Using fallback logic:", reason);
         const overlay = document.getElementById('feedbackOverlay');
         overlay.classList.remove('hidden');
-        overlay.innerHTML = '<div class="text-neon-pink font-digital border border-neon-pink p-2 bg-black">かんい モード</div>';
+        overlay.innerHTML = '<div class="text-neon-yellow font-digital border border-neon-yellow p-2 bg-black">かんい モード</div>';
         setTimeout(() => {
             if (fallbackCheck(targetChar, strokeCount)) {
                 showFeedback(true);
