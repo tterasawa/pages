@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>さいばー カタカナ トレーナー</title>
+
+    <!-- PWA & Mobile Meta -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="カタカナ">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Handwriting recognition library -->
+    <script src="handwriting.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'digital': ['DotGothic16', 'sans-serif'],
+                        'cyber': ['Orbitron', 'sans-serif'],
+                    },
+                    colors: {
+                        'neon-blue': '#00f3ff',
+                        'neon-pink': '#ff00ff',
+                        'neon-green': '#0aff00',
+                        'dark-bg': '#050510',
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'appear': 'appear 0.5s ease-out forwards',
+                    },
+                    keyframes: {
+                        appear: {
+                            '0%': { opacity: '0', transform: 'scale(0.9)' },
+                            '100%': { opacity: '1', transform: 'scale(1)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'DotGothic16', sans-serif;
+            background-color: #050510;
+            color: #00f3ff;
+            touch-action: manipulation;
+            overscroll-behavior: none;
+            background-image: radial-gradient(circle at 50% 50%, #101025 0%, #050510 100%);
+            overflow: hidden;
+        }
+
+        .cyber-box {
+            background: rgba(10, 20, 40, 0.8);
+            border: 1px solid #00f3ff;
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.2), inset 0 0 20px rgba(0, 243, 255, 0.1);
+            position: relative;
+            clip-path: polygon(0% 10px, 10px 0%, 100% 0%, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0% 100%);
+        }
+
+        #drawingCanvas {
+            background-color: rgba(0, 0, 0, 0.6);
+            border: 2px solid #00f3ff;
+            cursor: crosshair;
+            touch-action: none;
+            z-index: 20;
+            position: relative;
+            background-image: 
+                linear-gradient(rgba(0, 243, 255, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 243, 255, 0.1) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+
+        #hintLayer {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 180px;
+            color: rgba(0, 243, 255, 0.08); 
+            pointer-events: none;
+            z-index: 10;
+            font-family: sans-serif;
+            opacity: 0;
+            transition: opacity 1.5s ease-in;
+        }
+        #hintLayer.show { opacity: 1; text-shadow: 0 0 15px rgba(0, 243, 255, 0.3); }
+
+        .scanline-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.1) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 100;
+            opacity: 0.4;
+        }
+
+        .cyber-btn {
+            position: relative;
+            letter-spacing: 2px;
+            transition: all 0.2s;
+            clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
+        }
+        .cyber-btn:active { transform: scale(0.95); }
+
+        .blur-transition {
+            animation: cyber-blur-snap 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+        @keyframes cyber-blur-snap {
+            0% { filter: blur(0px); opacity: 1; }
+            50% { filter: blur(20px) brightness(2); opacity: 0; }
+            100% { filter: blur(0px); opacity: 1; }
+        }
+
+        .cyber-clear {
+            animation: cyber-stamp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes cyber-stamp {
+            0% { transform: scale(3); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes glitch-skew {
+            0% { transform: skew(0deg); }
+            20% { transform: skew(-10deg); }
+            100% { transform: skew(0deg); }
+        }
+        .shake { animation: glitch-skew 0.3s ease-in-out; border-color: #ff0000 !important; }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 12px;
+            width: 12px;
+            border-radius: 50%;
+            background: #00f3ff;
+            cursor: pointer;
+            box-shadow: 0 0 5px #00f3ff;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 2px;
+            background: #333;
+            border-radius: 1px;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col items-center justify-center">
+
+    <div class="scanline-overlay"></div>
+    
+    <!-- Audio Elements -->
+    <audio id="bgmAudio" loop><source src="bgm.mp3" type="audio/mpeg"></audio>
+    <audio id="clearAudio" loop><source src="clear.mp3" type="audio/mpeg"></audio>
+
+    <!-- メインメニュー -->
+    <div id="menuScreen" class="w-full max-w-md p-4 flex flex-col items-center gap-8 z-10 animate-appear">
+        <div class="text-center">
+            <h1 class="text-5xl font-black text-neon-blue tracking-tighter mb-2 font-digital italic text-glow">
+                カタカナ<br>トレーナー
+            </h1>
+            <div class="text-neon-pink font-bold tracking-[0.4em] text-xs">かきとり れんしゅう</div>
+        </div>
+        
+        <div class="cyber-box w-full p-8 text-center bg-black/60 backdrop-blur-md">
+            <p class="text-lg text-neon-green mb-8 animate-pulse-fast">トレーニング を はじめますか？</p>
+            <button onclick="startGame()" class="cyber-btn w-full bg-cyan-900/80 border border-cyan-400 text-cyan-100 text-2xl font-bold py-6 shadow-[0_0_15px_rgba(0,243,255,0.4)]">
+                スタート！
+            </button>
+        </div>
+
+        <div class="text-[10px] text-gray-500 font-digital">たいしょう：カタカナ 46文字</div>
+    </div>
+
+    <!-- ゲーム画面 -->
+    <div id="gameScreen" class="hidden w-full max-w-md p-4 flex flex-col h-full z-10 origin-center">
+        <!-- ヘッダー -->
+        <div class="flex justify-between items-center mb-4">
+            <div class="flex items-center gap-2">
+                <button onclick="location.reload()" class="border border-gray-600 bg-gray-900 text-gray-400 px-3 py-1 text-xs font-digital hover:text-white transition-colors">
+                    <i class="fas fa-times"></i> やめる
+                </button>
+                <div class="flex items-center bg-black/60 border border-neon-blue/30 px-2 py-1 rounded">
+                    <button onclick="toggleMute()" id="muteBtn" class="text-neon-blue w-6 transition-colors"><i class="fas fa-volume-up"></i></button>
+                    <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.3" class="w-12 h-1 ml-1" oninput="changeVolume(this.value)">
+                </div>
+            </div>
+            <div class="text-right">
+                <div class="text-[10px] text-neon-green font-digital tracking-widest">すすみぐあい</div>
+                <div class="text-xl font-cyber text-neon-blue">
+                    <span id="currentIdx">01</span><span class="text-gray-600">/</span>10
+                </div>
+            </div>
+        </div>
+
+        <!-- 問題表示 (HUD) -->
+        <div class="cyber-box p-6 mb-4 text-center bg-gray-900/80 min-h-[140px] flex flex-col items-center justify-center relative">
+            <div class="absolute top-2 left-2 w-1 h-1 bg-neon-blue"></div>
+            <div class="absolute top-2 right-2 w-1 h-1 bg-neon-blue"></div>
+            <div class="text-[10px] text-neon-blue/60 absolute top-2 left-4 font-digital">ひらがな</div>
+            
+            <div id="questionChar" class="text-7xl font-bold text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.4)]">あ</div>
+            <div class="text-xs text-neon-pink mt-2 font-digital">この ひらがな を カタカナ で かいてね</div>
+            
+            <div id="feedbackOverlay" class="absolute inset-0 flex items-center justify-center pointer-events-none z-50 hidden backdrop-blur-[2px]"></div>
+        </div>
+
+        <!-- 入力エリア -->
+        <div class="flex-1 flex flex-col items-center w-full">
+            <div class="relative w-full aspect-square mb-6 group">
+                <div class="absolute -inset-1 bg-gradient-to-r from-neon-blue to-neon-pink opacity-20 blur group-hover:opacity-40 transition duration-1000"></div>
+                <div id="hintLayer">ア</div>
+                <canvas id="drawingCanvas" width="320" height="320" class="w-full h-full relative z-20"></canvas>
+                
+                <div class="absolute top-2 right-2 flex gap-2 z-30">
+                    <button onclick="clearCanvas()" class="bg-black/80 border border-gray-500 text-gray-400 p-2 text-xs hover:border-neon-pink hover:text-neon-pink transition-all font-digital">
+                        <i class="fas fa-eraser"></i> けす
+                    </button>
+                </div>
+
+                <div id="checkingLoader" class="hidden absolute inset-0 bg-black/80 z-40 flex flex-col items-center justify-center border border-neon-blue">
+                    <div class="w-10 h-10 border-2 border-neon-blue border-t-transparent rounded-full animate-spin mb-3"></div>
+                    <div class="text-xs text-neon-blue font-digital animate-pulse">しらべています...</div>
+                </div>
+            </div>
+
+            <button id="submitBtn" onclick="checkAnswer()" class="cyber-btn w-full bg-gradient-to-r from-neon-blue to-blue-600 text-black py-4 font-black text-2xl shadow-[0_0_20px_rgba(0,243,255,0.5)]">
+                <i class="fas fa-pen-nib mr-2"></i> かけた！
+            </button>
+            
+            <div id="timerContainer" class="mt-4 text-[10px] font-digital text-gray-500 tracking-widest">
+                あと <span id="timerSec" class="text-neon-pink">10</span>びょう で ヒント が でるよ
+            </div>
+        </div>
+    </div>
+
+    <!-- 完了画面 -->
+    <div id="resultScreen" class="hidden w-full max-w-md p-8 text-center z-10 animate-appear">
+        <h2 class="text-4xl font-black text-neon-green mb-8 font-digital italic text-glow animate-pulse">よくできました！</h2>
+        <div class="text-9xl text-neon-blue mb-10 drop-shadow-[0_0_30px_rgba(0,243,255,0.6)]">
+            <i class="fas fa-trophy"></i>
+        </div>
+        <div class="cyber-box p-6 mb-10 bg-black/50">
+            <p class="text-2xl text-neon-pink font-digital">オール クリア</p>
+        </div>
+        <button onclick="location.reload()" class="cyber-btn w-full border border-neon-blue text-neon-blue py-5 font-bold text-xl hover:bg-neon-blue hover:text-black">
+            もういちど やる
+        </button>
+    </div>
+
+<script>
+const katakanaData = [
+    { h: 'あ', k: 'ア', s: 2 }, { h: 'い', k: 'イ', s: 2 }, { h: 'う', k: 'ウ', s: 3 }, { h: 'え', k: 'エ', s: 3 }, { h: 'お', k: 'オ', s: 3 },
+    { h: 'か', k: 'カ', s: 2 }, { h: 'き', k: 'キ', s: 3 }, { h: 'く', k: 'ク', s: 2 }, { h: 'け', k: 'ケ', s: 3 }, { h: 'こ', k: 'コ', s: 2 },
+    { h: 'さ', k: 'サ', s: 3 }, { h: 'し', k: 'シ', s: 3 }, { h: 'す', k: 'ス', s: 2 }, { h: 'せ', k: 'セ', s: 2 }, { h: 'そ', k: 'ソ', s: 2 },
+    { h: 'た', k: 'タ', s: 3 }, { h: 'ち', k: 'チ', s: 3 }, { h: 'つ', k: 'ツ', s: 3 }, { h: 'て', k: 'テ', s: 3 }, { h: 'と', k: 'ト', s: 2 },
+    { h: 'な', k: 'ナ', s: 2 }, { h: 'に', k: 'ニ', s: 2 }, { h: 'ぬ', k: 'ヌ', s: 2 }, { h: 'ね', k: 'ネ', s: 4 }, { h: 'の', k: 'ノ', s: 1 },
+    { h: 'は', k: 'ハ', s: 2 }, { h: 'ひ', k: 'ヒ', s: 2 }, { h: 'ふ', k: 'フ', s: 1 }, { h: 'へ', k: 'ヘ', s: 1 }, { h: 'ほ', k: 'ホ', s: 4 },
+    { h: 'ま', k: 'マ', s: 2 }, { h: 'み', k: 'ミ', s: 3 }, { h: 'む', k: 'ム', s: 2 }, { h: 'め', k: 'メ', s: 2 }, { h: 'も', k: 'モ', s: 3 },
+    { h: 'や', k: 'ヤ', s: 2 }, { h: 'ゆ', k: 'ユ', s: 2 }, { h: 'よ', k: 'ヨ', s: 3 },
+    { h: 'ら', k: 'ラ', s: 2 }, { h: 'り', k: 'リ', s: 2 }, { h: 'る', k: 'ル', s: 2 }, { h: 'れ', k: 'レ', s: 1 }, { h: 'ろ', k: 'ロ', s: 3 },
+    { h: 'わ', k: 'ワ', s: 2 }, { h: 'を', k: 'ヲ', s: 3 }, { h: 'ん', k: 'ン', s: 2 }
+];
+
+let questions = [];
+let currentIdx = 0;
+let hintTimer = null;
+let countdownValue = 10;
+
+// Canvas & Drawing
+let trace = [];
+let currentX = [];
+let currentY = [];
+let isDrawing = false;
+const canvas = document.getElementById('drawingCanvas');
+const ctx = canvas.getContext('2d');
+
+// Audio Context for SFX
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const bgm = document.getElementById('bgmAudio');
+const clearBgm = document.getElementById('clearAudio');
+let isMuted = false;
+
+function playSound(type) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    const now = audioCtx.currentTime;
+
+    if (type === 'correct') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(523.25, now); 
+        osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.3); 
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+        osc.start(); osc.stop(now + 0.3);
+    } else {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.linearRampToValueAtTime(50, now + 0.2);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+        osc.start(); osc.stop(now + 0.2);
+    }
+}
+
+function startGame() {
+    questions = [...katakanaData].sort(() => Math.random() - 0.5).slice(0, 10);
+    currentIdx = 0;
+    document.getElementById('menuScreen').classList.add('hidden');
+    document.getElementById('gameScreen').classList.remove('hidden');
+    
+    bgm.volume = document.getElementById('volumeSlider').value;
+    bgm.play().catch(() => {});
+    
+    setupCanvas();
+    loadQuestion();
+}
+
+function loadQuestion() {
+    const q = questions[currentIdx];
+    document.getElementById('currentIdx').textContent = (currentIdx + 1).toString().padStart(2, '0');
+    document.getElementById('questionChar').textContent = q.h;
+    document.getElementById('hintLayer').textContent = q.k;
+    document.getElementById('hintLayer').classList.remove('show');
+    document.getElementById('feedbackOverlay').classList.add('hidden');
+    document.getElementById('submitBtn').disabled = false;
+    document.getElementById('submitBtn').classList.remove('hidden');
+    
+    clearCanvas();
+    startHintTimer();
+}
+
+function startHintTimer() {
+    if (hintTimer) clearInterval(hintTimer);
+    countdownValue = 10;
+    document.getElementById('timerSec').textContent = countdownValue;
+    document.getElementById('timerContainer').style.opacity = "1";
+    
+    hintTimer = setInterval(() => {
+        countdownValue--;
+        document.getElementById('timerSec').textContent = Math.max(0, countdownValue);
+        if (countdownValue <= 0) {
+            document.getElementById('hintLayer').classList.add('show');
+            document.getElementById('timerContainer').style.opacity = "0.2";
+            clearInterval(hintTimer);
+        }
+    }, 1000);
+}
+
+function setupCanvas() {
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+
+    const getPos = (e) => {
+        const r = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: (clientX - r.left), y: (clientY - r.top) };
+    };
+
+    const start = (e) => {
+        isDrawing = true;
+        const pos = getPos(e);
+        currentX = [pos.x];
+        currentY = [pos.y];
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+    };
+
+    const move = (e) => {
+        if (!isDrawing) return;
+        const pos = getPos(e);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.strokeStyle = '#00f3ff';
+        ctx.lineWidth = 8;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#00f3ff';
+        ctx.stroke();
+        currentX.push(pos.x);
+        currentY.push(pos.y);
+    };
+
+    const end = () => {
+        if (isDrawing) {
+            trace.push([currentX, currentY, []]);
+            isDrawing = false;
+        }
+    };
+
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', end);
+
+    canvas.addEventListener('touchstart', (e) => { if(e.cancelable) e.preventDefault(); start(e); }, {passive:false});
+    canvas.addEventListener('touchmove', (e) => { if(e.cancelable) e.preventDefault(); move(e); }, {passive:false});
+    canvas.addEventListener('touchend', end);
+}
+
+function clearCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    trace = [];
+}
+
+function checkAnswer() {
+    if (trace.length === 0) return;
+    
+    const q = questions[currentIdx];
+    document.getElementById('checkingLoader').classList.remove('hidden');
+    document.getElementById('submitBtn').disabled = true;
+
+    handwriting.recognize(trace, {language: "ja", numOfReturn: 5}, (results, err) => {
+        document.getElementById('checkingLoader').classList.add('hidden');
+        
+        const strokeMatch = Math.abs(trace.length - q.s) <= 1;
+        const charMatch = results.includes(q.k);
+
+        if (charMatch && strokeMatch) {
+            showFeedback(true);
+        } else {
+            showFeedback(false);
+            document.getElementById('submitBtn').disabled = false;
+        }
+    });
+}
+
+function showFeedback(isCorrect) {
+    const overlay = document.getElementById('feedbackOverlay');
+    overlay.classList.remove('hidden');
+    
+    if (isCorrect) {
+        playSound('correct');
+        clearInterval(hintTimer);
+        overlay.innerHTML = `
+            <div class="cyber-clear flex flex-col items-center">
+                <div class="text-neon-green text-8xl drop-shadow-[0_0_15px_#0aff00]"><i class="fas fa-check-circle"></i></div>
+                <div class="text-neon-green font-digital font-bold text-2xl mt-2 tracking-widest">せいかい！</div>
+            </div>
+        `;
+        document.getElementById('submitBtn').classList.add('hidden');
+
+        setTimeout(() => {
+            document.getElementById('gameScreen').classList.add('blur-transition');
+            setTimeout(() => {
+                currentIdx++;
+                if (currentIdx < questions.length) {
+                    loadQuestion();
+                    document.getElementById('gameScreen').classList.remove('blur-transition');
+                } else {
+                    showFinalResult();
+                }
+            }, 250);
+        }, 800);
+    } else {
+        playSound('wrong');
+        canvas.parentElement.classList.add('shake');
+        overlay.innerHTML = `
+            <div class="animate-pulse flex flex-col items-center">
+                <div class="text-neon-pink text-8xl drop-shadow-[0_0_15px_#ff00ff]"><i class="fas fa-times-circle"></i></div>
+                <div class="text-neon-pink font-digital font-bold text-xl mt-2">ちがうよ！</div>
+            </div>
+        `;
+        setTimeout(() => {
+            overlay.classList.add('hidden');
+            canvas.parentElement.classList.remove('shake');
+        }, 1000);
+    }
+}
+
+function showFinalResult() {
+    document.getElementById('gameScreen').classList.add('hidden');
+    document.getElementById('resultScreen').classList.remove('hidden');
+    bgm.pause();
+    bgm.currentTime = 0;
+    clearBgm.volume = document.getElementById('volumeSlider').value;
+    clearBgm.play().catch(() => {});
+}
+
+function toggleMute() {
+    isMuted = !isMuted;
+    bgm.muted = isMuted;
+    clearBgm.muted = isMuted;
+    document.getElementById('muteBtn').innerHTML = isMuted ? '<i class="fas fa-volume-mute text-gray-500"></i>' : '<i class="fas fa-volume-up"></i>';
+}
+
+function changeVolume(val) {
+    bgm.volume = val;
+    clearBgm.volume = val;
+}
+
+window.onload = () => {
+    window.addEventListener('resize', () => {
+        if (!document.getElementById('gameScreen').classList.contains('hidden')) {
+            const temp = ctx.getImageData(0,0,canvas.width,canvas.height);
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            ctx.putImageData(temp, 0, 0);
+        }
+    });
+};
+</script>
+</body>
+</html>
