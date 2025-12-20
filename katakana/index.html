@@ -139,9 +139,13 @@
         }
         .shake { animation: glitch-skew 0.3s ease-in-out; border-color: #ff0000 !important; }
 
+        /* スライダーの垂直ずれ修正 */
         input[type="range"] {
             -webkit-appearance: none;
             background: transparent;
+            height: 24px; /* クリック領域を確保 */
+            display: flex;
+            align-items: center;
         }
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
@@ -151,6 +155,8 @@
             background: #00f3ff;
             cursor: pointer;
             box-shadow: 0 0 5px #00f3ff;
+            /* 芯に合わせるための調整 ( (thumb_height - track_height) / 2 ) */
+            margin-top: -5px; 
         }
         input[type="range"]::-webkit-slider-runnable-track {
             width: 100%;
@@ -158,13 +164,15 @@
             background: #333;
             border-radius: 1px;
         }
+        input[type="range"]:focus {
+            outline: none;
+        }
     </style>
 </head>
 <body class="flex flex-col items-center justify-center p-2">
 
     <div class="scanline-overlay"></div>
     
-    <!-- Audio Elements (Dummy paths, replace if hosting assets) -->
     <audio id="bgmAudio" loop><source src="SkylineNeon.mp3" type="audio/mpeg"></audio>
     <audio id="clearAudio" loop><source src="clear.mp3" type="audio/mpeg"></audio>
 
@@ -189,15 +197,15 @@
 
     <!-- ゲーム画面 -->
     <div id="gameScreen" class="hidden w-full max-w-md flex flex-col h-full max-h-screen z-10 overflow-hidden">
-        <!-- ヘッダー (高さを抑える) -->
+        <!-- ヘッダー -->
         <div class="flex justify-between items-center mb-2 shrink-0">
             <div class="flex items-center gap-2">
                 <button onclick="location.reload()" class="border border-gray-600 bg-gray-900 text-gray-400 px-2 py-1 text-[10px] font-digital hover:text-white transition-colors">
                     <i class="fas fa-times"></i> やめる
                 </button>
-                <div class="flex items-center bg-black/60 border border-neon-blue/30 px-2 py-0.5 rounded">
+                <div class="flex items-center bg-black/60 border border-neon-blue/30 px-2 py-0.5 rounded h-8">
                     <button onclick="toggleMute()" id="muteBtn" class="text-neon-blue w-5 text-xs transition-colors"><i class="fas fa-volume-up"></i></button>
-                    <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.3" class="w-10 h-0.5 ml-1" oninput="changeVolume(this.value)">
+                    <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.3" class="w-10 ml-1" oninput="changeVolume(this.value)">
                 </div>
             </div>
             <div class="text-right">
@@ -208,7 +216,7 @@
             </div>
         </div>
 
-        <!-- 問題表示 (HUD - コンパクト化) -->
+        <!-- 問題表示 (HUD) -->
         <div class="cyber-box p-3 mb-2 text-center bg-gray-900/80 min-h-[90px] flex flex-col items-center justify-center relative shrink-0">
             <div class="absolute top-1 left-1 w-1 h-1 bg-neon-blue"></div>
             <div class="absolute top-1 right-1 w-1 h-1 bg-neon-blue"></div>
@@ -220,12 +228,11 @@
             <div id="feedbackOverlay" class="absolute inset-0 flex items-center justify-center pointer-events-none z-50 hidden backdrop-blur-[1px]"></div>
         </div>
 
-        <!-- 入力エリア (ここを伸縮可能にする) -->
+        <!-- 入力エリア -->
         <div class="flex-1 flex flex-col items-center w-full min-h-0">
             <div class="relative w-full flex-1 mb-2 group min-h-0">
                 <div class="absolute -inset-1 bg-gradient-to-r from-neon-blue to-neon-pink opacity-10 blur group-hover:opacity-20 transition duration-1000"></div>
                 <div id="hintLayer">ア</div>
-                <!-- Canvas will be resized by JS to fill this container -->
                 <canvas id="drawingCanvas" class="w-full h-full relative z-20 rounded-sm"></canvas>
                 
                 <div class="absolute top-2 right-2 flex gap-2 z-30">
@@ -285,16 +292,12 @@ let questions = [];
 let currentIdx = 0;
 let hintTimer = null;
 let countdownValue = 10;
-
-// Canvas & Drawing
 let trace = [];
 let currentX = [];
 let currentY = [];
 let isDrawing = false;
 const canvas = document.getElementById('drawingCanvas');
 const ctx = canvas.getContext('2d');
-
-// Audio Context for SFX
 let audioCtx;
 const bgm = document.getElementById('bgmAudio');
 const clearBgm = document.getElementById('clearAudio');
@@ -338,10 +341,8 @@ function startGame() {
     currentIdx = 0;
     document.getElementById('menuScreen').classList.add('hidden');
     document.getElementById('gameScreen').classList.remove('hidden');
-    
     bgm.volume = document.getElementById('volumeSlider').value;
     bgm.play().catch(() => {});
-    
     setupCanvas();
     loadQuestion();
 }
@@ -355,7 +356,6 @@ function loadQuestion() {
     document.getElementById('feedbackOverlay').classList.add('hidden');
     document.getElementById('submitBtn').disabled = false;
     document.getElementById('submitBtn').classList.remove('hidden');
-    
     clearCanvas();
     startHintTimer();
 }
@@ -365,7 +365,6 @@ function startHintTimer() {
     countdownValue = 10;
     document.getElementById('timerSec').textContent = countdownValue;
     document.getElementById('timerContainer').style.opacity = "1";
-    
     hintTimer = setInterval(() => {
         countdownValue--;
         document.getElementById('timerSec').textContent = Math.max(0, countdownValue);
@@ -378,23 +377,19 @@ function startHintTimer() {
 }
 
 function setupCanvas() {
-    // 描画エリアのコンテナサイズに合わせてキャンバスをリサイズ
     const resizeCanvas = () => {
         const rect = canvas.getBoundingClientRect();
         canvas.width = rect.width;
         canvas.height = rect.height;
     };
-    
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
-
     const getPos = (e) => {
         const r = canvas.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
         return { x: (clientX - r.left), y: (clientY - r.top) };
     };
-
     const start = (e) => {
         isDrawing = true;
         const pos = getPos(e);
@@ -403,33 +398,29 @@ function setupCanvas() {
         ctx.beginPath();
         ctx.moveTo(pos.x, pos.y);
     };
-
     const move = (e) => {
         if (!isDrawing) return;
         const pos = getPos(e);
         ctx.lineTo(pos.x, pos.y);
         ctx.strokeStyle = '#00f3ff';
-        ctx.lineWidth = 5; // 少し細くして精密に
+        ctx.lineWidth = 5;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.shadowBlur = 3;
+        ctx.shadowBlur = 4;
         ctx.shadowColor = '#00f3ff';
         ctx.stroke();
         currentX.push(pos.x);
         currentY.push(pos.y);
     };
-
     const end = () => {
         if (isDrawing) {
             trace.push([currentX, currentY, []]);
             isDrawing = false;
         }
     };
-
     canvas.addEventListener('mousedown', start);
     canvas.addEventListener('mousemove', move);
     window.addEventListener('mouseup', end);
-
     canvas.addEventListener('touchstart', (e) => { if(e.cancelable) e.preventDefault(); start(e); }, {passive:false});
     canvas.addEventListener('touchmove', (e) => { if(e.cancelable) e.preventDefault(); move(e); }, {passive:false});
     canvas.addEventListener('touchend', end);
@@ -442,23 +433,17 @@ function clearCanvas() {
 
 function checkAnswer() {
     if (trace.length === 0) return;
-    
     const q = questions[currentIdx];
     document.getElementById('checkingLoader').classList.remove('hidden');
     document.getElementById('submitBtn').disabled = true;
-
     handwriting.recognize(trace, {language: "ja", numOfReturn: 5}, (results, err) => {
         document.getElementById('checkingLoader').classList.add('hidden');
-        
         if (err) {
-            console.error(err);
             document.getElementById('submitBtn').disabled = false;
             return;
         }
-
         const strokeMatch = Math.abs(trace.length - q.s) <= 1;
         const charMatch = results.includes(q.k);
-
         if (charMatch && strokeMatch) {
             showFeedback(true);
         } else {
@@ -471,18 +456,11 @@ function checkAnswer() {
 function showFeedback(isCorrect) {
     const overlay = document.getElementById('feedbackOverlay');
     overlay.classList.remove('hidden');
-    
     if (isCorrect) {
         playSound('correct');
         clearInterval(hintTimer);
-        overlay.innerHTML = `
-            <div class="cyber-clear flex flex-col items-center">
-                <div class="text-neon-green text-6xl drop-shadow-[0_0_15px_#0aff00]"><i class="fas fa-check-circle"></i></div>
-                <div class="text-neon-green font-digital font-bold text-xl mt-1 tracking-widest">せいかい！</div>
-            </div>
-        `;
+        overlay.innerHTML = `<div class="cyber-clear flex flex-col items-center"><div class="text-neon-green text-6xl drop-shadow-[0_0_15px_#0aff00]"><i class="fas fa-check-circle"></i></div><div class="text-neon-green font-digital font-bold text-xl mt-1 tracking-widest">せいかい！</div></div>`;
         document.getElementById('submitBtn').classList.add('hidden');
-
         setTimeout(() => {
             document.getElementById('gameScreen').classList.add('blur-transition');
             setTimeout(() => {
@@ -498,12 +476,7 @@ function showFeedback(isCorrect) {
     } else {
         playSound('wrong');
         canvas.parentElement.classList.add('shake');
-        overlay.innerHTML = `
-            <div class="animate-pulse flex flex-col items-center">
-                <div class="text-neon-pink text-6xl drop-shadow-[0_0_15px_#ff00ff]"><i class="fas fa-times-circle"></i></div>
-                <div class="text-neon-pink font-digital font-bold text-lg mt-1">ちがうよ！</div>
-            </div>
-        `;
+        overlay.innerHTML = `<div class="animate-pulse flex flex-col items-center"><div class="text-neon-pink text-6xl drop-shadow-[0_0_15px_#ff00ff]"><i class="fas fa-times-circle"></i></div><div class="text-neon-pink font-digital font-bold text-lg mt-1">ちがうよ！</div></div>`;
         setTimeout(() => {
             overlay.classList.add('hidden');
             canvas.parentElement.classList.remove('shake');
