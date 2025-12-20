@@ -57,6 +57,7 @@
             overscroll-behavior: none;
             background-image: radial-gradient(circle at 50% 50%, #101025 0%, #050510 100%);
             overflow: hidden;
+            height: 100dvh;
         }
 
         .cyber-box {
@@ -86,7 +87,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 180px;
+            font-size: 140px;
             color: rgba(0, 243, 255, 0.08); 
             pointer-events: none;
             z-index: 10;
@@ -159,26 +160,26 @@
         }
     </style>
 </head>
-<body class="h-screen flex flex-col items-center justify-center">
+<body class="flex flex-col items-center justify-center p-2">
 
     <div class="scanline-overlay"></div>
     
-    <!-- Audio Elements -->
+    <!-- Audio Elements (Dummy paths, replace if hosting assets) -->
     <audio id="bgmAudio" loop><source src="SkylineNeon.mp3" type="audio/mpeg"></audio>
     <audio id="clearAudio" loop><source src="clear.mp3" type="audio/mpeg"></audio>
 
     <!-- メインメニュー -->
-    <div id="menuScreen" class="w-full max-w-md p-4 flex flex-col items-center gap-8 z-10 animate-appear">
+    <div id="menuScreen" class="w-full max-w-md p-4 flex flex-col items-center gap-6 z-10 animate-appear">
         <div class="text-center">
-            <h1 class="text-5xl font-black text-neon-blue tracking-tighter mb-2 font-digital italic text-glow">
+            <h1 class="text-4xl font-black text-neon-blue tracking-tighter mb-1 font-digital italic text-glow">
                 カタカナ<br>トレーナー
             </h1>
-            <div class="text-neon-pink font-bold tracking-[0.4em] text-xs">かきとり れんしゅう</div>
+            <div class="text-neon-pink font-bold tracking-[0.4em] text-[10px]">かきとり れんしゅう</div>
         </div>
         
-        <div class="cyber-box w-full p-8 text-center bg-black/60 backdrop-blur-md">
-            <p class="text-lg text-neon-green mb-8 animate-pulse-fast">トレーニング を はじめますか？</p>
-            <button onclick="startGame()" class="cyber-btn w-full bg-cyan-900/80 border border-cyan-400 text-cyan-100 text-2xl font-bold py-6 shadow-[0_0_15px_rgba(0,243,255,0.4)]">
+        <div class="cyber-box w-full p-6 text-center bg-black/60 backdrop-blur-md">
+            <p class="text-base text-neon-green mb-6 animate-pulse-fast">トレーニング を はじめますか？</p>
+            <button onclick="startGame()" class="cyber-btn w-full bg-cyan-900/80 border border-cyan-400 text-cyan-100 text-xl font-bold py-4 shadow-[0_0_15px_rgba(0,243,255,0.4)]">
                 スタート！
             </button>
         </div>
@@ -187,77 +188,81 @@
     </div>
 
     <!-- ゲーム画面 -->
-    <div id="gameScreen" class="hidden w-full max-w-md p-4 flex flex-col h-full z-10 origin-center">
-        <!-- ヘッダー -->
-        <div class="flex justify-between items-center mb-4">
+    <div id="gameScreen" class="hidden w-full max-w-md flex flex-col h-full max-h-screen z-10 overflow-hidden">
+        <!-- ヘッダー (高さを抑える) -->
+        <div class="flex justify-between items-center mb-2 shrink-0">
             <div class="flex items-center gap-2">
-                <button onclick="location.reload()" class="border border-gray-600 bg-gray-900 text-gray-400 px-3 py-1 text-xs font-digital hover:text-white transition-colors">
+                <button onclick="location.reload()" class="border border-gray-600 bg-gray-900 text-gray-400 px-2 py-1 text-[10px] font-digital hover:text-white transition-colors">
                     <i class="fas fa-times"></i> やめる
                 </button>
-                <div class="flex items-center bg-black/60 border border-neon-blue/30 px-2 py-1 rounded">
-                    <button onclick="toggleMute()" id="muteBtn" class="text-neon-blue w-6 transition-colors"><i class="fas fa-volume-up"></i></button>
-                    <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.3" class="w-12 h-1 ml-1" oninput="changeVolume(this.value)">
+                <div class="flex items-center bg-black/60 border border-neon-blue/30 px-2 py-0.5 rounded">
+                    <button onclick="toggleMute()" id="muteBtn" class="text-neon-blue w-5 text-xs transition-colors"><i class="fas fa-volume-up"></i></button>
+                    <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.3" class="w-10 h-0.5 ml-1" oninput="changeVolume(this.value)">
                 </div>
             </div>
             <div class="text-right">
-                <div class="text-[10px] text-neon-green font-digital tracking-widest">すすみぐあい</div>
-                <div class="text-xl font-cyber text-neon-blue">
+                <div class="text-[8px] text-neon-green font-digital tracking-widest uppercase">Progress</div>
+                <div class="text-lg font-cyber text-neon-blue leading-tight">
                     <span id="currentIdx">01</span><span class="text-gray-600">/</span>10
                 </div>
             </div>
         </div>
 
-        <!-- 問題表示 (HUD) -->
-        <div class="cyber-box p-6 mb-4 text-center bg-gray-900/80 min-h-[140px] flex flex-col items-center justify-center relative">
-            <div class="absolute top-2 left-2 w-1 h-1 bg-neon-blue"></div>
-            <div class="absolute top-2 right-2 w-1 h-1 bg-neon-blue"></div>
-            <div class="text-[10px] text-neon-blue/60 absolute top-2 left-4 font-digital">ひらがな</div>
+        <!-- 問題表示 (HUD - コンパクト化) -->
+        <div class="cyber-box p-3 mb-2 text-center bg-gray-900/80 min-h-[90px] flex flex-col items-center justify-center relative shrink-0">
+            <div class="absolute top-1 left-1 w-1 h-1 bg-neon-blue"></div>
+            <div class="absolute top-1 right-1 w-1 h-1 bg-neon-blue"></div>
+            <div class="text-[8px] text-neon-blue/60 absolute top-1 left-3 font-digital">ひらがな</div>
             
-            <div id="questionChar" class="text-7xl font-bold text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.4)]">あ</div>
-            <div class="text-xs text-neon-pink mt-2 font-digital">この ひらがな を カタカナ で かいてね</div>
+            <div id="questionChar" class="text-5xl font-bold text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]">あ</div>
+            <div class="text-[10px] text-neon-pink mt-1 font-digital">カタカナ で かいてね</div>
             
-            <div id="feedbackOverlay" class="absolute inset-0 flex items-center justify-center pointer-events-none z-50 hidden backdrop-blur-[2px]"></div>
+            <div id="feedbackOverlay" class="absolute inset-0 flex items-center justify-center pointer-events-none z-50 hidden backdrop-blur-[1px]"></div>
         </div>
 
-        <!-- 入力エリア -->
-        <div class="flex-1 flex flex-col items-center w-full">
-            <div class="relative w-full aspect-square mb-6 group">
-                <div class="absolute -inset-1 bg-gradient-to-r from-neon-blue to-neon-pink opacity-20 blur group-hover:opacity-40 transition duration-1000"></div>
+        <!-- 入力エリア (ここを伸縮可能にする) -->
+        <div class="flex-1 flex flex-col items-center w-full min-h-0">
+            <div class="relative w-full flex-1 mb-2 group min-h-0">
+                <div class="absolute -inset-1 bg-gradient-to-r from-neon-blue to-neon-pink opacity-10 blur group-hover:opacity-20 transition duration-1000"></div>
                 <div id="hintLayer">ア</div>
-                <canvas id="drawingCanvas" width="320" height="320" class="w-full h-full relative z-20"></canvas>
+                <!-- Canvas will be resized by JS to fill this container -->
+                <canvas id="drawingCanvas" class="w-full h-full relative z-20 rounded-sm"></canvas>
                 
                 <div class="absolute top-2 right-2 flex gap-2 z-30">
-                    <button onclick="clearCanvas()" class="bg-black/80 border border-gray-500 text-gray-400 p-2 text-xs hover:border-neon-pink hover:text-neon-pink transition-all font-digital">
+                    <button onclick="clearCanvas()" class="bg-black/80 border border-gray-500 text-gray-400 px-2 py-1 text-[10px] hover:border-neon-pink hover:text-neon-pink transition-all font-digital">
                         <i class="fas fa-eraser"></i> けす
                     </button>
                 </div>
 
                 <div id="checkingLoader" class="hidden absolute inset-0 bg-black/80 z-40 flex flex-col items-center justify-center border border-neon-blue">
-                    <div class="w-10 h-10 border-2 border-neon-blue border-t-transparent rounded-full animate-spin mb-3"></div>
-                    <div class="text-xs text-neon-blue font-digital animate-pulse">しらべています...</div>
+                    <div class="w-8 h-8 border-2 border-neon-blue border-t-transparent rounded-full animate-spin mb-2"></div>
+                    <div class="text-[10px] text-neon-blue font-digital animate-pulse">Scanning...</div>
                 </div>
             </div>
 
-            <button id="submitBtn" onclick="checkAnswer()" class="cyber-btn w-full bg-gradient-to-r from-neon-blue to-blue-600 text-black py-4 font-black text-2xl shadow-[0_0_20px_rgba(0,243,255,0.5)]">
-                <i class="fas fa-pen-nib mr-2"></i> かけた！
-            </button>
-            
-            <div id="timerContainer" class="mt-4 text-[10px] font-digital text-gray-500 tracking-widest">
-                あと <span id="timerSec" class="text-neon-pink">10</span>びょう で ヒント が でるよ
+            <!-- 操作ボタンとタイマー -->
+            <div class="w-full shrink-0 flex flex-col items-center pb-2">
+                <div id="timerContainer" class="mb-1 text-[10px] font-digital text-gray-500 tracking-wider">
+                    あと <span id="timerSec" class="text-neon-pink font-bold">10</span>秒 で ヒント
+                </div>
+                
+                <button id="submitBtn" onclick="checkAnswer()" class="cyber-btn w-full bg-gradient-to-r from-neon-blue to-blue-600 text-black py-3 font-black text-xl shadow-[0_0_15px_rgba(0,243,255,0.4)]">
+                    <i class="fas fa-pen-nib mr-2"></i> かけた！
+                </button>
             </div>
         </div>
     </div>
 
     <!-- 完了画面 -->
-    <div id="resultScreen" class="hidden w-full max-w-md p-8 text-center z-10 animate-appear">
-        <h2 class="text-4xl font-black text-neon-green mb-8 font-digital italic text-glow animate-pulse">よくできました！</h2>
-        <div class="text-9xl text-neon-blue mb-10 drop-shadow-[0_0_30px_rgba(0,243,255,0.6)]">
+    <div id="resultScreen" class="hidden w-full max-w-md p-6 text-center z-10 animate-appear">
+        <h2 class="text-3xl font-black text-neon-green mb-6 font-digital italic text-glow animate-pulse">MISSION COMPLETE!</h2>
+        <div class="text-7xl text-neon-blue mb-8 drop-shadow-[0_0_20px_rgba(0,243,255,0.6)]">
             <i class="fas fa-trophy"></i>
         </div>
-        <div class="cyber-box p-6 mb-10 bg-black/50">
-            <p class="text-2xl text-neon-pink font-digital">オール クリア</p>
+        <div class="cyber-box p-4 mb-8 bg-black/50">
+            <p class="text-xl text-neon-pink font-digital">オール クリア</p>
         </div>
-        <button onclick="location.reload()" class="cyber-btn w-full border border-neon-blue text-neon-blue py-5 font-bold text-xl hover:bg-neon-blue hover:text-black">
+        <button onclick="location.reload()" class="cyber-btn w-full border border-neon-blue text-neon-blue py-4 font-bold text-lg hover:bg-neon-blue hover:text-black">
             もういちど やる
         </button>
     </div>
@@ -290,12 +295,19 @@ const canvas = document.getElementById('drawingCanvas');
 const ctx = canvas.getContext('2d');
 
 // Audio Context for SFX
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let audioCtx;
 const bgm = document.getElementById('bgmAudio');
 const clearBgm = document.getElementById('clearAudio');
 let isMuted = false;
 
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+}
+
 function playSound(type) {
+    initAudio();
     if (audioCtx.state === 'suspended') audioCtx.resume();
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
@@ -321,6 +333,7 @@ function playSound(type) {
 }
 
 function startGame() {
+    initAudio();
     questions = [...katakanaData].sort(() => Math.random() - 0.5).slice(0, 10);
     currentIdx = 0;
     document.getElementById('menuScreen').classList.add('hidden');
@@ -365,9 +378,15 @@ function startHintTimer() {
 }
 
 function setupCanvas() {
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
+    // 描画エリアのコンテナサイズに合わせてキャンバスをリサイズ
+    const resizeCanvas = () => {
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+    };
+    
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
 
     const getPos = (e) => {
         const r = canvas.getBoundingClientRect();
@@ -390,10 +409,10 @@ function setupCanvas() {
         const pos = getPos(e);
         ctx.lineTo(pos.x, pos.y);
         ctx.strokeStyle = '#00f3ff';
-        ctx.lineWidth = 8;
+        ctx.lineWidth = 5; // 少し細くして精密に
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 3;
         ctx.shadowColor = '#00f3ff';
         ctx.stroke();
         currentX.push(pos.x);
@@ -431,6 +450,12 @@ function checkAnswer() {
     handwriting.recognize(trace, {language: "ja", numOfReturn: 5}, (results, err) => {
         document.getElementById('checkingLoader').classList.add('hidden');
         
+        if (err) {
+            console.error(err);
+            document.getElementById('submitBtn').disabled = false;
+            return;
+        }
+
         const strokeMatch = Math.abs(trace.length - q.s) <= 1;
         const charMatch = results.includes(q.k);
 
@@ -452,8 +477,8 @@ function showFeedback(isCorrect) {
         clearInterval(hintTimer);
         overlay.innerHTML = `
             <div class="cyber-clear flex flex-col items-center">
-                <div class="text-neon-green text-8xl drop-shadow-[0_0_15px_#0aff00]"><i class="fas fa-check-circle"></i></div>
-                <div class="text-neon-green font-digital font-bold text-2xl mt-2 tracking-widest">せいかい！</div>
+                <div class="text-neon-green text-6xl drop-shadow-[0_0_15px_#0aff00]"><i class="fas fa-check-circle"></i></div>
+                <div class="text-neon-green font-digital font-bold text-xl mt-1 tracking-widest">せいかい！</div>
             </div>
         `;
         document.getElementById('submitBtn').classList.add('hidden');
@@ -475,8 +500,8 @@ function showFeedback(isCorrect) {
         canvas.parentElement.classList.add('shake');
         overlay.innerHTML = `
             <div class="animate-pulse flex flex-col items-center">
-                <div class="text-neon-pink text-8xl drop-shadow-[0_0_15px_#ff00ff]"><i class="fas fa-times-circle"></i></div>
-                <div class="text-neon-pink font-digital font-bold text-xl mt-2">ちがうよ！</div>
+                <div class="text-neon-pink text-6xl drop-shadow-[0_0_15px_#ff00ff]"><i class="fas fa-times-circle"></i></div>
+                <div class="text-neon-pink font-digital font-bold text-lg mt-1">ちがうよ！</div>
             </div>
         `;
         setTimeout(() => {
@@ -506,18 +531,6 @@ function changeVolume(val) {
     bgm.volume = val;
     clearBgm.volume = val;
 }
-
-window.onload = () => {
-    window.addEventListener('resize', () => {
-        if (!document.getElementById('gameScreen').classList.contains('hidden')) {
-            const temp = ctx.getImageData(0,0,canvas.width,canvas.height);
-            const rect = canvas.getBoundingClientRect();
-            canvas.width = rect.width;
-            canvas.height = rect.height;
-            ctx.putImageData(temp, 0, 0);
-        }
-    });
-};
 </script>
 </body>
 </html>
