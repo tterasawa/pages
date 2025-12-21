@@ -15,7 +15,7 @@
     <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- 文字認識ライブラリ (CDNから読み込み) -->
+    <!-- 文字認識ライブラリ -->
     <script src="../handwriting.js"></script>
     
     <script>
@@ -291,10 +291,9 @@ let isDrawing = false;
 let audioCtx;
 let isMuted = false;
 
-// ダミー音源 (ファイルがない場合でもエラーにならないように)
-const bgmAudio = new Audio();
-bgmAudio.loop = true;
-const clearAudio = new Audio();
+// オーディオ要素をDOMから取得
+const bgmAudio = document.getElementById('bgmAudio');
+const clearAudio = document.getElementById('clearAudio');
 
 const canvas = document.getElementById('drawingCanvas');
 const ctx = canvas.getContext('2d');
@@ -304,22 +303,27 @@ function initAudio() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
 }
 
 function startBGM() {
-    if (isMuted || !bgmAudio.src) return;
+    if (isMuted || !bgmAudio) return;
     bgmAudio.volume = document.getElementById('volumeSlider').value;
-    bgmAudio.play().catch(e => console.log("BGM play failed:", e));
+    bgmAudio.play().catch(e => {
+        console.log("BGM playback prevented by browser policy. Retrying on user interaction.");
+    });
 }
 
 function stopBGM() {
-    if (bgmAudio.src) fadeOutAudio(bgmAudio, 1000);
+    if (bgmAudio) fadeOutAudio(bgmAudio, 1000);
 }
 
 function playClearMusic() {
-    if (isMuted || !clearAudio.src) return;
+    if (isMuted || !clearAudio) return;
     clearAudio.volume = document.getElementById('volumeSlider').value;
-    clearAudio.play();
+    clearAudio.play().catch(e => console.log("Clear audio failed:", e));
 }
 
 function fadeOutAudio(audio, duration) {
@@ -340,7 +344,6 @@ function fadeOutAudio(audio, duration) {
 function playSound(type) {
     if (isMuted) return;
     initAudio();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.connect(gain);
@@ -373,7 +376,7 @@ function playSound(type) {
 
 // --- ゲームロジック ---
 function generateQuestions() {
-    let qList = [...katakanaData, ...katakanaData]; // 92問
+    let qList = [...katakanaData, ...katakanaData]; 
     for (let i = 0; i < 8; i++) {
         const randIdx = Math.floor(Math.random() * katakanaData.length);
         qList.push(katakanaData[randIdx]);
@@ -460,6 +463,7 @@ function setupCanvas() {
     };
 
     const start = (e) => {
+        initAudio(); // 描画開始時にもオーディオコンテキスト再開のチャンスを作る
         if (countdownValue <= 0) return;
         isDrawing = true;
         const pos = getPos(e);
@@ -504,11 +508,11 @@ function clearCanvas() {
 
 function checkAnswer() {
     if (trace.length === 0) return;
+    initAudio();
     const q = questions[currentIdx];
     document.getElementById('checkingLoader').classList.remove('hidden');
     document.getElementById('submitBtn').disabled = true;
 
-    // 手書き認識の実行
     if (typeof handwriting === 'undefined') {
         alert("文字認識ライブラリがロードされていません。インターネット接続を確認してください。");
         document.getElementById('checkingLoader').classList.add('hidden');
@@ -523,10 +527,9 @@ function checkAnswer() {
             return;
         }
         
-        // ヘの判定：カタカナの「ヘ」またはひらがなの「へ」が含まれていればOK
         let charMatch = results.includes(q.k);
         if (!charMatch && q.k === 'ヘ') {
-            charMatch = results.includes('へ'); // ひらがなの「へ」をチェック
+            charMatch = results.includes('へ');
         }
 
         const strokeMatch = Math.abs(trace.length - q.s) <= 1;
@@ -584,10 +587,11 @@ function toggleMute() {
     isMuted = !isMuted;
     const btn = document.getElementById('muteBtn');
     if (isMuted) {
-        bgmAudio.pause();
-        clearAudio.pause();
+        if (bgmAudio) bgmAudio.pause();
+        if (clearAudio) clearAudio.pause();
         btn.innerHTML = '<i class="fas fa-volume-mute text-gray-500"></i>';
     } else {
+        initAudio();
         if (!document.getElementById('gameScreen').classList.contains('hidden')) {
             startBGM();
         }
@@ -596,8 +600,8 @@ function toggleMute() {
 }
 
 function changeVolume(val) {
-    bgmAudio.volume = val;
-    clearAudio.volume = val;
+    if (bgmAudio) bgmAudio.volume = val;
+    if (clearAudio) clearAudio.volume = val;
 }
 </script>
 </body>
