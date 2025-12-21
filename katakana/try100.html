@@ -15,11 +15,11 @@
     <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- 文字認識ライブラリ -->
+    <!-- 文字認識ライブラリ (CDNから読み込み) -->
     <script src="../handwriting.js"></script>
     
     <script>
-        tailwind.config = {
+        window.tailwind.config = {
             theme: {
                 extend: {
                     fontFamily: { 'digital': ['DotGothic16', 'sans-serif'], },
@@ -195,7 +195,7 @@
             <div class="text-right">
                 <div class="text-[8px] text-neon-green font-digital tracking-widest uppercase">れんぞく せいかい</div>
                 <div class="text-lg font-cyber text-neon-blue leading-tight">
-                    <span id="currentIdx">００１</span><span class="text-gray-600">／</span>１００
+                    <span id="currentIdx">001</span><span class="text-gray-600">／</span>100
                 </div>
             </div>
         </div>
@@ -288,10 +288,10 @@ let isDrawing = false;
 let audioCtx;
 let isMuted = false;
 
-// オーディオ要素
-const bgmAudio = new Audio('boss.mp3'); // BGMファイルパス
+// ダミー音源 (ファイルがない場合でもエラーにならないように)
+const bgmAudio = new Audio();
 bgmAudio.loop = true;
-const clearAudio = new Audio('clear.mp3'); // クリア音ファイルパス
+const clearAudio = new Audio();
 
 const canvas = document.getElementById('drawingCanvas');
 const ctx = canvas.getContext('2d');
@@ -304,17 +304,17 @@ function initAudio() {
 }
 
 function startBGM() {
-    if (isMuted) return;
+    if (isMuted || !bgmAudio.src) return;
     bgmAudio.volume = document.getElementById('volumeSlider').value;
     bgmAudio.play().catch(e => console.log("BGM play failed:", e));
 }
 
 function stopBGM() {
-    fadeOutAudio(bgmAudio, 1000);
+    if (bgmAudio.src) fadeOutAudio(bgmAudio, 1000);
 }
 
 function playClearMusic() {
-    if (isMuted) return;
+    if (isMuted || !clearAudio.src) return;
     clearAudio.volume = document.getElementById('volumeSlider').value;
     clearAudio.play();
 }
@@ -395,7 +395,7 @@ function startGame() {
 
 function loadQuestion() {
     const q = questions[currentIdx];
-    document.getElementById('currentIdx').textContent = (currentIdx + 1).toString().padStart(3, '０');
+    document.getElementById('currentIdx').textContent = (currentIdx + 1).toString().padStart(3, '0');
     document.getElementById('questionChar').textContent = q.h;
     document.getElementById('hintLayer').textContent = q.k;
     document.getElementById('hintLayer').classList.remove('show');
@@ -427,7 +427,7 @@ function startHintTimer() {
 }
 
 function showHintFailure() {
-    stopBGM(); // 失敗したら音楽を止める
+    stopBGM(); 
     document.getElementById('hintLayer').classList.add('show');
     document.getElementById('timerContainer').classList.add('opacity-20');
     document.getElementById('submitBtn').classList.add('hidden');
@@ -451,8 +451,8 @@ function setupCanvas() {
 
     const getPos = (e) => {
         const r = canvas.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const clientX = (e.touches && e.touches.length > 0) ? e.touches[0].clientX : e.clientX;
+        const clientY = (e.touches && e.touches.length > 0) ? e.touches[0].clientY : e.clientY;
         return { x: (clientX - r.left), y: (clientY - r.top) };
     };
 
@@ -471,7 +471,7 @@ function setupCanvas() {
         const pos = getPos(e);
         ctx.lineTo(pos.x, pos.y);
         ctx.strokeStyle = '#00f3ff';
-        ctx.lineWidth = 6;
+        ctx.lineWidth = 10;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.stroke();
@@ -505,6 +505,14 @@ function checkAnswer() {
     document.getElementById('checkingLoader').classList.remove('hidden');
     document.getElementById('submitBtn').disabled = true;
 
+    // 手書き認識の実行
+    if (typeof handwriting === 'undefined') {
+        alert("文字認識ライブラリがロードされていません。インターネット接続を確認してください。");
+        document.getElementById('checkingLoader').classList.add('hidden');
+        document.getElementById('submitBtn').disabled = false;
+        return;
+    }
+
     handwriting.recognize(trace, {language: "ja", numOfReturn: 5}, (results, err) => {
         document.getElementById('checkingLoader').classList.add('hidden');
         if (err) {
@@ -512,7 +520,12 @@ function checkAnswer() {
             return;
         }
         
-        const charMatch = results.includes(q.k);
+        // ヘの判定：カタカナの「ヘ」またはひらがなの「へ」が含まれていればOK
+        let charMatch = results.includes(q.k);
+        if (!charMatch && q.k === 'ヘ') {
+            charMatch = results.includes('へ'); // ひらがなの「へ」をチェック
+        }
+
         const strokeMatch = Math.abs(trace.length - q.s) <= 1;
 
         if (charMatch && strokeMatch) {
@@ -566,15 +579,16 @@ function showFinalResult() {
 
 function toggleMute() {
     isMuted = !isMuted;
+    const btn = document.getElementById('muteBtn');
     if (isMuted) {
         bgmAudio.pause();
         clearAudio.pause();
-        document.getElementById('muteBtn').innerHTML = '<i class="fas fa-volume-mute text-gray-500"></i>';
+        btn.innerHTML = '<i class="fas fa-volume-mute text-gray-500"></i>';
     } else {
         if (!document.getElementById('gameScreen').classList.contains('hidden')) {
-            bgmAudio.play();
+            startBGM();
         }
-        document.getElementById('muteBtn').innerHTML = '<i class="fas fa-volume-up"></i>';
+        btn.innerHTML = '<i class="fas fa-volume-up"></i>';
     }
 }
 
