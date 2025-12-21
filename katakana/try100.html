@@ -12,20 +12,17 @@
     
     <!-- スタイルシート -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- フォント -->
     <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
-    <!-- アイコン -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <!-- 文字認識ライブラリ -->
-    <script src="handwriting.js"></script>
+    <script src="https://www.gstatic.com/autodraw/ota/handwriting.js"></script>
     
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    fontFamily: {
-                        'digital': ['DotGothic16', 'sans-serif'],
-                    },
+                    fontFamily: { 'digital': ['DotGothic16', 'sans-serif'], },
                     colors: {
                         'neon-blue': '#00f3ff',
                         'neon-pink': '#ff00ff',
@@ -265,7 +262,7 @@
     </div>
 
 <script>
-// 全46文字のデータ
+// --- 文字データ ---
 const katakanaData = [
     { h: 'あ', k: 'ア', s: 2 }, { h: 'い', k: 'イ', s: 2 }, { h: 'う', k: 'ウ', s: 3 }, { h: 'え', k: 'エ', s: 3 }, { h: 'お', k: 'オ', s: 3 },
     { h: 'か', k: 'カ', s: 2 }, { h: 'き', k: 'キ', s: 3 }, { h: 'く', k: 'ク', s: 2 }, { h: 'け', k: 'ケ', s: 3 }, { h: 'こ', k: 'コ', s: 2 },
@@ -279,6 +276,7 @@ const katakanaData = [
     { h: 'わ', k: 'ワ', s: 2 }, { h: 'を', k: 'ヲ', s: 3 }, { h: 'ん', k: 'ン', s: 2 }
 ];
 
+// --- グローバル変数 ---
 let questions = [];
 let currentIdx = 0;
 let hintTimer = null;
@@ -290,13 +288,50 @@ let isDrawing = false;
 let audioCtx;
 let isMuted = false;
 
+// オーディオ要素
+const bgmAudio = new Audio('boss.mp3'); // BGMファイルパス
+bgmAudio.loop = true;
+const clearAudio = new Audio('clear.mp3'); // クリア音ファイルパス
+
 const canvas = document.getElementById('drawingCanvas');
 const ctx = canvas.getContext('2d');
 
+// --- 音楽・SE関連 ---
 function initAudio() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
+}
+
+function startBGM() {
+    if (isMuted) return;
+    bgmAudio.volume = document.getElementById('volumeSlider').value;
+    bgmAudio.play().catch(e => console.log("BGM play failed:", e));
+}
+
+function stopBGM() {
+    fadeOutAudio(bgmAudio, 1000);
+}
+
+function playClearMusic() {
+    if (isMuted) return;
+    clearAudio.volume = document.getElementById('volumeSlider').value;
+    clearAudio.play();
+}
+
+function fadeOutAudio(audio, duration) {
+    const startVol = audio.volume;
+    const interval = 50;
+    const step = startVol / (duration / interval);
+    const timer = setInterval(() => {
+        if (audio.volume > step) {
+            audio.volume -= step;
+        } else {
+            audio.volume = 0;
+            audio.pause();
+            clearInterval(timer);
+        }
+    }, interval);
 }
 
 function playSound(type) {
@@ -333,17 +368,13 @@ function playSound(type) {
     }
 }
 
-// ぜんぶの文字を2回ずつ（計92問）＋ ランダムな8文字 ＝ 合計100問を生成
+// --- ゲームロジック ---
 function generateQuestions() {
     let qList = [...katakanaData, ...katakanaData]; // 92問
-    
-    // ランダムな8文字を追加
     for (let i = 0; i < 8; i++) {
         const randIdx = Math.floor(Math.random() * katakanaData.length);
         qList.push(katakanaData[randIdx]);
     }
-    
-    // 全体をシャッフル
     for (let i = qList.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [qList[i], qList[j]] = [qList[j], qList[i]];
@@ -353,6 +384,7 @@ function generateQuestions() {
 
 function startGame() {
     initAudio();
+    startBGM();
     questions = generateQuestions();
     currentIdx = 0;
     document.getElementById('menuScreen').classList.add('hidden');
@@ -395,9 +427,9 @@ function startHintTimer() {
 }
 
 function showHintFailure() {
+    stopBGM(); // 失敗したら音楽を止める
     document.getElementById('hintLayer').classList.add('show');
     document.getElementById('timerContainer').classList.add('opacity-20');
-    
     document.getElementById('submitBtn').classList.add('hidden');
     document.getElementById('retryBtn').classList.remove('hidden');
     
@@ -526,17 +558,29 @@ function showFeedback(isCorrect) {
 }
 
 function showFinalResult() {
+    stopBGM();
+    playClearMusic();
     document.getElementById('gameScreen').classList.add('hidden');
     document.getElementById('resultScreen').classList.remove('hidden');
 }
 
 function toggleMute() {
     isMuted = !isMuted;
-    document.getElementById('muteBtn').innerHTML = isMuted ? '<i class="fas fa-volume-mute text-gray-500"></i>' : '<i class="fas fa-volume-up"></i>';
+    if (isMuted) {
+        bgmAudio.pause();
+        clearAudio.pause();
+        document.getElementById('muteBtn').innerHTML = '<i class="fas fa-volume-mute text-gray-500"></i>';
+    } else {
+        if (!document.getElementById('gameScreen').classList.contains('hidden')) {
+            bgmAudio.play();
+        }
+        document.getElementById('muteBtn').innerHTML = '<i class="fas fa-volume-up"></i>';
+    }
 }
 
 function changeVolume(val) {
-    // 音量スライダーの値を保持するのみ
+    bgmAudio.volume = val;
+    clearAudio.volume = val;
 }
 </script>
 </body>
