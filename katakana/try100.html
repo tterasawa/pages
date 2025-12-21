@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>さいばー カタカナ 100もん チャレンジ</title>
+
+    <!-- モバイル設定 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="カタカナきょうく">
+    
+    <!-- スタイルシート -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- フォント -->
+    <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+    <!-- アイコン -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 文字認識ライブラリ -->
+    <script src="handwriting.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'digital': ['DotGothic16', 'sans-serif'],
+                    },
+                    colors: {
+                        'neon-blue': '#00f3ff',
+                        'neon-pink': '#ff00ff',
+                        'neon-green': '#0aff00',
+                        'dark-bg': '#050510',
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'appear': 'appear 0.5s ease-out forwards',
+                    },
+                    keyframes: {
+                        appear: {
+                            '0%': { opacity: '0', transform: 'scale(0.9)' },
+                            '100%': { opacity: '1', transform: 'scale(1)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'DotGothic16', sans-serif;
+            background-color: #050510;
+            color: #00f3ff;
+            touch-action: manipulation;
+            overscroll-behavior: none;
+            background-image: radial-gradient(circle at 50% 50%, #101025 0%, #050510 100%);
+            overflow: hidden;
+            height: 100dvh;
+        }
+
+        .cyber-box {
+            background: rgba(10, 20, 40, 0.8);
+            border: 1px solid #00f3ff;
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.2), inset 0 0 20px rgba(0, 243, 255, 0.1);
+            position: relative;
+            clip-path: polygon(0% 10px, 10px 0%, 100% 0%, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0% 100%);
+        }
+
+        #drawingCanvas {
+            background-color: rgba(0, 0, 0, 0.6);
+            border: 2px solid #00f3ff;
+            cursor: crosshair;
+            touch-action: none;
+            z-index: 20;
+            position: relative;
+            background-image: 
+                linear-gradient(rgba(0, 243, 255, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 243, 255, 0.1) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+
+        #hintLayer {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 140px;
+            color: rgba(255, 0, 255, 0.15); 
+            pointer-events: none;
+            z-index: 10;
+            font-family: sans-serif;
+            opacity: 0;
+            transition: opacity 0.5s ease-in;
+        }
+        #hintLayer.show { opacity: 1; text-shadow: 0 0 15px rgba(255, 0, 255, 0.5); }
+
+        .scanline-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.1) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 100;
+            opacity: 0.4;
+        }
+
+        .cyber-btn {
+            position: relative;
+            letter-spacing: 2px;
+            transition: all 0.2s;
+            clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
+        }
+        .cyber-btn:active { transform: scale(0.95); }
+        .cyber-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .blur-transition {
+            animation: cyber-blur-snap 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+        @keyframes cyber-blur-snap {
+            0% { filter: blur(0px); opacity: 1; }
+            50% { filter: blur(20px) brightness(2); opacity: 0; }
+            100% { filter: blur(0px); opacity: 1; }
+        }
+
+        @keyframes glitch-skew {
+            0% { transform: skew(0deg); }
+            20% { transform: skew(-10deg); }
+            100% { transform: skew(0deg); }
+        }
+        .shake { animation: glitch-skew 0.3s ease-in-out; border-color: #ff0000 !important; }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: transparent;
+            height: 24px;
+            display: flex;
+            align-items: center;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 12px;
+            width: 12px;
+            border-radius: 50%;
+            background: #00f3ff;
+            cursor: pointer;
+            box-shadow: 0 0 5px #00f3ff;
+            margin-top: -5px; 
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 2px;
+            background: #333;
+            border-radius: 1px;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center p-2">
+
+    <div class="scanline-overlay"></div>
+    
+    <!-- メインメニュー -->
+    <div id="menuScreen" class="w-full max-w-md p-4 flex flex-col items-center gap-6 z-10 animate-appear">
+        <div class="text-center">
+            <h1 class="text-4xl font-black text-neon-blue tracking-tighter mb-1 font-digital italic">
+                カタカナ<br>１００もん チャレンジ
+            </h1>
+            <div class="text-neon-pink font-bold tracking-[0.4em] text-[10px]">ヒントなしで ぜんぶ かけ！</div>
+        </div>
+        
+        <div class="cyber-box w-full p-6 text-center bg-black/60 backdrop-blur-md">
+            <p class="text-sm text-neon-green mb-4">
+                ルール：<br>
+                カタカナ１００もじを １０びょういないに かけ！<br>
+                ヒントが でたら しっぱい。
+            </p>
+            <button onclick="startGame()" class="cyber-btn w-full bg-cyan-900/80 border border-cyan-400 text-cyan-100 text-xl font-bold py-4 shadow-[0_0_15px_rgba(0,243,255,0.4)]">
+                しれんを はじめる
+            </button>
+        </div>
+
+        <div class="text-[10px] text-gray-500 font-digital">もくひょう：かんぺきな １００もん</div>
+    </div>
+
+    <!-- ゲーム画面 -->
+    <div id="gameScreen" class="hidden w-full max-w-md flex flex-col h-full max-h-screen z-10 overflow-hidden">
+        <div class="flex justify-between items-center mb-2 shrink-0">
+            <div class="flex items-center gap-2">
+                <button onclick="location.reload()" class="border border-gray-600 bg-gray-900 text-gray-400 px-2 py-1 text-[10px] font-digital hover:text-white transition-colors">
+                    <i class="fas fa-times"></i> ちゅうし
+                </button>
+                <div class="flex items-center bg-black/60 border border-neon-blue/30 px-2 py-0.5 rounded h-8">
+                    <button onclick="toggleMute()" id="muteBtn" class="text-neon-blue w-5 text-xs"><i class="fas fa-volume-up"></i></button>
+                    <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.3" class="w-10 ml-1" oninput="changeVolume(this.value)">
+                </div>
+            </div>
+            <div class="text-right">
+                <div class="text-[8px] text-neon-green font-digital tracking-widest uppercase">れんぞく せいかい</div>
+                <div class="text-lg font-cyber text-neon-blue leading-tight">
+                    <span id="currentIdx">００１</span><span class="text-gray-600">／</span>１００
+                </div>
+            </div>
+        </div>
+
+        <!-- 問題表示 -->
+        <div class="cyber-box p-3 mb-2 text-center bg-gray-900/80 min-h-[90px] flex flex-col items-center justify-center relative shrink-0">
+            <div class="absolute top-1 left-1 w-1 h-1 bg-neon-blue"></div>
+            <div class="absolute top-1 right-1 w-1 h-1 bg-neon-blue"></div>
+            
+            <div id="questionChar" class="text-5xl font-bold text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]">あ</div>
+            <div class="text-[10px] text-neon-pink mt-1 font-digital">カタカナで かいてください</div>
+            
+            <div id="feedbackOverlay" class="absolute inset-0 flex items-center justify-center pointer-events-none z-50 hidden backdrop-blur-[1px]"></div>
+        </div>
+
+        <!-- 入力エリア -->
+        <div class="flex-1 flex flex-col items-center w-full min-h-0">
+            <div class="relative w-full flex-1 mb-2 group min-h-0">
+                <div class="absolute -inset-1 bg-gradient-to-r from-neon-blue to-neon-pink opacity-10 blur group-hover:opacity-20 transition duration-1000"></div>
+                <div id="hintLayer">ア</div>
+                <canvas id="drawingCanvas" class="w-full h-full relative z-20 rounded-sm"></canvas>
+                
+                <div class="absolute top-2 right-2 flex gap-2 z-30">
+                    <button onclick="clearCanvas()" class="bg-black/80 border border-gray-500 text-gray-400 px-2 py-1 text-[10px] hover:border-neon-pink hover:text-neon-pink transition-all font-digital">
+                        <i class="fas fa-eraser"></i> けす
+                    </button>
+                </div>
+
+                <div id="checkingLoader" class="hidden absolute inset-0 bg-black/80 z-40 flex flex-col items-center justify-center border border-neon-blue">
+                    <div class="w-8 h-8 border-2 border-neon-blue border-t-transparent rounded-full animate-spin mb-2"></div>
+                    <div class="text-[10px] text-neon-blue font-digital animate-pulse">かいせきちゅう...</div>
+                </div>
+            </div>
+
+            <!-- 操作ボタンとタイマー -->
+            <div class="w-full shrink-0 flex flex-col items-center pb-2">
+                <div id="timerContainer" class="mb-1 text-[10px] font-digital text-gray-500 tracking-wider">
+                    せいげんじかん：<span id="timerSec" class="text-neon-pink font-bold">１０</span>びょう
+                </div>
+                
+                <button id="submitBtn" onclick="checkAnswer()" class="cyber-btn w-full bg-gradient-to-r from-neon-blue to-blue-600 text-black py-3 font-black text-xl shadow-[0_0_15px_rgba(0,243,255,0.4)]">
+                    <i class="fas fa-pen-nib mr-2"></i> かけた！
+                </button>
+                <button id="retryBtn" onclick="location.reload()" class="hidden cyber-btn w-full bg-gradient-to-r from-red-600 to-neon-pink text-white py-3 font-black text-xl shadow-[0_0_15px_rgba(255,0,0,0.4)]">
+                    <i class="fas fa-redo mr-2"></i> さいしょから
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 完了画面 -->
+    <div id="resultScreen" class="hidden w-full max-w-md p-6 text-center z-10 animate-appear">
+        <h2 class="text-3xl font-black text-neon-green mb-6 font-digital italic animate-pulse">ぜんもん せいかい！</h2>
+        <div class="text-7xl text-neon-blue mb-8 drop-shadow-[0_0_20px_rgba(0,243,255,0.6)]">
+            <i class="fas fa-crown"></i>
+        </div>
+        <div class="cyber-box p-4 mb-8 bg-black/50 border-neon-green">
+            <p class="text-xl text-neon-green font-digital font-bold">１００もん れんぞく ノーヒント たっせい</p>
+            <p class="text-xs text-gray-400 mt-2">あなたは カタカナの しんのたつじんです</p>
+        </div>
+        <button onclick="location.reload()" class="cyber-btn w-full border border-neon-blue text-neon-blue py-4 font-bold text-lg hover:bg-neon-blue hover:text-black">
+            もういちど いどむ
+        </button>
+    </div>
+
+<script>
+// 全46文字のデータ
+const katakanaData = [
+    { h: 'あ', k: 'ア', s: 2 }, { h: 'い', k: 'イ', s: 2 }, { h: 'う', k: 'ウ', s: 3 }, { h: 'え', k: 'エ', s: 3 }, { h: 'お', k: 'オ', s: 3 },
+    { h: 'か', k: 'カ', s: 2 }, { h: 'き', k: 'キ', s: 3 }, { h: 'く', k: 'ク', s: 2 }, { h: 'け', k: 'ケ', s: 3 }, { h: 'こ', k: 'コ', s: 2 },
+    { h: 'さ', k: 'サ', s: 3 }, { h: 'し', k: 'シ', s: 3 }, { h: 'す', k: 'ス', s: 2 }, { h: 'せ', k: 'セ', s: 2 }, { h: 'そ', k: 'ソ', s: 2 },
+    { h: 'た', k: 'タ', s: 3 }, { h: 'ち', k: 'チ', s: 3 }, { h: 'つ', k: 'ツ', s: 3 }, { h: 'て', k: 'テ', s: 3 }, { h: 'と', k: 'ト', s: 2 },
+    { h: 'な', k: 'ナ', s: 2 }, { h: 'に', k: 'ニ', s: 2 }, { h: 'ぬ', k: 'ヌ', s: 2 }, { h: 'ね', k: 'ネ', s: 4 }, { h: 'の', k: 'ノ', s: 1 },
+    { h: 'は', k: 'ハ', s: 2 }, { h: 'ひ', k: 'ヒ', s: 2 }, { h: 'ふ', k: 'フ', s: 1 }, { h: 'へ', k: 'ヘ', s: 1 }, { h: 'ほ', k: 'ホ', s: 4 },
+    { h: 'ま', k: 'マ', s: 2 }, { h: 'み', k: 'ミ', s: 3 }, { h: 'む', k: 'ム', s: 2 }, { h: 'め', k: 'メ', s: 2 }, { h: 'も', k: 'モ', s: 3 },
+    { h: 'や', k: 'ヤ', s: 2 }, { h: 'ゆ', k: 'ユ', s: 2 }, { h: 'よ', k: 'ヨ', s: 3 },
+    { h: 'ら', k: 'ラ', s: 2 }, { h: 'り', k: 'リ', s: 2 }, { h: 'る', k: 'ル', s: 2 }, { h: 'れ', k: 'レ', s: 1 }, { h: 'ろ', k: 'ロ', s: 3 },
+    { h: 'わ', k: 'ワ', s: 2 }, { h: 'を', k: 'ヲ', s: 3 }, { h: 'ん', k: 'ン', s: 2 }
+];
+
+let questions = [];
+let currentIdx = 0;
+let hintTimer = null;
+let countdownValue = 10;
+let trace = [];
+let currentX = [];
+let currentY = [];
+let isDrawing = false;
+let audioCtx;
+let isMuted = false;
+
+const canvas = document.getElementById('drawingCanvas');
+const ctx = canvas.getContext('2d');
+
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+}
+
+function playSound(type) {
+    if (isMuted) return;
+    initAudio();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    const now = audioCtx.currentTime;
+
+    if (type === 'correct') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(523.25, now); 
+        osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.3); 
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+        osc.start(); osc.stop(now + 0.3);
+    } else if (type === 'wrong') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.linearRampToValueAtTime(50, now + 0.2);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+        osc.start(); osc.stop(now + 0.2);
+    } else if (type === 'fail') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(80, now);
+        osc.frequency.linearRampToValueAtTime(40, now + 1.0);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.linearRampToValueAtTime(0.0, now + 1.0);
+        osc.start(); osc.stop(now + 1.0);
+    }
+}
+
+// ぜんぶの文字を2回ずつ（計92問）＋ ランダムな8文字 ＝ 合計100問を生成
+function generateQuestions() {
+    let qList = [...katakanaData, ...katakanaData]; // 92問
+    
+    // ランダムな8文字を追加
+    for (let i = 0; i < 8; i++) {
+        const randIdx = Math.floor(Math.random() * katakanaData.length);
+        qList.push(katakanaData[randIdx]);
+    }
+    
+    // 全体をシャッフル
+    for (let i = qList.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [qList[i], qList[j]] = [qList[j], qList[i]];
+    }
+    return qList;
+}
+
+function startGame() {
+    initAudio();
+    questions = generateQuestions();
+    currentIdx = 0;
+    document.getElementById('menuScreen').classList.add('hidden');
+    document.getElementById('gameScreen').classList.remove('hidden');
+    setupCanvas();
+    loadQuestion();
+}
+
+function loadQuestion() {
+    const q = questions[currentIdx];
+    document.getElementById('currentIdx').textContent = (currentIdx + 1).toString().padStart(3, '０');
+    document.getElementById('questionChar').textContent = q.h;
+    document.getElementById('hintLayer').textContent = q.k;
+    document.getElementById('hintLayer').classList.remove('show');
+    document.getElementById('feedbackOverlay').classList.add('hidden');
+    
+    document.getElementById('submitBtn').classList.remove('hidden');
+    document.getElementById('submitBtn').disabled = false;
+    document.getElementById('retryBtn').classList.add('hidden');
+    
+    clearCanvas();
+    startHintTimer();
+}
+
+function startHintTimer() {
+    if (hintTimer) clearInterval(hintTimer);
+    countdownValue = 10;
+    document.getElementById('timerSec').textContent = countdownValue.toString().padStart(2, '０');
+    document.getElementById('timerContainer').classList.remove('opacity-20');
+    
+    hintTimer = setInterval(() => {
+        countdownValue--;
+        document.getElementById('timerSec').textContent = Math.max(0, countdownValue).toString().padStart(2, '０');
+        
+        if (countdownValue <= 0) {
+            clearInterval(hintTimer);
+            showHintFailure();
+        }
+    }, 1000);
+}
+
+function showHintFailure() {
+    document.getElementById('hintLayer').classList.add('show');
+    document.getElementById('timerContainer').classList.add('opacity-20');
+    
+    document.getElementById('submitBtn').classList.add('hidden');
+    document.getElementById('retryBtn').classList.remove('hidden');
+    
+    playSound('fail');
+    
+    const overlay = document.getElementById('feedbackOverlay');
+    overlay.classList.remove('hidden');
+    overlay.innerHTML = `<div class="flex flex-col items-center"><div class="text-neon-pink text-4xl drop-shadow-[0_0_15px_#ff00ff]"><i class="fas fa-exclamation-triangle"></i></div><div class="text-neon-pink font-digital font-bold text-lg mt-1 tracking-tighter">しっぱい：ヒントをみてしまった</div></div>`;
+}
+
+function setupCanvas() {
+    const resizeCanvas = () => {
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+    };
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    const getPos = (e) => {
+        const r = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: (clientX - r.left), y: (clientY - r.top) };
+    };
+
+    const start = (e) => {
+        if (countdownValue <= 0) return;
+        isDrawing = true;
+        const pos = getPos(e);
+        currentX = [pos.x];
+        currentY = [pos.y];
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+    };
+
+    const move = (e) => {
+        if (!isDrawing) return;
+        const pos = getPos(e);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.strokeStyle = '#00f3ff';
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+        currentX.push(pos.x);
+        currentY.push(pos.y);
+    };
+
+    const end = () => {
+        if (isDrawing) {
+            trace.push([currentX, currentY, []]);
+            isDrawing = false;
+        }
+    };
+
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', end);
+    canvas.addEventListener('touchstart', (e) => { if(e.cancelable) e.preventDefault(); start(e); }, {passive:false});
+    canvas.addEventListener('touchmove', (e) => { if(e.cancelable) e.preventDefault(); move(e); }, {passive:false});
+    canvas.addEventListener('touchend', end);
+}
+
+function clearCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    trace = [];
+}
+
+function checkAnswer() {
+    if (trace.length === 0) return;
+    const q = questions[currentIdx];
+    document.getElementById('checkingLoader').classList.remove('hidden');
+    document.getElementById('submitBtn').disabled = true;
+
+    handwriting.recognize(trace, {language: "ja", numOfReturn: 5}, (results, err) => {
+        document.getElementById('checkingLoader').classList.add('hidden');
+        if (err) {
+            document.getElementById('submitBtn').disabled = false;
+            return;
+        }
+        
+        const charMatch = results.includes(q.k);
+        const strokeMatch = Math.abs(trace.length - q.s) <= 1;
+
+        if (charMatch && strokeMatch) {
+            showFeedback(true);
+        } else {
+            showFeedback(false);
+            document.getElementById('submitBtn').disabled = false;
+        }
+    });
+}
+
+function showFeedback(isCorrect) {
+    const overlay = document.getElementById('feedbackOverlay');
+    overlay.classList.remove('hidden');
+    
+    if (isCorrect) {
+        playSound('correct');
+        clearInterval(hintTimer);
+        overlay.innerHTML = `<div class="flex flex-col items-center"><div class="text-neon-green text-6xl drop-shadow-[0_0_15px_#0aff00]"><i class="fas fa-check-circle"></i></div><div class="text-neon-green font-digital font-bold text-xl mt-1 tracking-widest uppercase">せいかい</div></div>`;
+        document.getElementById('submitBtn').classList.add('hidden');
+        
+        setTimeout(() => {
+            document.getElementById('gameScreen').classList.add('blur-transition');
+            setTimeout(() => {
+                currentIdx++;
+                if (currentIdx < questions.length) {
+                    loadQuestion();
+                    document.getElementById('gameScreen').classList.remove('blur-transition');
+                } else {
+                    showFinalResult();
+                }
+            }, 250);
+        }, 800);
+    } else {
+        playSound('wrong');
+        canvas.parentElement.classList.add('shake');
+        overlay.innerHTML = `<div class="animate-pulse flex flex-col items-center"><div class="text-neon-pink text-6xl drop-shadow-[0_0_15px_#ff00ff]"><i class="fas fa-times-circle"></i></div><div class="text-neon-pink font-digital font-bold text-lg mt-1">にんしき エラー</div></div>`;
+        setTimeout(() => {
+            overlay.classList.add('hidden');
+            canvas.parentElement.classList.remove('shake');
+        }, 1000);
+    }
+}
+
+function showFinalResult() {
+    document.getElementById('gameScreen').classList.add('hidden');
+    document.getElementById('resultScreen').classList.remove('hidden');
+}
+
+function toggleMute() {
+    isMuted = !isMuted;
+    document.getElementById('muteBtn').innerHTML = isMuted ? '<i class="fas fa-volume-mute text-gray-500"></i>' : '<i class="fas fa-volume-up"></i>';
+}
+
+function changeVolume(val) {
+    // 音量スライダーの値を保持するのみ
+}
+</script>
+</body>
+</html>
