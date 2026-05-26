@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>九九ルーンの塔</title>
+    <link rel="stylesheet" href="./css/style.css?v=5" />
+  </head>
+  <body>
+    <main class="app" aria-live="polite">
+      <button id="settingsButton" class="settings-button" type="button" aria-label="BGM設定" aria-expanded="false">⚙</button>
+      <section id="settingsPanel" class="settings-panel is-hidden" aria-label="BGM設定">
+        <div class="settings-header">
+          <p class="kicker">Sound</p>
+          <button id="settingsCloseButton" class="close-button" type="button" aria-label="設定を閉じる">×</button>
+        </div>
+        <label class="toggle-row">
+          <input id="settingsMuteToggle" type="checkbox" />
+          <span>BGMをミュート</span>
+        </label>
+        <label class="volume-row" for="volumeSlider">
+          <span>音量</span>
+          <strong id="volumeValue">45%</strong>
+        </label>
+        <input id="volumeSlider" class="volume-slider" type="range" min="0" max="100" step="1" />
+      </section>
+
+      <section id="titleView" class="view title-view">
+        <img class="logo-emblem" src="./assets/logo-emblem.png" alt="九九ルーンの塔 ロゴ" />
+        <p class="kicker">Miralia Rune Academy</p>
+        <h1>九九ルーンの塔</h1>
+        <p class="lead">数の塔に封じられた九つの位を、掛け算の詠唱で取り戻す。</p>
+        <button id="startButton" class="primary-button wide-button" type="button">START</button>
+        <div class="bgm-notice">
+          <p>START後、エリア選択とバトルでBGMが流れます。</p>
+          <label class="toggle-row title-toggle">
+            <input id="titleMuteToggle" type="checkbox" />
+            <span>ミュートで始める</span>
+          </label>
+        </div>
+      </section>
+
+      <section id="areaView" class="view area-view is-hidden">
+        <header class="screen-header">
+          <button id="titleButton" class="icon-button" type="button" aria-label="トップへ">←</button>
+          <div>
+            <p class="kicker">Area Select</p>
+            <h2>数位の門を選ぶ</h2>
+          </div>
+        </header>
+        <p class="screen-copy">星見の相棒エンバーミュウと契約中。選んだ位の九九だけが出題される。</p>
+        <div id="areaGrid" class="area-grid" aria-label="1の位から9の位までのエリア"></div>
+      </section>
+
+      <section id="battleView" class="view battle-view is-hidden">
+        <header class="battle-header">
+          <button id="areaBackButton" class="icon-button" type="button" aria-label="エリア選択へ">←</button>
+          <div>
+            <p id="areaName" class="kicker">1の位</p>
+            <h2 id="enemyName">敵モンスター</h2>
+          </div>
+          <div id="turnBadge" class="pill">第1問</div>
+        </header>
+
+        <section class="battlefield">
+          <div class="fighter ally">
+            <div class="nameplate">
+              <span id="playerName">エンバーミュウ</span>
+              <strong id="comboBadge">連鎖 0</strong>
+            </div>
+            <div class="hp-track"><div id="playerHpBar" class="hp-fill player-hp"></div></div>
+            <img id="playerSprite" class="sprite player-sprite" src="./assets/embermew.png" alt="エンバーミュウ" />
+          </div>
+
+          <div class="tower-rune"><span id="areaNumber">1</span></div>
+
+          <div class="fighter enemy">
+            <div class="nameplate">
+              <span id="enemyPlateName">敵</span>
+              <strong id="enemyLevel">門番</strong>
+            </div>
+            <div class="hp-track"><div id="enemyHpBar" class="hp-fill enemy-hp"></div></div>
+            <img id="enemySprite" class="sprite enemy-sprite" src="" alt="" />
+          </div>
+        </section>
+
+        <section class="command-panel">
+          <p id="battleText" class="battle-text">掛け算の詠唱を選べ。</p>
+          <div id="question" class="question">1 × 1 = ?</div>
+          <div id="choiceButtons" class="choice-grid" aria-label="答え候補"></div>
+          <div id="resultActions" class="result-actions is-hidden">
+            <button id="nextAreaButton" class="primary-button" type="button">次の位へ</button>
+            <button id="areaSelectButton" class="secondary-button" type="button">エリア選択へ</button>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="./js/game.js?v=7"></script>
+  </body>
+</html>
