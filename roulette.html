@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>わくわくルーレット</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Canvas Confetti Library -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;900&display=swap');
+    
+    body {
+      font-family: 'M PLUS Rounded 1c', sans-serif;
+      touch-action: manipulation;
+    }
+
+    /* Pointer bounce animation */
+    @keyframes pointer-tick {
+      0% { transform: translateX(-50%) rotate(0deg); }
+      30% { transform: translateX(-50%) rotate(-18deg); }
+      100% { transform: translateX(-50%) rotate(0deg); }
+    }
+
+    .pointer-ticking {
+      animation: pointer-tick 0.12s ease-in-out;
+    }
+
+    /* Shiny pulse for center button */
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.6); }
+      50% { box-shadow: 0 0 28px rgba(239, 68, 68, 0.9), inset 0 2px 8px rgba(255, 255, 255, 0.8); }
+    }
+
+    .center-spin-btn {
+      animation: pulse-glow 2s infinite;
+    }
+
+    /* Modal pop animation */
+    @keyframes modal-pop {
+      0% { transform: scale(0.6) translateY(20px); opacity: 0; }
+      100% { transform: scale(1) translateY(0); opacity: 1; }
+    }
+
+    .animate-pop {
+      animation: modal-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between select-none overflow-x-hidden">
+
+  <header class="bg-slate-800/80 backdrop-blur border-b border-slate-700/60 p-4 sticky top-0 z-30 shadow-md">
+    <div class="max-w-4xl mx-auto flex justify-between items-center">
+      <div class="flex items-center gap-2">
+        <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-rose-500 to-amber-400 flex items-center justify-center shadow-lg">
+          <svg class="w-5 h-5 text-white fill-current" viewBox="0 0 24 24">
+            <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 18a8 8 0 110-16 8 8 0 010 16zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
+          </svg>
+        </div>
+        <h1 class="text-xl font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-rose-300 to-pink-400">
+          わくわくルーレット
+        </h1>
+      </div>
+
+      <!-- Controls Header Right -->
+      <div class="flex items-center gap-2">
+        <!-- Sound Toggle Button -->
+        <button id="soundToggleBtn" class="bg-slate-700 hover:bg-slate-600 text-slate-200 p-2.5 rounded-xl border border-slate-600 transition flex items-center gap-1.5 text-sm font-bold active:scale-95">
+          <span id="soundIcon">🔊</span>
+          <span class="hidden sm:inline">効果音</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-4xl w-full mx-auto p-4 md:p-6 flex-1 flex flex-col lg:flex-row items-center lg:items-start justify-center gap-8 my-auto">
+
+    <!-- Left Column: Wheel Canvas Container -->
+    <div class="flex flex-col items-center justify-center w-full max-w-md">
+      
+      <!-- Wheel Container with Arrow -->
+      <div class="relative w-full aspect-square max-w-[360px] sm:max-w-[400px] flex items-center justify-center my-2">
+        
+        <!-- Top Pointer Arrow -->
+        <div id="pointerArrow" class="absolute -top-3 left-1/2 -translate-x-1/2 z-20 origin-top transition-transform duration-75 filter drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)]">
+          <svg width="44" height="52" viewBox="0 0 44 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22 52L0.349367 14.5L43.6506 14.5L22 52Z" fill="#EF4444"/>
+            <path d="M22 45L5 16L39 16L22 45Z" fill="#F87171"/>
+            <circle cx="22" cy="14" r="12" fill="#DC2626" stroke="#FFFFFF" stroke-width="3"/>
+          </svg>
+        </div>
+
+        <!-- Canvas Element -->
+        <canvas id="wheelCanvas" width="800" height="800" class="w-full h-full rounded-full shadow-2xl border-4 border-slate-700/80 bg-slate-800"></canvas>
+
+        <!-- Center Spin Button -->
+        <button id="spinBtn" class="center-spin-btn absolute z-10 w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-br from-red-500 via-rose-600 to-red-700 border-4 border-white text-white font-black text-xl sm:text-2xl shadow-2xl flex flex-col items-center justify-center cursor-pointer transition transform active:scale-90 hover:scale-105 group">
+          <span class="tracking-wider drop-shadow">PUSH</span>
+          <span class="text-[10px] sm:text-xs font-normal opacity-90 tracking-normal group-hover:underline">真ん中を押す</span>
+        </button>
+
+      </div>
+
+      <!-- Quick Action / Status Bar -->
+      <div class="mt-4 w-full text-center">
+        <p id="spinStatusText" class="text-slate-400 text-sm font-bold bg-slate-800/60 py-2 px-4 rounded-full inline-block border border-slate-700/50">
+          🎯 真ん中のボタンを押してルーレットを回そう！
+        </p>
+      </div>
+
+    </div>
+
+    <!-- Right Column: Settings and Custom Items -->
+    <div class="w-full max-w-md bg-slate-800/90 rounded-2xl p-5 border border-slate-700 shadow-xl flex flex-col gap-4">
+      
+      <!-- Preset Buttons -->
+      <div>
+        <label class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">クイックプリセット</label>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <button onclick="loadPreset('lunch')" class="bg-slate-700 hover:bg-slate-600 text-xs font-bold py-2 px-2.5 rounded-lg border border-slate-600/80 text-slate-200 transition active:scale-95 text-center">🍱 今日のランチ</button>
+          <button onclick="loadPreset('fortune')" class="bg-slate-700 hover:bg-slate-600 text-xs font-bold py-2 px-2.5 rounded-lg border border-slate-600/80 text-slate-200 transition active:scale-95 text-center">⛩ おみくじ</button>
+          <button onclick="loadPreset('penalty')" class="bg-slate-700 hover:bg-slate-600 text-xs font-bold py-2 px-2.5 rounded-lg border border-slate-600/80 text-slate-200 transition active:scale-95 text-center">⚡ 罰ゲーム</button>
+          <button onclick="loadPreset('yesno')" class="bg-slate-700 hover:bg-slate-600 text-xs font-bold py-2 px-2.5 rounded-lg border border-slate-600/80 text-slate-200 transition active:scale-95 text-center">⭕ はい/いいえ</button>
+          <button onclick="loadPreset('who')" class="bg-slate-700 hover:bg-slate-600 text-xs font-bold py-2 px-2.5 rounded-lg border border-slate-600/80 text-slate-200 transition active:scale-95 text-center">👑 誰が払う？</button>
+          <button onclick="loadPreset('number')" class="bg-slate-700 hover:bg-slate-600 text-xs font-bold py-2 px-2.5 rounded-lg border border-slate-600/80 text-slate-200 transition active:scale-95 text-center">🔢 1 〜 6 数字</button>
+        </div>
+      </div>
+
+      <!-- Items Management List Header -->
+      <div class="flex items-center justify-between pt-2 border-t border-slate-700/80">
+        <label class="text-sm font-bold text-slate-300 flex items-center gap-1.5">
+          <span>📝 項目リスト</span>
+          <span id="itemCountBadge" class="bg-rose-500/20 text-rose-300 text-xs px-2 py-0.5 rounded-full font-extrabold border border-rose-500/30">6項目</span>
+        </label>
+        <button id="addItemBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow transition flex items-center gap-1 active:scale-95">
+          <span>＋</span> 項目を追加
+        </button>
+      </div>
+
+      <!-- Scrollable Items List Container -->
+      <div id="itemsContainer" class="max-h-56 sm:max-h-64 overflow-y-auto pr-1 flex flex-col gap-2">
+        <!-- Item Rows rendered dynamically via JS -->
+      </div>
+
+      <!-- Options / Shuffle Controls -->
+      <div class="flex items-center gap-2 pt-2 border-t border-slate-700/80">
+        <button id="shuffleBtn" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold py-2 px-3 rounded-lg border border-slate-600 transition flex items-center justify-center gap-1">
+          🔀 順番をシャッフル
+        </button>
+        <button id="resetColorsBtn" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold py-2 px-3 rounded-lg border border-slate-600 transition flex items-center justify-center gap-1">
+          🎨 色をランダム変更
+        </button>
+      </div>
+
+    </div>
+
+  </main>
+
+  <div id="resultModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-800 border-2 border-amber-400/80 w-full max-w-sm sm:max-w-md rounded-3xl p-6 sm:p-8 text-center shadow-2xl relative animate-pop overflow-hidden">
+      
+      <!-- Background Ambient Glow -->
+      <div class="absolute -top-12 -left-12 w-40 h-40 bg-amber-500/20 rounded-full blur-2xl pointer-events-none"></div>
+      <div class="absolute -bottom-12 -right-12 w-40 h-40 bg-rose-500/20 rounded-full blur-2xl pointer-events-none"></div>
+
+      <!-- Crown/Trophy Icon -->
+      <div class="w-16 h-16 bg-gradient-to-tr from-amber-400 to-yellow-300 rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg mb-3">
+        🎉
+      </div>
+
+      <p class="text-sm font-bold text-amber-300 tracking-widest uppercase mb-1">ルーレットの結果</p>
+      
+      <!-- Dynamic Large Text Result -->
+      <div id="resultTextContainer" class="my-4 py-4 px-2 bg-slate-900/80 rounded-2xl border border-slate-700/80 shadow-inner flex items-center justify-center min-h-[100px]">
+        <h2 id="resultText" class="text-3xl sm:text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-rose-300 to-pink-300 break-words leading-tight">
+          --
+        </h2>
+      </div>
+
+      <p class="text-xs text-slate-400 mb-6">矢印が指したのはこちらです！</p>
+
+      <!-- Modal Action Buttons -->
+      <div class="flex items-center gap-3">
+        <button id="closeModalBtn" class="flex-1 bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white font-extrabold py-3 px-4 rounded-xl shadow-lg border border-rose-400/30 transition active:scale-95 text-base">
+          もう一度回す 🔄
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="py-3 text-center text-xs text-slate-500 border-t border-slate-800">
+    <p>わくわくルーレット &copy; 2026 - タップして楽しもう！</p>
+  </footer>
+
+  <script>
+    class SoundEffects {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            this.ctx = new AudioContext();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playTick() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(150, this.ctx.currentTime + 0.04);
+
+          gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.04);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.04);
+        } catch (e) {
+          console.warn('Audio tick play error:', e);
+        }
+      }
+
+      playFanfare() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+
+        try {
+          const now = this.ctx.currentTime;
+          const notes = [
+            { freq: 523.25, time: 0, duration: 0.12 },     // C5
+            { freq: 659.25, time: 0.12, duration: 0.12 },  // E5
+            { freq: 783.99, time: 0.24, duration: 0.12 },  // G5
+            { freq: 1046.50, time: 0.36, duration: 0.4 }   // C6
+          ];
+
+          notes.forEach(n => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(n.freq, now + n.time);
+
+            gain.gain.setValueAtTime(0.3, now + n.time);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + n.time + n.duration);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+
+            osc.start(now + n.time);
+            osc.stop(now + n.time + n.duration);
+          });
+        } catch (e) {
+          console.warn('Audio fanfare error:', e);
+        }
+      }
+    }
+
+    const sound = new SoundEffects();
+
+    const COLOR_PALETTE = [
+      '#FF595E', '#FFCA3A', '#8AC926', '#1982C4', '#6A4C93',
+      '#FF924C', '#38B000', '#0077B6', '#9D4EDD', '#F15BB5',
+      '#00F5D4', '#EE9B00', '#001845', '#E63946', '#2A9D8F'
+    ];
+
+    const PRESETS = {
+      lunch: [
+        { text: 'ラーメン', color: '#FF595E' },
+        { text: 'カレーライス', color: '#FFCA3A' },
+        { text: '寿司', color: '#1982C4' },
+        { text: 'パスタ', color: '#8AC926' },
+        { text: 'ハンバーグ', color: '#FF924C' },
+        { text: 'うどん・そば', color: '#6A4C93' }
+      ],
+      fortune: [
+        { text: '大吉 🌟', color: '#FFD700' },
+        { text: '中吉 ✨', color: '#FF8C00' },
+        { text: '小吉 😊', color: '#32CD32' },
+        { text: '吉 🍀', color: '#1E90FF' },
+        { text: '末吉 🌿', color: '#9370DB' },
+        { text: '凶 ⚡', color: '#708090' }
+      ],
+      penalty: [
+        { text: 'モノマネ1回 🎭', color: '#FF595E' },
+        { text: '全員にお茶を汲む 🍵', color: '#FFCA3A' },
+        { text: 'ダジャレを言う 😅', color: '#8AC926' },
+        { text: '最近の失敗談発表 🎤', color: '#1982C4' },
+        { text: 'スクワット10回 🏋️', color: '#FF924C' },
+        { text: 'セーフ！パス 🎟️', color: '#38B000' }
+      ],
+      yesno: [
+        { text: 'はい ⭕', color: '#2A9D8F' },
+        { text: 'いいえ ❌', color: '#E63946' },
+        { text: '保留 ❓', color: '#FFCA3A' },
+        { text: 'もう一度回す 🔄', color: '#1982C4' }
+      ],
+      who: [
+        { text: 'Aさん 👤', color: '#FF595E' },
+        { text: 'Bさん 👤', color: '#FFCA3A' },
+        { text: 'Cさん 👤', color: '#8AC926' },
+        { text: 'Dさん 👤', color: '#1982C4' }
+      ],
+      number: [
+        { text: '1', color: '#FF595E' },
+        { text: '2', color: '#FFCA3A' },
+        { text: '3', color: '#8AC926' },
+        { text: '4', color: '#1982C4' },
+        { text: '5', color: '#6A4C93' },
+        { text: '6', color: '#FF924C' }
+      ]
+    };
+
+    let items = JSON.parse(JSON.stringify(PRESETS.lunch));
+    let currentAngle = 0; // In radians
+    let isSpinning = false;
+    let lastSegmentIndex = -1;
+
+    // DOM Elements
+    const canvas = document.getElementById('wheelCanvas');
+    const ctx = canvas.getContext('2d');
+    const spinBtn = document.getElementById('spinBtn');
+    const pointerArrow = document.getElementById('pointerArrow');
+    const itemsContainer = document.getElementById('itemsContainer');
+    const addItemBtn = document.getElementById('addItemBtn');
+    const itemCountBadge = document.getElementById('itemCountBadge');
+    const spinStatusText = document.getElementById('spinStatusText');
+    const soundToggleBtn = document.getElementById('soundToggleBtn');
+    const soundIcon = document.getElementById('soundIcon');
+    const resultModal = document.getElementById('resultModal');
+    const resultText = document.getElementById('resultText');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const shuffleBtn = document.getElementById('shuffleBtn');
+    const resetColorsBtn = document.getElementById('resetColorsBtn');
+
+    function drawWheel() {
+      const width = canvas.width;
+      const height = canvas.height;
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const radius = width / 2 - 20;
+
+      ctx.clearRect(0, 0, width, height);
+
+      if (items.length === 0) {
+        ctx.fillStyle = '#334155';
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = 'bold 32px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('項目を追加してください', centerX, centerY);
+        return;
+      }
+
+      const arcSize = (Math.PI * 2) / items.length;
+
+      // Draw Segments
+      for (let i = 0; i < items.length; i++) {
+        const startAngle = currentAngle + i * arcSize;
+        const endAngle = startAngle + arcSize;
+
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+        ctx.fillStyle = items[i].color;
+        ctx.fill();
+
+        // Slice Border Lines
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = 'rgba(15, 23, 42, 0.4)';
+        ctx.stroke();
+
+        // Draw Item Text
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(startAngle + arcSize / 2);
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#FFFFFF';
+
+        // Dynamic Font Size based on text length & item count
+        const text = items[i].text;
+        const baseFontSize = items.length > 10 ? 26 : (items.length > 6 ? 32 : 38);
+        ctx.font = `900 ${baseFontSize}px "M PLUS Rounded 1c", sans-serif`;
+
+        // Text shadow for readability
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
+
+        // Truncate text if too long
+        const maxTextWidth = radius - 110;
+        let displayText = text;
+        if (ctx.measureText(displayText).width > maxTextWidth) {
+          while (displayText.length > 1 && ctx.measureText(displayText + '…').width > maxTextWidth) {
+            displayText = displayText.slice(0, -1);
+          }
+          displayText += '…';
+        }
+
+        ctx.fillText(displayText, radius - 45, 0);
+        ctx.restore();
+      }
+
+      // Outer Decorative Ring
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      ctx.lineWidth = 14;
+      ctx.strokeStyle = '#1E293B';
+      ctx.stroke();
+
+      // Outer Gold Accent Border
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius + 7, 0, Math.PI * 2);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#F59E0B';
+      ctx.stroke();
+
+      // Inner Center Cap Ring
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 70, 0, Math.PI * 2);
+      ctx.fillStyle = '#0F172A';
+      ctx.fill();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#38BDF8';
+      ctx.stroke();
+    }
+
+    function spinWheel() {
+      if (isSpinning || items.length === 0) return;
+
+      sound.init();
+      isSpinning = true;
+      spinBtn.disabled = true;
+      spinBtn.classList.add('opacity-80', 'scale-95');
+      spinStatusText.innerText = '🌀 ぐるぐる回転中...';
+
+      // Random target calculation
+      const minSpins = 6;
+      const maxSpins = 10;
+      const totalRadianRotation = (minSpins + Math.random() * (maxSpins - minSpins)) * Math.PI * 2 + Math.random() * Math.PI * 2;
+      
+      const startAngle = currentAngle;
+      const targetAngle = startAngle + totalRadianRotation;
+      const duration = 4500 + Math.random() * 1000; // 4.5s ~ 5.5s spin duration
+      const startTime = performance.now();
+
+      function animate(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+
+        // Ease Out Cubic physics formula
+        const easeOut = 1 - Math.pow(1 - progress, 3);
+        currentAngle = startAngle + (targetAngle - startAngle) * easeOut;
+
+        // Ticking Sound logic when arrow passes slice boundary
+        // Arrow is pointing straight down at top (270 degrees or -90 degrees = -PI/2)
+        const arrowAngle = (1.5 * Math.PI - currentAngle) % (2 * Math.PI);
+        const normalizedArrowAngle = arrowAngle < 0 ? arrowAngle + Math.PI * 2 : arrowAngle;
+        const arcSize = (Math.PI * 2) / items.length;
+        const currentSegmentIndex = Math.floor(normalizedArrowAngle / arcSize);
+
+        if (currentSegmentIndex !== lastSegmentIndex) {
+          sound.playTick();
+          triggerPointerTick();
+          lastSegmentIndex = currentSegmentIndex;
+        }
+
+        drawWheel();
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          // Spin Complete
+          isSpinning = false;
+          spinBtn.disabled = false;
+          spinBtn.classList.remove('opacity-80', 'scale-95');
+          spinStatusText.innerText = '✨ 決定しました！結果を表示中...';
+
+          const winnerItem = items[currentSegmentIndex % items.length];
+          showWinnerModal(winnerItem.text);
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    function triggerPointerTick() {
+      pointerArrow.classList.remove('pointer-ticking');
+      void pointerArrow.offsetWidth; // Force reflow
+      pointerArrow.classList.add('pointer-ticking');
+    }
+
+    function showWinnerModal(winnerText) {
+      resultText.innerText = winnerText;
+      resultModal.classList.remove('hidden');
+
+      sound.playFanfare();
+
+      // Launch Colorful Confetti bursts
+      const count = 200;
+      const defaults = {
+        origin: { y: 0.6 }
+      };
+
+      function fire(particleRatio, opts) {
+        confetti({
+          ...defaults,
+          ...opts,
+          particleCount: Math.floor(count * particleRatio)
+        });
+      }
+
+      fire(0.25, {
+        spread: 26,
+        startVelocity: 55,
+      });
+      fire(0.2, {
+        spread: 60,
+      });
+      fire(0.35, {
+        spread: 100,
+        decay: 0.91,
+        scalar: 0.8
+      });
+      fire(0.1, {
+        spread: 120,
+        startVelocity: 25,
+        decay: 0.92,
+        scalar: 1.2
+      });
+      fire(0.1, {
+        spread: 120,
+        startVelocity: 45,
+      });
+    }
+
+    function closeModal() {
+      resultModal.classList.add('hidden');
+      spinStatusText.innerText = '🎯 真ん中のボタンを押してルーレットを回そう！';
+    }
+
+    function renderItemList() {
+      itemsContainer.innerHTML = '';
+      itemCountBadge.innerText = `${items.length}項目`;
+
+      items.forEach((item, index) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-2 bg-slate-900/90 p-2 rounded-xl border border-slate-700/60 shadow-sm';
+
+        row.innerHTML = `
+          <!-- Color Picker Input -->
+          <input type="color" value="${item.color}" data-index="${index}" class="color-picker w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0 p-0 flex-shrink-0">
+          
+          <!-- Text Label Input -->
+          <input type="text" value="${escapeHtml(item.text)}" data-index="${index}" class="item-text-input flex-1 bg-slate-800 border border-slate-700 text-slate-100 text-sm font-bold rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-400">
+          
+          <!-- Delete Button -->
+          <button data-index="${index}" class="delete-item-btn text-slate-400 hover:text-rose-400 p-1.5 rounded-lg hover:bg-slate-800 transition flex-shrink-0" title="削除">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+        `;
+
+        itemsContainer.appendChild(row);
+      });
+
+      // Attach event listeners to newly created input rows
+      document.querySelectorAll('.item-text-input').forEach(input => {
+        input.addEventListener('input', (e) => {
+          const idx = parseInt(e.target.dataset.index);
+          items[idx].text = e.target.value;
+          drawWheel();
+        });
+      });
+
+      document.querySelectorAll('.color-picker').forEach(picker => {
+        picker.addEventListener('input', (e) => {
+          const idx = parseInt(e.target.dataset.index);
+          items[idx].color = e.target.value;
+          drawWheel();
+        });
+      });
+
+      document.querySelectorAll('.delete-item-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const idx = parseInt(e.currentTarget.dataset.index);
+          if (items.length <= 2) {
+            alert('ルーレットは最低2つ以上の項目が必要です。');
+            return;
+          }
+          items.splice(idx, 1);
+          renderItemList();
+          drawWheel();
+        });
+      });
+
+      drawWheel();
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, function(m) {
+        return {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#039;'
+        }[m];
+      });
+    }
+
+    function addItem() {
+      if (items.length >= 20) {
+        alert('項目は最大20個まで登録できます。');
+        return;
+      }
+      const newColor = COLOR_PALETTE[items.length % COLOR_PALETTE.length];
+      items.push({ text: `新しい項目 ${items.length + 1}`, color: newColor });
+      renderItemList();
+      // Scroll to bottom
+      itemsContainer.scrollTop = itemsContainer.scrollHeight;
+    }
+
+    function loadPreset(presetKey) {
+      if (PRESETS[presetKey]) {
+        items = JSON.parse(JSON.stringify(PRESETS[presetKey]));
+        currentAngle = 0;
+        renderItemList();
+      }
+    }
+
+    function shuffleItems() {
+      for (let i = items.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [items[i], items[j]] = [items[j], items[i]];
+      }
+      renderItemList();
+    }
+
+    function resetColors() {
+      items.forEach((item, idx) => {
+        item.color = COLOR_PALETTE[(idx + Math.floor(Math.random() * COLOR_PALETTE.length)) % COLOR_PALETTE.length];
+      });
+      renderItemList();
+    }
+
+    spinBtn.addEventListener('click', spinWheel);
+    closeModalBtn.addEventListener('click', closeModal);
+    addItemBtn.addEventListener('click', addItem);
+    shuffleBtn.addEventListener('click', shuffleItems);
+    resetColorsBtn.addEventListener('click', resetColors);
+
+    // Sound Toggle Button
+    soundToggleBtn.addEventListener('click', () => {
+      sound.enabled = !sound.enabled;
+      soundIcon.innerText = sound.enabled ? '🔊' : '🔇';
+      soundToggleBtn.classList.toggle('bg-rose-900/60', !sound.enabled);
+      soundToggleBtn.classList.toggle('border-rose-500/50', !sound.enabled);
+    });
+
+    // Close modal on background click
+    resultModal.addEventListener('click', (e) => {
+      if (e.target === resultModal) {
+        closeModal();
+      }
+    });
+
+    // Window Load Initialization
+    window.addEventListener('load', () => {
+      renderItemList();
+      drawWheel();
+    });
+  </script>
+</body>
+</html>
