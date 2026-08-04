@@ -1,0 +1,556 @@
+{
+  "version": 1,
+  "bgm": {
+    "home": {
+      "src": "bgm/home.mp3",
+      "volume": 0.45,
+      "loop": true,
+      "bgmSynth": "home"
+    },
+    "battle": {
+      "src": "bgm/battle.mp3",
+      "volume": 0.45,
+      "loop": true,
+      "bgmSynth": "battle"
+    },
+    "boss": {
+      "src": "bgm/boss.mp3",
+      "volume": 0.5,
+      "loop": true,
+      "bgmSynth": "boss"
+    },
+    "result": {
+      "src": "bgm/result.mp3",
+      "volume": 0.45,
+      "loop": false,
+      "bgmSynth": "result"
+    }
+  },
+  "sfx": {
+    "tap": {
+      "src": "sfx/tap.mp3",
+      "volume": 0.6,
+      "synth": "tap"
+    },
+    "correct": {
+      "src": "sfx/correct.mp3",
+      "volume": 0.8,
+      "synth": "correct"
+    },
+    "wrong": {
+      "src": "sfx/wrong.mp3",
+      "volume": 0.7,
+      "synth": "wrong"
+    },
+    "hit": {
+      "src": "sfx/hit.mp3",
+      "volume": 0.7,
+      "synth": "hit"
+    },
+    "levelup": {
+      "src": "sfx/levelup.mp3",
+      "volume": 0.8,
+      "synth": "levelup"
+    },
+    "finisher": {
+      "src": "sfx/finisher.mp3",
+      "volume": 0.9,
+      "synth": "finisher"
+    },
+    "join": {
+      "src": "sfx/join.mp3",
+      "volume": 0.8,
+      "synth": "join"
+    }
+  },
+  "voice": {
+    "battle_start_01": {
+      "src": "voice/battle_start_01.mp3",
+      "volume": 1
+    },
+    "battle_start_02": {
+      "src": "voice/battle_start_02.mp3",
+      "volume": 1
+    },
+    "boss_appear_01": {
+      "src": "voice/boss_appear_01.mp3",
+      "volume": 1
+    },
+    "boss_down_01": {
+      "src": "voice/boss_down_01.mp3",
+      "volume": 1
+    },
+    "boss_intro_1": {
+      "src": "voice/boss_intro_1.mp3",
+      "volume": 1
+    },
+    "boss_intro_2": {
+      "src": "voice/boss_intro_2.mp3",
+      "volume": 1
+    },
+    "boss_intro_3": {
+      "src": "voice/boss_intro_3.mp3",
+      "volume": 1
+    },
+    "boss_intro_4": {
+      "src": "voice/boss_intro_4.mp3",
+      "volume": 1
+    },
+    "boss_intro_5": {
+      "src": "voice/boss_intro_5.mp3",
+      "volume": 1
+    },
+    "boss_intro_6": {
+      "src": "voice/boss_intro_6.mp3",
+      "volume": 1
+    },
+    "boss_intro_7": {
+      "src": "voice/boss_intro_7.mp3",
+      "volume": 1
+    },
+    "boss_intro_8": {
+      "src": "voice/boss_intro_8.mp3",
+      "volume": 1
+    },
+    "boss_intro_9": {
+      "src": "voice/boss_intro_9.mp3",
+      "volume": 1
+    },
+    "clinic_clear": {
+      "src": "voice/clinic_clear.mp3",
+      "volume": 1
+    },
+    "clinic_end": {
+      "src": "voice/clinic_end.mp3",
+      "volume": 1
+    },
+    "clinic_start": {
+      "src": "voice/clinic_start.mp3",
+      "volume": 1
+    },
+    "combo_3": {
+      "src": "voice/combo_3.mp3",
+      "volume": 1
+    },
+    "combo_5": {
+      "src": "voice/combo_5.mp3",
+      "volume": 1
+    },
+    "combo_7": {
+      "src": "voice/combo_7.mp3",
+      "volume": 1
+    },
+    "correct_01": {
+      "src": "voice/correct_01.mp3",
+      "volume": 1
+    },
+    "correct_02": {
+      "src": "voice/correct_02.mp3",
+      "volume": 1
+    },
+    "correct_03": {
+      "src": "voice/correct_03.mp3",
+      "volume": 1
+    },
+    "correct_04": {
+      "src": "voice/correct_04.mp3",
+      "volume": 1
+    },
+    "finisher_01": {
+      "src": "voice/finisher_01.mp3",
+      "volume": 1
+    },
+    "finisher_02": {
+      "src": "voice/finisher_02.mp3",
+      "volume": 1
+    },
+    "greet_01": {
+      "src": "voice/greet_01.mp3",
+      "volume": 1
+    },
+    "greet_02": {
+      "src": "voice/greet_02.mp3",
+      "volume": 1
+    },
+    "home_weak": {
+      "src": "voice/home_weak.mp3",
+      "volume": 1
+    },
+    "join_01": {
+      "src": "voice/join_01.mp3",
+      "volume": 1
+    },
+    "keypad_intro": {
+      "src": "voice/keypad_intro.mp3",
+      "volume": 1
+    },
+    "kuku_1x1": {
+      "src": "voice/kuku_1x1.mp3",
+      "volume": 1
+    },
+    "kuku_1x2": {
+      "src": "voice/kuku_1x2.mp3",
+      "volume": 1
+    },
+    "kuku_1x3": {
+      "src": "voice/kuku_1x3.mp3",
+      "volume": 1
+    },
+    "kuku_1x4": {
+      "src": "voice/kuku_1x4.mp3",
+      "volume": 1
+    },
+    "kuku_1x5": {
+      "src": "voice/kuku_1x5.mp3",
+      "volume": 1
+    },
+    "kuku_1x6": {
+      "src": "voice/kuku_1x6.mp3",
+      "volume": 1
+    },
+    "kuku_1x7": {
+      "src": "voice/kuku_1x7.mp3",
+      "volume": 1
+    },
+    "kuku_1x8": {
+      "src": "voice/kuku_1x8.mp3",
+      "volume": 1
+    },
+    "kuku_1x9": {
+      "src": "voice/kuku_1x9.mp3",
+      "volume": 1
+    },
+    "kuku_2x1": {
+      "src": "voice/kuku_2x1.mp3",
+      "volume": 1
+    },
+    "kuku_2x2": {
+      "src": "voice/kuku_2x2.mp3",
+      "volume": 1
+    },
+    "kuku_2x3": {
+      "src": "voice/kuku_2x3.mp3",
+      "volume": 1
+    },
+    "kuku_2x4": {
+      "src": "voice/kuku_2x4.mp3",
+      "volume": 1
+    },
+    "kuku_2x5": {
+      "src": "voice/kuku_2x5.mp3",
+      "volume": 1
+    },
+    "kuku_2x6": {
+      "src": "voice/kuku_2x6.mp3",
+      "volume": 1
+    },
+    "kuku_2x7": {
+      "src": "voice/kuku_2x7.mp3",
+      "volume": 1
+    },
+    "kuku_2x8": {
+      "src": "voice/kuku_2x8.mp3",
+      "volume": 1
+    },
+    "kuku_2x9": {
+      "src": "voice/kuku_2x9.mp3",
+      "volume": 1
+    },
+    "kuku_3x1": {
+      "src": "voice/kuku_3x1.mp3",
+      "volume": 1
+    },
+    "kuku_3x2": {
+      "src": "voice/kuku_3x2.mp3",
+      "volume": 1
+    },
+    "kuku_3x3": {
+      "src": "voice/kuku_3x3.mp3",
+      "volume": 1
+    },
+    "kuku_3x4": {
+      "src": "voice/kuku_3x4.mp3",
+      "volume": 1
+    },
+    "kuku_3x5": {
+      "src": "voice/kuku_3x5.mp3",
+      "volume": 1
+    },
+    "kuku_3x6": {
+      "src": "voice/kuku_3x6.mp3",
+      "volume": 1
+    },
+    "kuku_3x7": {
+      "src": "voice/kuku_3x7.mp3",
+      "volume": 1
+    },
+    "kuku_3x8": {
+      "src": "voice/kuku_3x8.mp3",
+      "volume": 1
+    },
+    "kuku_3x9": {
+      "src": "voice/kuku_3x9.mp3",
+      "volume": 1
+    },
+    "kuku_4x1": {
+      "src": "voice/kuku_4x1.mp3",
+      "volume": 1
+    },
+    "kuku_4x2": {
+      "src": "voice/kuku_4x2.mp3",
+      "volume": 1
+    },
+    "kuku_4x3": {
+      "src": "voice/kuku_4x3.mp3",
+      "volume": 1
+    },
+    "kuku_4x4": {
+      "src": "voice/kuku_4x4.mp3",
+      "volume": 1
+    },
+    "kuku_4x5": {
+      "src": "voice/kuku_4x5.mp3",
+      "volume": 1
+    },
+    "kuku_4x6": {
+      "src": "voice/kuku_4x6.mp3",
+      "volume": 1
+    },
+    "kuku_4x7": {
+      "src": "voice/kuku_4x7.mp3",
+      "volume": 1
+    },
+    "kuku_4x8": {
+      "src": "voice/kuku_4x8.mp3",
+      "volume": 1
+    },
+    "kuku_4x9": {
+      "src": "voice/kuku_4x9.mp3",
+      "volume": 1
+    },
+    "kuku_5x1": {
+      "src": "voice/kuku_5x1.mp3",
+      "volume": 1
+    },
+    "kuku_5x2": {
+      "src": "voice/kuku_5x2.mp3",
+      "volume": 1
+    },
+    "kuku_5x3": {
+      "src": "voice/kuku_5x3.mp3",
+      "volume": 1
+    },
+    "kuku_5x4": {
+      "src": "voice/kuku_5x4.mp3",
+      "volume": 1
+    },
+    "kuku_5x5": {
+      "src": "voice/kuku_5x5.mp3",
+      "volume": 1
+    },
+    "kuku_5x6": {
+      "src": "voice/kuku_5x6.mp3",
+      "volume": 1
+    },
+    "kuku_5x7": {
+      "src": "voice/kuku_5x7.mp3",
+      "volume": 1
+    },
+    "kuku_5x8": {
+      "src": "voice/kuku_5x8.mp3",
+      "volume": 1
+    },
+    "kuku_5x9": {
+      "src": "voice/kuku_5x9.mp3",
+      "volume": 1
+    },
+    "kuku_6x1": {
+      "src": "voice/kuku_6x1.mp3",
+      "volume": 1
+    },
+    "kuku_6x2": {
+      "src": "voice/kuku_6x2.mp3",
+      "volume": 1
+    },
+    "kuku_6x3": {
+      "src": "voice/kuku_6x3.mp3",
+      "volume": 1
+    },
+    "kuku_6x4": {
+      "src": "voice/kuku_6x4.mp3",
+      "volume": 1
+    },
+    "kuku_6x5": {
+      "src": "voice/kuku_6x5.mp3",
+      "volume": 1
+    },
+    "kuku_6x6": {
+      "src": "voice/kuku_6x6.mp3",
+      "volume": 1
+    },
+    "kuku_6x7": {
+      "src": "voice/kuku_6x7.mp3",
+      "volume": 1
+    },
+    "kuku_6x8": {
+      "src": "voice/kuku_6x8.mp3",
+      "volume": 1
+    },
+    "kuku_6x9": {
+      "src": "voice/kuku_6x9.mp3",
+      "volume": 1
+    },
+    "kuku_7x1": {
+      "src": "voice/kuku_7x1.mp3",
+      "volume": 1
+    },
+    "kuku_7x2": {
+      "src": "voice/kuku_7x2.mp3",
+      "volume": 1
+    },
+    "kuku_7x3": {
+      "src": "voice/kuku_7x3.mp3",
+      "volume": 1
+    },
+    "kuku_7x4": {
+      "src": "voice/kuku_7x4.mp3",
+      "volume": 1
+    },
+    "kuku_7x5": {
+      "src": "voice/kuku_7x5.mp3",
+      "volume": 1
+    },
+    "kuku_7x6": {
+      "src": "voice/kuku_7x6.mp3",
+      "volume": 1
+    },
+    "kuku_7x7": {
+      "src": "voice/kuku_7x7.mp3",
+      "volume": 1
+    },
+    "kuku_7x8": {
+      "src": "voice/kuku_7x8.mp3",
+      "volume": 1
+    },
+    "kuku_7x9": {
+      "src": "voice/kuku_7x9.mp3",
+      "volume": 1
+    },
+    "kuku_8x1": {
+      "src": "voice/kuku_8x1.mp3",
+      "volume": 1
+    },
+    "kuku_8x2": {
+      "src": "voice/kuku_8x2.mp3",
+      "volume": 1
+    },
+    "kuku_8x3": {
+      "src": "voice/kuku_8x3.mp3",
+      "volume": 1
+    },
+    "kuku_8x4": {
+      "src": "voice/kuku_8x4.mp3",
+      "volume": 1
+    },
+    "kuku_8x5": {
+      "src": "voice/kuku_8x5.mp3",
+      "volume": 1
+    },
+    "kuku_8x6": {
+      "src": "voice/kuku_8x6.mp3",
+      "volume": 1
+    },
+    "kuku_8x7": {
+      "src": "voice/kuku_8x7.mp3",
+      "volume": 1
+    },
+    "kuku_8x8": {
+      "src": "voice/kuku_8x8.mp3",
+      "volume": 1
+    },
+    "kuku_8x9": {
+      "src": "voice/kuku_8x9.mp3",
+      "volume": 1
+    },
+    "kuku_9x1": {
+      "src": "voice/kuku_9x1.mp3",
+      "volume": 1
+    },
+    "kuku_9x2": {
+      "src": "voice/kuku_9x2.mp3",
+      "volume": 1
+    },
+    "kuku_9x3": {
+      "src": "voice/kuku_9x3.mp3",
+      "volume": 1
+    },
+    "kuku_9x4": {
+      "src": "voice/kuku_9x4.mp3",
+      "volume": 1
+    },
+    "kuku_9x5": {
+      "src": "voice/kuku_9x5.mp3",
+      "volume": 1
+    },
+    "kuku_9x6": {
+      "src": "voice/kuku_9x6.mp3",
+      "volume": 1
+    },
+    "kuku_9x7": {
+      "src": "voice/kuku_9x7.mp3",
+      "volume": 1
+    },
+    "kuku_9x8": {
+      "src": "voice/kuku_9x8.mp3",
+      "volume": 1
+    },
+    "kuku_9x9": {
+      "src": "voice/kuku_9x9.mp3",
+      "volume": 1
+    },
+    "mob_down_01": {
+      "src": "voice/mob_down_01.mp3",
+      "volume": 1
+    },
+    "mob_down_02": {
+      "src": "voice/mob_down_02.mp3",
+      "volume": 1
+    },
+    "result_good": {
+      "src": "voice/result_good.mp3",
+      "volume": 1
+    },
+    "result_level": {
+      "src": "voice/result_level.mp3",
+      "volume": 1
+    },
+    "timeout_01": {
+      "src": "voice/timeout_01.mp3",
+      "volume": 1
+    },
+    "tournament_end": {
+      "src": "voice/tournament_end.mp3",
+      "volume": 1
+    },
+    "tournament_start": {
+      "src": "voice/tournament_start.mp3",
+      "volume": 1
+    },
+    "training_start": {
+      "src": "voice/training_start.mp3",
+      "volume": 1
+    },
+    "wrong_01": {
+      "src": "voice/wrong_01.mp3",
+      "volume": 1
+    },
+    "wrong_02": {
+      "src": "voice/wrong_02.mp3",
+      "volume": 1
+    },
+    "wrong_03": {
+      "src": "voice/wrong_03.mp3",
+      "volume": 1
+    }
+  }
+}
