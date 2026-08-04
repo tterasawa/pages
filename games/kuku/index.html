@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
+    />
+    <!-- theme.css の --sumi と同じ色。ここと manifest の theme_color / background_color はそろえる -->
+    <meta name="theme-color" content="#17141c" />
+    <meta name="description" content="九九をたたかいながらおぼえる、ククモン道場。" />
+
+    <!--
+      ホーム画面に入れて遊べるようにする（PWA）。
+      パスは "/" 始まりで書く。Vite が base（"./"）に合わせた相対パスへ書き換えるので、
+      GitHub Pages のサブディレクトリに置いてもそのまま動く。
+    -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./favicon.ico" sizes="48x48 32x32 16x16" />
+    <link rel="icon" href="./icons/icon-192.png" type="image/png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <!-- iOS は古い名前しか見ない端末が残っているので両方書く -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="ククモン" />
+
+    <title>ククモン道場</title>
+    <script type="module" crossorigin src="./assets/index-CBCZw6Km.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BNE8tMI-.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
