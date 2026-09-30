@@ -1,7 +1,7 @@
 /* Bump VERSION for every published release. All resources are first-party. */
 const BASE=new URL('./',self.location.href);
 const PREFIX='last-light-'+encodeURIComponent(BASE.pathname)+'-';
-const VERSION=PREFIX+'1.0.0';
+const VERSION=PREFIX+'1.0.1';
 const ASSETS=['./','./index.html','./style.css','./src/main.js','./src/core.js','./src/render.js','./src/audio.js','./manifest.webmanifest','./assets/icon.svg','./assets/icon-192.png','./assets/icon-512.png','./assets/icon-maskable.png'];
 self.addEventListener('install',event=>event.waitUntil((async()=>{const cache=await caches.open(VERSION);await cache.addAll(ASSETS.map(path=>new Request(new URL(path,BASE),{cache:'reload'})));})()));
 self.addEventListener('activate',event=>event.waitUntil((async()=>{const keys=await caches.keys();await Promise.all(keys.filter(k=>k.startsWith(PREFIX)&&k!==VERSION).map(k=>caches.delete(k)));await self.clients.claim();})()));
