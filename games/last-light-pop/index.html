@@ -50,6 +50,7 @@
 <symbol id="i-tempo" viewBox="0 0 24 24"><path d="M8 21h8l-2-17h-4ZM12 15l6-9M7 17h10"/></symbol>
 <symbol id="i-infinity" viewBox="0 0 24 24"><path d="M6 8a4 4 0 1 0 0 8c4 0 8-8 12-8a4 4 0 1 1 0 8c-4 0-8-8-12-8Z"/></symbol>
 <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M4 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H4ZM20 4h-4a3 3 0 0 0-2 1v15a2 2 0 0 1 2-2h4Z"/></symbol>
 <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></symbol>
 </defs></svg>
 <div class="app-shell">
@@ -79,6 +80,7 @@
         </div>
         <div class="mission-card">
           <div class="card-kicker"><span>SELECT STAGE</span><span class="tiny-dot"></span></div>
+          <button id="resume-run" class="resume-run" hidden><svg><use href="#i-arrow"/></svg><span><strong>つづきから</strong><small id="resume-detail"></small></span></button>
           <div class="stage-row" id="stage-row"><button id="stage-prev" class="heat-step" aria-label="前のステージ">‹</button><div class="stage-info"><strong id="stage-name">夜の荒野</strong><small id="stage-rule"></small></div><button id="stage-next" class="heat-step" aria-label="次のステージ">›</button></div>
           <button id="char-button" class="char-chip" aria-label="キャラクターを選ぶ"><img id="char-img" alt=""><span><strong id="char-name">ランタン</strong><small id="char-perk"></small></span><em>変更</em></button>
           <div class="mode-tabs" role="group" aria-label="作戦を選択">
@@ -93,7 +95,7 @@
           <button id="daily-button" class="daily-button"><svg><use href="#i-calendar"/></svg><span><strong>今日のチャレンジ</strong><small id="daily-summary">—</small></span><em id="daily-badge"></em></button>
           <div class="mission-foot"><span><kbd>WASD</kbd> / タッチで移動</span><span>攻撃は自動！</span></div>
         </div>
-        <div class="home-bottom"><button class="home-sticker" data-dialog="shop" style="--c:var(--yellow)"><svg><use href="#i-shop"/></svg><span>工房</span><em id="shop-badge" hidden>!</em></button><button class="home-sticker" data-dialog="achievements" style="--c:var(--mint)"><svg><use href="#i-medal"/></svg><span>実績 <small id="achieve-count">0/0</small></span></button><div class="best-record"><svg><use href="#i-clock"/></svg><small>BEST</small><span id="home-best">--:--</span></div><div class="best-record combo-best"><svg><use href="#i-light"/></svg><small>MAX COMBO</small><span id="home-combo">0</span></div></div>
+        <div class="home-bottom"><button class="home-sticker" data-dialog="shop" style="--c:var(--yellow)"><svg><use href="#i-shop"/></svg><span>工房</span><em id="shop-badge" hidden>!</em></button><button class="home-sticker" data-dialog="codex" style="--c:var(--sky)"><svg><use href="#i-book"/></svg><span>図鑑 <small id="codex-count">0%</small></span></button><button class="home-sticker" data-dialog="achievements" style="--c:var(--mint)"><svg><use href="#i-medal"/></svg><span>実績 <small id="achieve-count">0/0</small></span></button><div class="best-record"><svg><use href="#i-clock"/></svg><small>BEST</small><span id="home-best">--:--</span></div><div class="best-record combo-best"><svg><use href="#i-light"/></svg><small>MAX COMBO</small><span id="home-combo">0</span></div></div>
       </div>
       <div id="hud" class="hud" hidden>
         <div class="hud-top">
@@ -129,7 +131,7 @@
       </div>
       <div class="screen-overlay" id="result-screen" hidden><div class="compact-card result-card"><div class="rank-stamp" id="result-rank">A</div><span class="eyebrow" id="result-eyebrow">NEXT NIGHT</span><h2 id="result-title">次の夜へ！</h2><p id="result-copy">その灯火は、まだあなたの中に。</p><div class="result-stats"><div><small>生存時間</small><strong id="result-time">00:00</strong></div><div><small>撃破数</small><strong id="result-kills">0</strong></div><div><small>レベル</small><strong id="result-level">1</strong></div><div><small>最大コンボ</small><strong id="result-combo">0</strong></div></div><div id="result-build" class="result-build"></div><div id="result-relics" class="result-build"></div><div class="damage-board" id="damage-board"></div><div class="star-earned" id="star-earned"><div class="star-total">★ <b id="star-total">0</b><small id="star-mult"></small></div><ul id="star-lines"></ul></div><div class="unlocks" id="result-unlocks"></div><div class="new-record" id="new-record" hidden>★ NEW RECORD! 自己ベスト更新 ★</div><button id="retry-button" class="primary-button">もう一回！ <svg><use href="#i-arrow"/></svg></button><button id="result-home" class="secondary-button">ホームへ</button></div></div>
       <div class="pwa-update" id="pwa-update" hidden><span>新しいバージョンがあります</span><button id="update-button">更新</button></div>
-      <div class="corner-meta"><button class="text-button" id="install-button" hidden><svg><use href="#i-install"/></svg> インストール</button><span id="performance">CANVAS 2D</span><span class="version">V 2.3.1</span></div>
+      <div class="corner-meta"><button class="text-button" id="install-button" hidden><svg><use href="#i-install"/></svg> インストール</button><span id="performance">CANVAS 2D</span><span class="version">V 2.4.0</span></div>
     </section>
   </main>
 </div>

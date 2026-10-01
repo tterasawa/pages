@@ -10,8 +10,8 @@ export const PALETTE = Object.freeze({
 });
 const P = PALETTE;
 const CONFETTI = [P.coral, P.yellow, P.mint, P.sky, P.purple, P.orange, P.pink, P.white];
-const ENEMY_COLORS = [P.tomato, P.orange, P.teal, P.purple, P.magenta, P.orange, P.mint, P.mint, P.sky, P.pink, P.purple];
-const ENEMY_SIZES = [64, 62, 84, 62, 132, 74, 70, 40, 78, 62, 62];
+const ENEMY_COLORS = [P.tomato, P.orange, P.teal, P.purple, P.magenta, P.orange, P.mint, P.mint, P.sky, P.pink, P.purple, P.orange];
+const ENEMY_SIZES = [64, 62, 84, 62, 132, 74, 70, 40, 78, 62, 62, 124];
 // Per-stage palettes: [ground, alt checker, dots, sparkle, boss body, boss shade]
 const STAGE_LOOK = { wilds: ['#3a2a7c', '#41308a', '#5440a6', '#6d58c4', '#f15bb5', '#c93f92'], frost: ['#2c4f86', '#335a96', '#5b86c4', '#cfe8ff', '#4cc9f0', '#2a9fd0'], candy: ['#7a2f6e', '#863879', '#b14f99', '#ffb3d9', '#ff9f1c', '#e07b00'] };
 const COMIC_WORDS = ['POP!', 'BAM!', 'POW!', 'ZAP!', 'BOOM!', 'WHAM!'];
@@ -70,7 +70,7 @@ function makeSprites() {
     roundRect(c, 21, 2, 8, 10, 3); ink(c, P.lemon, 0); oval(c, 25, 8, 2, 3, P.orange);
     oval(c, 13, 5, 4, 4, hood, 2.5);
   });
-  S.player = S.player_keeper = hero(P.coral, '#e0406f', 'star'); S.player_runner = hero(P.sky, '#2a9fd0', 'wind'); S.player_knight = hero(P.purple, '#7b2cbf', 'horn'); S.player_witch = hero(P.mint, '#22b884', 'witch');
+  S.__hero = hero; S.player = S.player_keeper = hero(P.coral, '#e0406f', 'star'); S.player_runner = hero(P.sky, '#2a9fd0', 'wind'); S.player_knight = hero(P.purple, '#7b2cbf', 'horn'); S.player_witch = hero(P.mint, '#22b884', 'witch');
 
   S.enemy0 = sprite(c => {
     shadow(c, 19, 16);
@@ -209,7 +209,8 @@ export class Renderer {
   constructor(el) {
     this.canvas = el; this.ctx = el.getContext('2d', { alpha: false }); this.sprites = makeSprites();
     this.white = {}; this.ghost = {};
-    for (let i = 0; i < 11; i++) this.white['enemy' + i] = tinted(this.sprites['enemy' + i], P.white);
+    this.sprites.enemy11 = this.sprites.enemy4_candy;
+    for (let i = 0; i < 12; i++) this.white['enemy' + i] = tinted(this.sprites['enemy' + i], P.white);
     for (const st of ['wilds', 'frost', 'candy']) this.white['enemy4_' + st] = tinted(this.sprites['enemy4_' + st], P.white);
     this.ghost.player = tinted(this.sprites.player, P.sky);
     this.width = 1; this.height = 1; this.scale = 1; this.camera = { x: 0, y: 0 }; this.quality = 'auto'; this.autoLow = false;
@@ -232,6 +233,13 @@ export class Renderer {
     const dpr = Math.min(window.devicePixelRatio || 1, this.low ? 1 : this.quality === 'high' ? 2 : 1.5); this.dpr = dpr;
     this.canvas.width = Math.round(this.width * dpr); this.canvas.height = Math.round(this.height * dpr); this.ctx.imageSmoothingEnabled = true;
     this.scale = this.width < 760 ? 0.86 : 1.1;
+  }
+  // Character + skin sprite, built lazily and cached.
+  hero(character = 'keeper', skin = 'classic') {
+    const HATS = { keeper: ['star', P.coral, '#e0406f'], runner: ['wind', P.sky, '#2a9fd0'], knight: ['horn', P.purple, '#7b2cbf'], witch: ['witch', P.mint, '#22b884'] };
+    const RAINBOW = [[P.coral, '#e0406f'], [P.orange, '#e07b00'], [P.yellow, '#e0a800'], [P.mint, '#22b884'], [P.sky, '#2a9fd0'], [P.purple, '#7b2cbf']];
+    const def = HATS[character] || HATS.keeper, colors = skin === 'rainbow' ? RAINBOW[Math.floor(this.clock * 6) % 6] : this.skinColors?.[skin] || [def[1], def[2]];
+    const key = `hero_${character}_${colors[0]}`; if (!this.sprites[key]) this.sprites[key] = this.sprites.__hero(colors[0], colors[1], def[0]); return key;
   }
   sprite(name, x, y, size, rotation = 0, alpha = 1, sx = 1, sy = 1, set = this.sprites) {
     const c = this.ctx, s = set[name]; if (!s) return;
@@ -304,7 +312,7 @@ export class Renderer {
           this.kick = 1.2; this.zoomKick = .12; this.flash('#fff7d6', .45);
           if (effects) { this.confetti(e.x, e.y, heavy ? 120 : 30, 640); for (let i = 0; i < 4; i++) this.spawn('ring', e.x, e.y, { life: .5 + i * .15, size: 140 + i * 90, color: CONFETTI[i], grow: 1 }); this.comic(e.x, e.y - 70, 'K.O.!', P.yellow, 2); }
           break;
-        case 'firework': if (effects) { this.burst(e.x, e.y, heavy ? 22 : 8, CONFETTI, 420, { type: 'star', size: 8, life: .6 }); this.spawn('ring', e.x, e.y, { life: .4, size: e.a, color: P.pink, grow: 1 }); } this.kick = Math.max(this.kick, .25); break;
+        case 'firework': if (effects) { if (heavy) this.burst(e.x, e.y, this.crowd ? 8 : 22, CONFETTI, 420, { type: this.crowd ? 'dot' : 'star', size: 8, life: .6 }); this.spawn('ring', e.x, e.y, { life: .4, size: e.a, color: P.pink, grow: 1 }); } this.kick = Math.max(this.kick, .25); break;
         case 'star': if (effects) { this.spawn('blast', e.x, e.y, { life: .26, size: e.a, color: P.yellow }); if (heavy) this.burst(e.x, e.y, 6, [P.lemon, P.white], 260, { type: 'star', size: 6, life: .4 }); } break;
         case 'slam': this.kick = Math.max(this.kick, .45); if (effects) { this.spawn('ring', e.x, e.y, { life: .35, size: e.a * 1.2, color: P.tomato, grow: 1 }); this.spawn('puff', e.x, e.y, { life: .3, size: e.a, color: '#ff5a5f' }); } break;
         case 'special': { const words = ['MAGNET!', 'BOMB!!', 'FREEZE!', 'STAR POWER!'], cols = [P.coral, P.orange, P.sky, P.yellow]; this.flash(e.a === 1 ? '#ffffff' : e.a === 2 ? '#c9f3ff' : '#fff7d6', e.a === 1 ? .5 : .25); this.kick = Math.max(this.kick, e.a === 1 ? 1.1 : .4); this.zoomKick = .07;
@@ -313,6 +321,9 @@ export class Renderer {
         case 'heal': if (effects) { this.spawn('ring', e.x, e.y, { life: .45, size: e.a, color: P.pink, grow: 1 }); for (let k = 0; k < 6; k++) this.spawn('twinkle', e.x + (Math.random() - .5) * e.a, e.y + (Math.random() - .5) * e.a, { life: .5, size: 9, color: P.mint, vy: -40 }); } break;
         case 'shieldBreak': if (effects) { this.burst(e.x, e.y, 10, [P.white, P.sky], 300, { type: 'spark', size: 10, life: .3 }); this.comic(e.x, e.y - 30, 'BREAK!', P.sky, .7); } break;
         case 'relic': this.flash('#e5d4ff', .3); this.zoomKick = .08; if (effects) { for (let k = 0; k < 3; k++) this.spawn('ring', e.x, e.y, { life: .5 + k * .15, size: 120 + k * 80, color: [P.purple, P.pink, P.lemon][k], grow: 1 }); this.confetti(e.x, e.y, heavy ? 60 : 18, 480); this.comic(e.x, e.y - 100, 'RELIC!', P.purple, 1.3); } break;
+        case 'fusion': this.flash('#ffffff', .45); this.kick = 1.2; this.zoomKick = .14; if (effects) { for (let k = 0; k < 5; k++) this.spawn('ring', e.x, e.y, { life: .5 + k * .12, size: 120 + k * 90, color: CONFETTI[k], grow: 1 }); this.confetti(e.x, e.y, heavy ? 140 : 40, 700); this.comic(e.x, e.y - 120, 'FUSION!!', P.yellow, 1.8); } break;
+        case 'decoy': if (effects) { this.spawn('puff', e.x, e.y, { life: .6, size: 120, color: P.pink }); this.comic(e.x, e.y - 90, 'どれが本物？', P.pink, 1.1); } break;
+        case 'iceZone': if (effects) this.spawn('ring', e.x, e.y, { life: .45, size: e.a, color: P.white, grow: 1 }); break;
         case 'eliteDown':
           this.kick = Math.max(this.kick, .6); this.flash('#fff2b0', .15);
           if (effects) { this.confetti(e.x, e.y, heavy ? 50 : 16, 520); this.spawn('ring', e.x, e.y, { life: .45, size: 150, color: P.yellow, grow: 1 }); this.comic(e.x, e.y - 50, 'GREAT!', P.yellow, 1.2); }
@@ -411,6 +422,7 @@ export class Renderer {
     this.drawArena(x0, y0, x1, y1, game);
     const l = game.levels;
     if (l.frost) this.drawFrost(p, l.frost, game.time);
+    for (const z of game.iceZones || []) { const a = Math.min(1, z.t / 1.5); c.fillStyle = `rgba(201,243,255,${.35 * a})`; c.beginPath(); c.arc(z.x, z.y, z.r, 0, TAU); c.fill(); c.strokeStyle = `rgba(255,255,255,${.7 * a})`; c.lineWidth = 3; c.setLineDash([6, 8]); c.beginPath(); c.arc(z.x, z.y, z.r, 0, TAU); c.stroke(); c.setLineDash([]); for (let k = 0; k < 6; k++) { const ang = k / 6 * TAU + z.t * .3; c.fillStyle = '#ffffffaa'; star(c, z.x + Math.cos(ang) * z.r * .6, z.y + Math.sin(ang) * z.r * .6, 7, 2.5, 6, 0); c.fill(); } }
     for (const h of game.hazards || []) { const t = 1 - h.t / h.max; c.fillStyle = `rgba(255,90,95,${.12 + t * .25})`; c.beginPath(); c.arc(h.x, h.y, h.r, 0, TAU); c.fill(); c.fillStyle = `rgba(255,90,95,${.35})`; c.beginPath(); c.arc(h.x, h.y, h.r * t, 0, TAU); c.fill(); c.save(); c.beginPath(); c.arc(h.x, h.y, h.r, 0, TAU); c.clip(); c.strokeStyle = '#ffffff55'; c.lineWidth = 4; c.beginPath(); for (let k = -h.r * 2; k < h.r * 2; k += 16) { c.moveTo(h.x + k, h.y - h.r); c.lineTo(h.x + k + h.r * 2, h.y + h.r); } c.stroke(); c.restore(); c.strokeStyle = P.tomato; c.lineWidth = 4; c.setLineDash([12, 8]); c.lineDashOffset = -this.clock * 50; c.beginPath(); c.arc(h.x, h.y, h.r, 0, TAU); c.stroke(); c.setLineDash([]); if (t > .7 && this.frame % 6 < 3) { c.strokeStyle = P.white; c.lineWidth = 3; c.beginPath(); c.arc(h.x, h.y, h.r - 4, 0, TAU); c.stroke(); } }
     for (const m of game.mines || []) this.sprite(m.arm <= 0 && this.frame % 20 < 10 ? 'mineLit' : 'mine', m.x, m.y, 30);
     for (const st of game.strikes || []) { const t = Math.max(0, st.t / st.max); c.strokeStyle = '#fff07aaa'; c.lineWidth = 3; c.beginPath(); c.arc(st.x, st.y, st.r * (1 - t * .5), 0, TAU); c.stroke(); this.sprite('fallStar', st.x + t * 60, st.y - t * 240, 60, .25); }
@@ -452,11 +464,11 @@ export class Renderer {
       const hitPop = e.hit > 0 ? 1 + e.hit * 2.2 : 1, sqx = (1 + wob * .06) * hitPop, sqy = (1 - wob * .06) / Math.sqrt(hitPop) * (e.hit > 0 ? 1.05 : 1);
       const flip = e.x > p.x && e.type !== 3 && e.type !== 4, set = e.hit > .03 ? this.white : this.sprites, lift = Math.abs(wob) * (e.type === 1 ? 4 : 2);
       const tele = (e.type === 5 || e.type === 10) && e.ai === 1;
-      if (fast && e.type !== 4 && !e.elite && !tele && !(e.type === 8 && e.shield > 0)) { this.blit('enemy' + e.type, set, flip, ox + (e.x - this.camera.x) * k, oy + (e.y - lift - this.camera.y) * k, size); continue; }
+      if (fast && e.type !== 4 && e.type !== 11 && !e.elite && !tele && !(e.type === 8 && e.shield > 0)) { this.blit('enemy' + e.type, set, flip, ox + (e.x - this.camera.x) * k, oy + (e.y - lift - this.camera.y) * k, size); continue; }
       if (fast) { c.setTransform(k, 0, 0, k, ox - this.camera.x * k, oy - this.camera.y * k); c.imageSmoothingEnabled = true; }
       if (e.elite) { c.strokeStyle = P.yellow; c.lineWidth = 4; c.setLineDash([10, 8]); c.lineDashOffset = -this.clock * 40; c.beginPath(); c.ellipse(e.x, e.y + e.r * .6, e.r * 1.25, e.r * .5, 0, 0, TAU); c.stroke(); c.setLineDash([]); }
       if (tele) { const len = e.type === 5 ? 420 : 640, a = 1 - e.aiT / (e.type === 5 ? .75 : .8); c.strokeStyle = e.type === 5 ? `rgba(255,159,28,${.4 + a * .5})` : `rgba(255,90,95,${.3 + a * .6})`; c.lineWidth = e.type === 5 ? 26 * (1 - a * .5) : 3 + a * 3; c.setLineDash(e.type === 5 ? [16, 10] : [6, 6]); c.beginPath(); c.moveTo(e.x, e.y); c.lineTo(e.x + e.cx * len, e.y + e.cy * len); c.stroke(); c.setLineDash([]); }
-      this.sprite(e.type === 4 ? 'enemy4_' + (this.stage || 'wilds') : 'enemy' + e.type, e.x, e.y - lift, e.elite ? size * 1.45 : size, e.type === 1 ? wob * .12 : 0, 1, flip ? -sqx : sqx, sqy, set);
+      this.sprite(e.type === 4 || e.type === 11 ? 'enemy4_' + (this.stage || 'wilds') : 'enemy' + e.type, e.x, e.y - lift, e.elite ? size * 1.45 : size, e.type === 1 ? wob * .12 : 0, 1, flip ? -sqx : sqx, sqy, set);
       if (e.type === 8 && e.shield > 0) this.sprite('shield', e.x, e.y - lift, 64, Math.atan2(p.y - e.y, p.x - e.x), .5 + e.shield * .17);
       if (e.elite) { this.sprite('crown', e.x, e.y - e.r * 1.35 - lift + (motion ? Math.sin(this.clock * 5) * 2 : 0), 34); if (e.hp < e.maxHP) { const bw = 56, by = e.y - e.r * 1.7; roundRect(c, e.x - bw / 2 - 2, by - 2, bw + 4, 9, 4); c.fillStyle = P.ink; c.fill(); roundRect(c, e.x - bw / 2, by, Math.max(4, bw * e.hp / e.maxHP), 5, 2.5); c.fillStyle = P.yellow; c.fill(); } }
       if (e.slow > 0) { c.fillStyle = '#9be7ff55'; c.beginPath(); c.ellipse(e.x, e.y + e.r * .7, e.r + 4, 6, 0, 0, TAU); c.fill(); }
@@ -475,11 +487,11 @@ export class Renderer {
     c.setTransform(k, 0, 0, k, ox - this.camera.x * k, oy - this.camera.y * k);
     this.drawCoreParticles(game, x0, y0, x1, y1, 'over');
     if (l.orbit) {
-      const count = l.orbit === 5 ? 5 : l.orbit + 1, r = orbitRadius(l.orbit), spin = l.orbit >= 4 ? 2.9 : 2.2;
+      const count = (l.orbit === 5 ? 5 : l.orbit + 1) + (game.levels.fx_galaxy ? 3 : 0), r = orbitRadius(l.orbit), spin = l.orbit >= 4 ? 2.9 : 2.2;
       c.strokeStyle = '#ffffff22'; c.lineWidth = 2; c.setLineDash([6, 10]); c.beginPath(); c.arc(p.x, p.y, r, 0, TAU); c.stroke(); c.setLineDash([]);
       for (let i = 0; i < count; i++) {
         const a = game.time * spin + i * TAU / count;
-        if (motion) { c.strokeStyle = l.orbit === 5 ? '#ffd23f88' : '#4cc9f088'; c.lineWidth = 8; c.lineCap = 'round'; c.beginPath(); c.arc(p.x, p.y, r, a - .55, a - .05); c.stroke(); }
+        if (motion) { c.strokeStyle = game.levels.fx_galaxy ? CONFETTI[(i + (this.frame >> 3)) & 7] + 'aa' : l.orbit === 5 ? '#ffd23f88' : '#4cc9f088'; c.lineWidth = 8; c.lineCap = 'round'; c.beginPath(); c.arc(p.x, p.y, r, a - .55, a - .05); c.stroke(); }
         this.sprite('blade', p.x + Math.cos(a) * r, p.y + Math.sin(a) * r, l.orbit === 5 ? 40 : 34, game.time * 9);
       }
     }
@@ -488,11 +500,12 @@ export class Renderer {
     const moving = Math.hypot(p.dx, p.dy) > 0, step = motion ? Math.sin(game.time * 14) : 0, bounce = 1 + (motion ? pump * .05 * beat.energy : 0);
     const facing = p.dx < -.1 ? -1 : 1;
     if (game.starPower > 0 && motion) { c.strokeStyle = CONFETTI[this.frame >> 2 & 7]; c.lineWidth = 6; c.beginPath(); c.arc(p.x, p.y - 4, 34 + Math.sin(this.clock * 20) * 3, 0, TAU); c.stroke(); if (this.frame % 3 === 0) this.spawn('star', p.x + (Math.random() - .5) * 40, p.y + (Math.random() - .5) * 40, { life: .5, size: 7, color: CONFETTI[this.frame & 7], vy: -40 }); }
-    this.sprite('player_' + (game.character || 'keeper'), p.x, p.y - Math.abs(step) * (moving ? 2.5 : .6), 84, 0, p.invincible > .3 && p.invincible < 100 && this.frame % 6 < 2 ? .55 : 1, facing * (1 + step * .03) * bounce, (1 - step * .03) * bounce);
+    this.sprite(this.hero(game.character, this.skin), p.x, p.y - Math.abs(step) * (moving ? 2.5 : .6), 84, 0, p.invincible > .3 && p.invincible < 100 && this.frame % 6 < 2 ? .55 : 1, facing * (1 + step * .03) * bounce, (1 - step * .03) * bounce);
     this.drawFx(x0, y0, x1, y1);
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     if (!home && !['won', 'dead'].includes(game.state) && game.boss?.alive) this.bossIndicator(game.boss, s);
     if (!home && this.nearestChest && game.state === 'running') this.bossIndicator(this.nearestChest, s, P.yellow);
+    if (game.darkness > .02) { const px = w / 2 + (p.x - this.camera.x) * s + sx, py = h / 2 + (p.y - this.camera.y) * s + sy, R = 260 * s, g2 = c.createRadialGradient(px, py, R * .35, px, py, R); g2.addColorStop(0, 'rgba(14,4,36,0)'); g2.addColorStop(1, `rgba(14,4,36,${.86 * game.darkness})`); c.fillStyle = g2; c.fillRect(0, 0, w, h); if (game.boss?.alive) { const bx = w / 2 + (game.boss.x - this.camera.x) * s + sx, by = h / 2 + (game.boss.y - this.camera.y) * s + sy; c.fillStyle = `rgba(255,90,95,${game.darkness * (.6 + Math.sin(this.clock * 6) * .3)})`; for (const ox of [-14, 14]) { c.beginPath(); c.ellipse(bx + ox * s, by - 6 * s, 6 * s, 4 * s, 0, 0, TAU); c.fill(); } } }
     if (game.freeze > 0) { c.fillStyle = `rgba(155,231,255,${Math.min(.28, game.freeze * .08)})`; c.fillRect(0, 0, w, h); c.strokeStyle = '#e8fbffcc'; c.lineWidth = 14; c.strokeRect(0, 0, w, h); }
     if (this.hurtTime > 0 && motion && this.opts.flash) { const a = this.hurtTime / .35; c.strokeStyle = `rgba(255,70,110,${a * .55})`; c.lineWidth = 28; c.strokeRect(0, 0, w, h); }
     if (p.hp < p.maxHP * .3 && !home && game.state === 'running' && motion) { const a = (.18 + Math.sin(this.clock * 7) * .1); c.strokeStyle = `rgba(255,70,110,${a})`; c.lineWidth = 18; c.strokeRect(0, 0, w, h); }
@@ -556,7 +569,7 @@ export class Renderer {
         else if (q.type === 'warning') { c.strokeStyle = P.tomato; c.globalAlpha = .4 + life * .5; c.lineWidth = 5; c.setLineDash([10, 8]); c.beginPath(); c.arc(q.x, q.y, q.size * (1.4 - life * .4), 0, TAU); c.stroke(); c.setLineDash([]); c.globalAlpha = 1; }
         continue;
       }
-      if (q.type === 'beam') { c.globalAlpha = Math.min(1, life * 1.6); c.lineCap = 'round'; for (const [lw, col] of [[q.size * 2 + 8, P.ink], [q.size * 2, P.sky], [q.size * .8, P.white]]) { c.lineWidth = lw * (.6 + life * .4); c.strokeStyle = col; c.beginPath(); c.moveTo(q.x, q.y); c.lineTo(q.x2, q.y2); c.stroke(); } c.globalAlpha = 1; continue; }
+      if (q.type === 'beam') { c.globalAlpha = Math.min(1, life * 1.6); c.lineCap = 'round'; const prism = game.levels.fx_prism > 0; for (const [lw, col] of [[q.size * 2 + 8, P.ink], [q.size * 2, prism ? CONFETTI[this.frame >> 2 & 7] : P.sky], [q.size * .8, P.white]]) { c.lineWidth = lw * (.6 + life * .4); c.strokeStyle = col; c.beginPath(); c.moveTo(q.x, q.y); c.lineTo(q.x2, q.y2); c.stroke(); } c.globalAlpha = 1; continue; }
       if (q.type === 'arc') {
         const segs = 6, pts = [[q.x, q.y]]; for (let i = 1; i < segs; i++) { const t = i / segs; pts.push([q.x + (q.x2 - q.x) * t + (Math.random() - .5) * 22, q.y + (q.y2 - q.y) * t + (Math.random() - .5) * 22]); } pts.push([q.x2, q.y2]);
         c.lineJoin = 'round'; c.lineCap = 'round'; c.globalAlpha = Math.min(1, life * 2);

@@ -1,5 +1,5 @@
 import { Game, MODES, UPGRADES, HEATS, MUTATORS, EVOLVE_PAIRS, SLOT_LIMIT, CHARACTERS, EVENTS, STAGES, RELICS, CURSES, formatTime } from './core.js';
-import { SHOP, shopCost, ACHIEVEMENTS, sanitizeProfile, buy, refundAll, recordRun, checkProfileAchievements, UNLOCKS, lockedWeapons, characterUnlocked, stageUnlocked, dailyConfig, describeDaily, heatMultiplier, localDate } from './meta.js';
+import { SHOP, shopCost, ACHIEVEMENTS, sanitizeProfile, buy, refundAll, recordRun, checkProfileAchievements, CODEX, codexProgress, SKINS, skinUnlocked, UNLOCKS, lockedWeapons, characterUnlocked, stageUnlocked, dailyConfig, describeDaily, heatMultiplier, localDate } from './meta.js';
 import { Renderer } from './render.js';
 import { AudioEngine, MUSIC_BPM } from './audio.js';
 import { EndingSequence } from './ending.js';
@@ -43,17 +43,32 @@ function start(opts = {}) {
   const daily = !!opts.daily;
   if (daily) { const cfg = dailyConfig(); runInfo = { daily: true, heat: cfg.heat, mutators: cfg.mutators, day: cfg.day }; game = new Game(cfg.mode, cfg.seed, { heat: cfg.heat, mutators: cfg.mutators }); }
   else { runInfo = { daily: false, heat: settings.heat, mutators: [], day: '' }; game = new Game(mode, Date.now(), { stage: stageUnlocked(profile, profile.stage) ? profile.stage : 'wilds', heat: settings.heat, meta: profile.meta, character: characterUnlocked(profile, profile.character) ? profile.character : 'keeper', locked: lockedWeapons(profile) }); }
-  ending = null; endingResultShown = false; runResult = null; clearInput(); game.start(); audio.setStage(STAGES[game.stage].transpose); coachQueue.length = 0; hideCoach(); combo.reset(); resultSaved = false; lastArsenal = ''; lastKills = 0; lastLevel = 1; slowmo = 0; choosing = false;
+  game.start(); clearRun(); enterRun(false);
+}
+// Shared run setup for a fresh start and for resuming a suspended run.
+function enterRun(resumed) {
+  ending = null; endingResultShown = false; runResult = null; clearInput(); audio.setStage(STAGES[game.stage].transpose); coachQueue.length = 0; hideCoach(); combo.reset(); resultSaved = false; lastArsenal = ''; lastKills = 0; lastLevel = 1; slowmo = 0; choosing = false;
   prevState = ''; accumulator = 0; document.body.classList.add('playing'); renderer.camera.x = game.player.x; renderer.camera.y = game.player.y; renderer.resize();
   audioPrimed = true; audio.setScene('play'); void audio.unlock(); audio.setActive(true);
   $('#dash-button kbd').textContent = settings.keyDash.replace('Key', '').toUpperCase(); $('#pulse-button kbd').textContent = settings.keyPulse.replace('Key', '').toUpperCase();
   $('#mission-label').textContent = `${MODES[game.mode].name}・${STAGES[game.stage].name}`;
   $('#hud-chips').innerHTML = (runInfo.daily ? `<span class="daily">DAILY ${runInfo.day.slice(5).replace('-', '/')}</span>` : '') + (runInfo.heat ? `<span>ヒート${runInfo.heat}</span>` : '') + runInfo.mutators.map(id => `<span class="daily">${MUTATORS[id].name}</span>`).join(''); $('#time-target').textContent = '/ ' + formatTime(game.duration); $('#movement-hint').hidden = false; $('#announcement').hidden = true; $('#warning-banner').hidden = true; $('#combo').hidden = true;
-  transition(); updateHUD(); renderer.celebrate('start', game); announce('READY… GO!!');
+  transition(); updateHUD(); if (resumed) { announce('おかえり！続きからスタート'); return; } renderer.celebrate('start', game); announce('READY… GO!!');
   coach('move', '<b>動いて</b>キラキラを集めよう！攻撃は自動。ピンチは<b>ダッシュ</b>で回避、囲まれたら<b>パルス</b>！'); if (game.stage === 'frost') coach('ice', '氷の湖は<b>足元が滑る</b>！早めに方向を変えよう。'); if (game.stage === 'candy') coach('syrup', 'ピンクの<b>シロップ</b>に入ると足が鈍る。敵も遅くなるよ。'); $('#stage').focus({ preventScroll: true });
 }
+// --- suspend / resume -------------------------------------------------------------------------
+const RUN_KEY = 'lastlight-pop-run-v1'; let lastSave = 0;
+function saveRun() { if (!game || ending || !['running', 'paused', 'upgrade', 'chest', 'relic'].includes(game.state)) return; try { localStorage.setItem(RUN_KEY, JSON.stringify({ v: 1, at: Date.now(), runInfo, combo: { count: combo.count, best: combo.best }, kills: lastKills, game: game.snapshot() })); lastSave = performance.now(); } catch { } }
+function clearRun() { try { localStorage.removeItem(RUN_KEY); } catch { } }
+function savedRun() { const d = read(RUN_KEY, null); if (!d || d.v !== 1 || !d.game || !MODES[d.game.mode]) return null; if (d.runInfo?.daily && d.runInfo.day !== localDate()) return null; return d; }
+function resumeRun() {
+  const d = savedRun(); if (!d) { updateHome(); return; }
+  try { game = Game.restore(d.game); } catch { clearRun(); toast('保存された出撃を読み込めませんでした。'); updateHome(); return; }
+  runInfo = d.runInfo || { daily: false, heat: 0, mutators: [], day: '' }; if (game.state === 'running') game.state = 'paused'; enterRun(true);
+  combo.reset(); combo.best = d.combo?.best || 0; lastKills = game.kills; audio.setStage(STAGES[game.stage].transpose); prevState = ''; transition();
+}
 function home() {
-  if (game && ['running', 'paused', 'upgrade', 'chest', 'relic'].includes(game.state)) finalizeRun(false); hideCoach();
+  if (game && ['running', 'paused', 'upgrade', 'chest', 'relic'].includes(game.state)) finalizeRun(false); hideCoach(); clearRun();
   game = null; ending = null; endingResultShown = false; audio.setScene('home'); clearInput(); prevState = 'home'; hideScreens(); $('#home-screen').hidden = false;
   document.body.classList.remove('playing'); $('#announcement').hidden = true; $('#warning-banner').hidden = true; $('#boss-panel').hidden = true; renderer.resize(); demo = makeDemo(); updateBest(); updateHome(); $('#start-button').focus({ preventScroll: true });
 }
@@ -86,9 +101,9 @@ function evolveHint(u) {
 function renderUpgrades(flip = false) {
   const cards = $('#upgrade-cards'); cards.classList.toggle('banishing', banishMode); cards.classList.remove('rerolled'); if (flip) { void cards.offsetWidth; cards.classList.add('rerolled'); }
   cards.innerHTML = game.choices.map((u, i) => {
-    const lv = game.levels[u.id], evolved = lv === 4 && u.tag === 'WEAPON', desc = lv > 0 && u.effect ? u.effect[lv - 1] : u.description;
+    const lv = game.levels[u.id], fusion = u.tag === 'FUSION', evolved = lv === 4 && u.tag === 'WEAPON' || fusion, desc = lv > 0 && u.effect ? u.effect[lv - 1] : u.description;
     const pips = Array.from({ length: u.max }, (_, k) => `<i class="${k < lv ? 'on' : k === lv ? 'next' : ''}"></i>`).join('');
-    return `<button class="upgrade-card ${evolved ? 'evolve' : ''}" data-upgrade="${u.id}" style="--c:${POP_COLORS[u.id] || 'var(--yellow)'}" aria-label="${u.name}を${banishMode ? '除外' : '選択'}"><div class="upgrade-top"><span>${evolved ? '★ EVOLUTION ★' : lv === 0 ? 'NEW ' + u.tag : u.tag}</span><kbd>${i + 1}</kbd></div><div class="upgrade-icon">${icon(u.icon)}</div><h3>${u.name}${evolved ? '・極' : ''}</h3><p>${desc}</p>${evolveHint(u)}<span class="upgrade-level">${lv === 0 ? 'GET!' : `LV. ${lv} → ${lv + 1}`}<span class="pips">${pips}</span></span></button>`;
+    return `<button class="upgrade-card ${evolved ? 'evolve' : ''} ${fusion ? 'fusion' : ''}" data-upgrade="${u.id}" style="--c:${POP_COLORS[u.id] || 'var(--yellow)'}" aria-label="${u.name}を${banishMode ? '除外' : '選択'}"><div class="upgrade-top"><span>${fusion ? '★ FUSION ★' : evolved ? '★ EVOLUTION ★' : lv === 0 ? 'NEW ' + u.tag : u.tag}</span><kbd>${i + 1}</kbd></div><div class="upgrade-icon">${icon(u.icon)}</div><h3>${u.name}${evolved && !fusion ? '・極' : ''}</h3><p>${desc}${fusion ? `<br><b>${u.from.map(id => UPGRADES.find(x => x.id === id).name).join(' ＋ ')}</b>` : ''}</p>${evolveHint(u)}<span class="upgrade-level">${fusion ? '合体！' : lv === 0 ? 'GET!' : `LV. ${lv} → ${lv + 1}`}${fusion ? '' : `<span class="pips">${pips}</span>`}</span></button>`;
   }).join('');
   $('#reroll-count').textContent = game.rerolls; $('#banish-count').textContent = game.banishes; $('#reroll-button').disabled = game.rerolls <= 0; $('#banish-button').disabled = game.banishes <= 0 && !banishMode;
   $('#banish-button').setAttribute('aria-pressed', String(banishMode)); $('#upgrade-footnote').textContent = banishMode ? '除外するカードを選んでください（この出撃では二度と出ません）・ X でキャンセル' : `武器 ${game.owned('WEAPON')}/${SLOT_LIMIT.WEAPON} ・ 支援 ${game.owned('SUPPORT')}/${SLOT_LIMIT.SUPPORT} ・ 数字キー 1 / 2 / 3 でも選べます`;
@@ -111,7 +126,7 @@ function skipUpgrade() { if (game?.state === 'upgrade' && !choosing && game.skip
 // --- treasure chest presentation -------------------------------------------------------------
 function rewardView(r) {
   if (r.id === 'heal') return { name: 'HP回復', label: '+30 HP', icon: 'heart', color: 'var(--coral)', evolved: false };
-  const u = UPGRADES.find(x => x.id === r.id); return { name: u.name + (r.evolved ? '・極' : ''), label: r.evolved ? '★ EVOLUTION' : 'Lv. ' + r.level, icon: u.icon, color: POP_COLORS[u.id], evolved: r.evolved };
+  const u = UPGRADES.find(x => x.id === r.id); return { name: u.name + (r.evolved ? '・極' : ''), label: u.tag === 'FUSION' ? '★ FUSION' : r.evolved ? '★ EVOLUTION' : 'Lv. ' + r.level, icon: u.icon, color: POP_COLORS[u.id], evolved: r.evolved };
 }
 function reelHTML(r, spinning) { const v = rewardView(r); return `<div class="reel ${spinning ? 'spinning' : 'stopped'} ${!spinning && v.evolved ? 'evolved' : ''}" style="--c:${v.color}"><div class="reel-top">${spinning ? '? ? ?' : v.evolved ? 'EVOLVE!' : 'GET!'}</div><div class="reel-icon">${icon(v.icon)}</div><strong>${spinning ? '…' : v.name}</strong><small>${spinning ? '&nbsp;' : v.label}</small></div>`; }
 function clearChestTimers() { for (const t of chestTimers) { clearTimeout(t); clearInterval(t); } chestTimers = []; }
@@ -182,8 +197,8 @@ function pollPad(now) {
   }
   pad.prev = b;
 }
-function runSummary(won) { const st = game.stats; return { mode: game.mode, won, time: game.time, kills: game.kills, level: game.level, heat: runInfo.heat, combo: combo.best, evolves: st.evolves, jackpots: st.jackpots, elites: st.elites, bossKills: st.bossKills, bossHits: st.bossHits, chests: st.chests, daily: runInfo.daily, specials: st.specials, character: game.character, stage: game.stage, relics: st.relics, curses: game.curses.length }; }
-function finalizeRun(won) { if (!game || resultSaved) return runResult; const best = storeResult(won); runResult = { best, ...recordRun(profile, runSummary(won), runInfo.day || localDate()) }; saveProfile(); updateStars(true); return runResult; }
+function runSummary(won) { const st = game.stats; return { mode: game.mode, won, time: game.time, kills: game.kills, level: game.level, heat: runInfo.heat, combo: combo.best, evolves: st.evolves, jackpots: st.jackpots, elites: st.elites, bossKills: st.bossKills, bossHits: st.bossHits, chests: st.chests, daily: runInfo.daily, specials: st.specials, character: game.character, stage: game.stage, relics: st.relics, curses: game.curses.length, fusions: st.fusions, codex: [...game.seen, ...UPGRADES.filter(u => game.levels[u.id] > 0).map(u => u.id), ...[...game.relics].map(id => 'relic_' + id)] }; }
+function finalizeRun(won) { if (!game || resultSaved) return runResult; clearRun(); const best = storeResult(won); runResult = { best, ...recordRun(profile, runSummary(won), runInfo.day || localDate()) }; saveProfile(); updateStars(true); return runResult; }
 function storeResult(won) {
   if (!game || resultSaved) return false; resultSaved = true;
   const best = game.time > records.bestTime || game.kills > records.bestKills || combo.best > records.bestCombo;
@@ -208,7 +223,7 @@ function renderResult() {
   if (game.endless) { $('#result-title').textContent = `${formatTime(game.time)} 生き残った！`; $('#result-eyebrow').textContent = 'ENDLESS NIGHT'; $('#result-copy').textContent = `自己ベスト ${formatTime(profile.endlessBest)}`; }
   $('#result-unlocks').innerHTML = res.newlyUnlocked.map(u => `<div class="unlock new">${icon(u.kind === 'weapon' ? UPGRADES.find(x => x.id === u.id).icon : 'user')}${u.kind === 'weapon' ? '新しい武器' : '新キャラクター'}「${u.label}」が解放された！<small>NEW!</small></div>`).join('') + (res.heatUnlocked ? `<div class="unlock heat">${icon('flame')}ヒート${res.heatUnlocked}「${HEATS[res.heatUnlocked].name}」が解放された！<small>★×${heatMultiplier(res.heatUnlocked).toFixed(2)}</small></div>` : '') + res.unlocked.map(a => `<div class="unlock">${icon('medal')}実績「${a.name}」達成！<small>★ +${a.reward}</small></div>`).join('');
   if (res.unlocked.length) setTimeout(() => audio.effect('achieve'), 1400); if (res.newlyUnlocked.length) setTimeout(() => audio.effect('unlock'), 2000);
-  $('#result-relics').innerHTML = [...game.relics].map(id => `<span style="--c:${RELICS[id].color}">${icon(RELICS[id].icon)} ${RELICS[id].name}</span>`).join('');
+  $('#result-relics').innerHTML = UPGRADES.filter(u => u.tag === 'FUSION' && game.levels[u.id] > 0).map(u => `<span style="--c:${u.color}">${icon(u.icon)} ${u.name}</span>`).join('') + [...game.relics].map(id => `<span style="--c:${RELICS[id].color}">${icon(RELICS[id].icon)} ${RELICS[id].name}</span>`).join('');
   $('#result-build').innerHTML = UPGRADES.filter(u => u.tag === 'WEAPON' && game.levels[u.id] > 0).map(u => `<span style="--c:${POP_COLORS[u.id]}" title="${u.name}">${icon(u.icon)} ${game.levels[u.id] === 5 ? '★MAX' : 'Lv' + game.levels[u.id]}</span>`).join('');
 }
 function countUp() {
@@ -228,6 +243,8 @@ function updateHome() {
   const badge = $('#daily-badge'); badge.textContent = rec?.won ? 'CLEAR' : rec ? formatTime(rec.best) : 'NEW'; badge.className = rec?.won ? 'done' : '';
   $('#achieve-count').textContent = `${Object.keys(profile.achievements).length}/${ACHIEVEMENTS.length}`;
   updateCharacter();
+  const saved = savedRun(), rb = $('#resume-run'); rb.hidden = !saved;
+  if (saved) { const g = saved.game; $('#resume-detail').textContent = `${MODES[g.mode].name}・${STAGES[g.stage]?.name || ''}・${formatTime(g.time)}・Lv.${g.level}${saved.runInfo?.daily ? '・デイリー' : ''}`; }
   const st = STAGES[profile.stage], open = stageUnlocked(profile, profile.stage), srow = $('#stage-row'), anyStage = STAGE_ORDER.some(id => id !== 'wilds' && stageUnlocked(profile, id));
   srow.hidden = !anyStage; srow.dataset.locked = open ? 0 : 1; $('#stage-name').textContent = (open ? '' : '🔒 ') + st.name; const su = UNLOCKS.find(u => u.kind === 'stage' && u.id === profile.stage);
   $('#stage-rule').textContent = open ? st.rule : `実績「${ACHIEVEMENTS.find(a => a.id === su.achievement).name}」で解放`; srow.style.setProperty('--st1', STAGE_COLORS[profile.stage][0]); srow.style.setProperty('--st2', STAGE_COLORS[profile.stage][1]);
@@ -236,11 +253,12 @@ function updateHome() {
   $('#daily-button').hidden = profile.stats.runs < 1; markNew($('#daily-button'), 'daily', profile.stats.runs >= 1);
   const endlessOpen = !!profile.achievements['first-clear'], et = $('[data-mode="endless"]'); et.disabled = !endlessOpen; et.title = endlessOpen ? 'エンドレス' : '初クリアで解放'; markNew(et, 'endless', endlessOpen); if (!endlessOpen && mode === 'endless') $('[data-mode="guard"]').click();
   const anyChar = Object.keys(CHARACTERS).some(id => id !== 'keeper' && characterUnlocked(profile, id)); $('#char-button').hidden = !anyChar; markNew($('#char-button'), 'chars', anyChar);
+  $('#codex-count').textContent = Math.round(codexProgress(profile).ratio * 100) + '%';
   $('#shop-badge').hidden = !SHOP.some(i => profile.stars >= shopCost(i, profile.meta[i.id] || 0));
 }
-function applyRenderOptions() { renderer.opts = { shake: settings.shake, flash: settings.flash, numbers: settings.numbers }; }
-function charImage(id) { try { return renderer.sprites['player_' + id].image.toDataURL(); } catch { return ''; } }
-function updateCharacter() { const id = characterUnlocked(profile, profile.character) ? profile.character : 'keeper', c = CHARACTERS[id]; $('#char-img').src = charImage(id); $('#char-name').textContent = `${c.name}・${c.title}`; $('#char-perk').textContent = c.perk; }
+function applyRenderOptions() { renderer.opts = { shake: settings.shake, flash: settings.flash, numbers: settings.numbers }; renderer.skinColors = Object.fromEntries(Object.entries(SKINS).filter(([, v]) => Array.isArray(v.colors)).map(([k, v]) => [k, v.colors])); renderer.skin = skinUnlocked(profile, profile.skin) ? profile.skin : 'classic'; }
+function charImage(id, skin = 'classic') { try { return renderer.sprites[renderer.hero(id, skin === 'rainbow' ? 'classic' : skin)].image.toDataURL(); } catch { return ''; } }
+function updateCharacter() { const id = characterUnlocked(profile, profile.character) ? profile.character : 'keeper', c = CHARACTERS[id]; $('#char-img').src = charImage(id, renderer.skin); $('#char-name').textContent = `${c.name}・${c.title}`; $('#char-perk').textContent = c.perk; }
 const STAGE_ORDER = Object.keys(STAGES), STAGE_COLORS = { wilds: ['#3a2a7c', '#7b5cd6'], frost: ['#2c4f86', '#4cc9f0'], candy: ['#7a2f6e', '#ff8fc7'] };
 function cycleStage(delta) { const i = STAGE_ORDER.indexOf(profile.stage), next = STAGE_ORDER[(i + delta + STAGE_ORDER.length) % STAGE_ORDER.length]; profile.stage = next; saveProfile(); audio.effect('ui'); demo = makeDemo(); updateHome(); }
 function markNew(el, key, show) { if (!el) return; const fresh = show && !profile.seen[key]; el.classList.toggle('new-badge', fresh); if (fresh && !el.dataset.seenHook) { el.dataset.seenHook = '1'; el.addEventListener('click', () => { profile.seen[key] = true; saveProfile(); el.classList.remove('new-badge'); }, { capture: true }); } }
@@ -263,13 +281,13 @@ function updateHUD() {
   }
   const signature = UPGRADES.map(u => game.levels[u.id]).join(',') + [...game.relics].join() + game.curses.join();
   if (signature !== lastArsenal) {
-    const before = lastArsenal.split(','); lastArsenal = signature; const equipped = UPGRADES.filter(u => u.tag === 'WEAPON' && game.levels[u.id] > 0), weapons = UPGRADES;
-    $('#arsenal-slots').innerHTML = equipped.map(u => { const i = weapons.indexOf(u), fresh = before.length > 1 && Number(before[i]) !== game.levels[u.id]; return `<div class="weapon-slot ${game.levels[u.id] === 5 ? 'evolved' : ''} ${fresh ? 'fresh' : ''}" style="--c:${POP_COLORS[u.id]}" title="${u.name} Lv.${game.levels[u.id]}">${icon(u.icon)}<small>${game.levels[u.id] === 5 ? 'MAX' : 'Lv' + game.levels[u.id]}</small></div>`; }).join('') + '<div class="weapon-slot empty"></div>'.repeat(Math.max(0, SLOT_LIMIT.WEAPON - equipped.length));
+    const before = lastArsenal.split(','); lastArsenal = signature; const equipped = UPGRADES.filter(u => u.tag === 'WEAPON' && game.levels[u.id] > 0), weapons = UPGRADES, fusedIds = UPGRADES.filter(f => f.tag === 'FUSION' && game.levels[f.id] > 0).flatMap(f => f.from);
+    $('#arsenal-slots').innerHTML = equipped.map(u => { const i = weapons.indexOf(u), fresh = before.length > 1 && Number(before[i]) !== game.levels[u.id]; return `<div class="weapon-slot ${game.levels[u.id] === 5 ? 'evolved' : ''} ${fusedIds.includes(u.id) ? 'fused' : ''} ${fresh ? 'fresh' : ''}" style="--c:${POP_COLORS[u.id]}" title="${u.name} Lv.${game.levels[u.id]}">${icon(u.icon)}<small>${game.levels[u.id] === 5 ? 'MAX' : 'Lv' + game.levels[u.id]}</small></div>`; }).join('') + '<div class="weapon-slot empty"></div>'.repeat(Math.max(0, SLOT_LIMIT.WEAPON - equipped.length));
     $('#relic-slots').innerHTML = [...game.relics].map(id => `<span style="--c:${RELICS[id].color}" title="${RELICS[id].name}：${RELICS[id].desc}">${icon(RELICS[id].icon)}</span>`).join('') + game.curses.map(id => `<span class="curse" title="呪い：${CURSES[id].name}（${CURSES[id].desc}）">${icon('skull')}</span>`).join('');
     const supports = UPGRADES.filter(u => u.tag === 'SUPPORT' && game.levels[u.id] > 0); $('#support-slots').innerHTML = supports.map(u => `<div class="weapon-slot" style="--c:${POP_COLORS[u.id]}" title="${u.name} Lv.${game.levels[u.id]}">${icon(u.icon)}<small>${game.levels[u.id]}</small></div>`).join('') + '<div class="weapon-slot empty"></div>'.repeat(Math.max(0, SLOT_LIMIT.SUPPORT - supports.length));
   }
   const boss = game.boss; $('#boss-panel').hidden = !boss?.alive;
-  if (boss?.alive) { $('#boss-name').textContent = boss.final ? '夜の主 — 終夜' : '夜の主 — 先触れ'; $('#boss-hp').textContent = `${Math.ceil(boss.hp).toLocaleString()} / ${Math.ceil(boss.maxHP).toLocaleString()}`; $('#boss-bar').style.width = `${boss.hp / boss.maxHP * 100}%`; }
+  if (boss?.alive) { $('#boss-name').textContent = `${STAGES[game.stage].boss} — ${boss.final ? '終夜' : '先触れ'}`; $('#boss-hp').textContent = `${Math.ceil(boss.hp).toLocaleString()} / ${Math.ceil(boss.maxHP).toLocaleString()}`; $('#boss-bar').style.width = `${boss.hp / boss.maxHP * 100}%`; }
 }
 function updateCombo(dt) {
   if (!game) return; const gained = game.kills - lastKills; lastKills = game.kills;
@@ -286,7 +304,8 @@ function processEvents(g, muted = false) {
   const terminal = g.events.some(e => e.type === 'won' || e.type === 'dead'); if (terminal && !muted) audio.setScene('ending');
   for (const e of g.events) {
     if (muted || terminal && !['won', 'dead'].includes(e.type)) continue;
-    if (e.type !== 'kill' && e.type !== 'chest') audio.effect(e.type === 'relicOffer' && e.source === 'altar' ? 'altar' : e.type, e);
+    if (e.type === 'decoy') audio.effect('decoy');
+    if (e.type !== 'kill' && e.type !== 'chest' && e.type !== 'decoy') audio.effect(e.type === 'relicOffer' && e.source === 'altar' ? 'altar' : e.type, e);
     if (e.type === 'elite') { announce('エリート出現！宝箱を持ってるぞ！', 'combo-call'); coach('elite', '<b>王冠のエリート</b>は宝箱を落とす！優先して倒そう。'); }
     if (e.type === 'boss') coach('boss', '<b>夜の主</b>が来た！弱るほど攻撃が激しくなる。<b>赤い円</b>は攻撃の予告だから離れよう。');
     if (e.type === 'special') coach('special', '<b>光る泡</b>は特殊アイテム。爆弾・時間停止・スターなど、拾うと一発逆転！');
@@ -295,11 +314,13 @@ function processEvents(g, muted = false) {
     if (e.type === 'altar') { announce('呪いの祭壇が現れた…', 'danger'); coach('altar', '<b>祭壇</b>に触れるとレリックが手に入る。ただし呪い付き…。'); }
     if (e.type === 'event') { warning({ siege: 'モンスターに包囲された！', stampede: '大暴走が迫ってくる！', meteor: '流星群が降ってくる！赤い円を避けろ！' }[e.kind]); $('#warning-banner strong').textContent = EVENTS[e.kind].length > 2 ? EVENTS[e.kind] + '!!' : EVENTS[e.kind] + '！！'; }
     if (e.type === 'boss') $('#warning-banner strong').textContent = 'WARNING!!';
-    if (e.type === 'bossPhase') announce(e.phase >= 3 ? '夜の主が本気になった！赤い円に注意！' : '夜の主が怒った！手下を呼んだぞ！', 'danger');
+    if (e.type === 'bossPhase') { const st = game?.stage || 'wilds'; announce({ wilds: e.phase >= 3 ? '夜の主が闇を呼んだ！灯火のまわりで戦え！' : '夜の主が怒った！手下を呼んだぞ！', frost: e.phase >= 3 ? '凍結床が広がる！白い円は足が鈍るぞ！' : '氷の女王が氷柱を放つ！赤い列を避けろ！', candy: e.phase >= 3 ? 'またまた分身！本物はどれ？' : 'キャンディ大王が分身した！本物を探せ！' }[st], 'danger');
+      if (e.phase >= 3 && st === 'wilds') coach('dark', '闇の中でも<b>灯火</b>の周りは見える。赤く光る<b>目</b>がボスの位置だ！'); if (st === 'candy') coach('decoys', '分身を倒すと<b>キャンディ弾</b>が飛び散る。本物にはHPバーが出るよ。'); if (st === 'frost' && e.phase >= 2) coach('spikes', '赤い円の<b>列</b>は氷柱の予告。列の横へ逃げよう！'); }
     if (e.type === 'special') announce({ magnet: 'ぜんぶ吸い寄せ！', bomb: 'ドカーン！画面の敵を一掃！', freeze: '時間よ止まれ！', star: 'スターパワー！無敵＆パワーアップ！' }[e.kind], 'evolve');
     if (e.type === 'revive') { announce('もういっかい！復活！！', 'evolve'); slowmo = renderer.reduced ? 0 : .8; }
     if (e.type === 'boss') { warning(e.final ? '夜の主が現れた — 最後の灯火を守れ！' : '夜の主が接近中！'); renderer.celebrate('boss', g); }
     if (e.type === 'bossDown') { announce('夜の主をたおした！', 'evolve'); slowmo = renderer.reduced ? 0 : .9; }
+    if (e.type === 'fusion') { const u = UPGRADES.find(x => x.id === e.id); announce(`合体！「${u ? u.name : ''}」`, 'evolve'); slowmo = renderer.reduced ? 0 : .7; coach('fusion', '<b>合体武器</b>は2つの進化武器の力をかけ合わせた究極の武器！'); }
     if (e.type === 'evolve') { announce('武器が進化した！！', 'evolve'); renderer.celebrate('evolve', g); slowmo = renderer.reduced ? 0 : .45; }
     if (e.type === 'hurt' && settings.vibration && navigator.vibrate) navigator.vibrate(22);
   }
@@ -316,6 +337,7 @@ function syncBeat(now) {
 }
 function frame(now) {
   const presentationElapsed = Math.max(0, (now - previous) / 1000), elapsed = Math.min(presentationElapsed, .1), frameEnding = ending; previous = now;
+  if (game && now - lastSave > 30000) saveRun(); // hide, pagehide and pause also save immediately
   pollPad(now); const begin = performance.now(), active = !document.hidden && !$('#app-dialog').open; syncBeat(now);
   const scale = slowmo > 0 ? .3 : 1; slowmo = Math.max(0, slowmo - elapsed); accumulator = Math.min(.1, accumulator + elapsed * scale);
   if (game) {
@@ -337,7 +359,7 @@ $('#stage').tabIndex = -1;
 $('#ending-skip').addEventListener('click', skipEnding);
 $('#start-button').addEventListener('click', () => start());
 $('#heat-down').addEventListener('click', () => setHeat(-1)); $('#heat-up').addEventListener('click', () => setHeat(1));
-$('#daily-button').addEventListener('click', () => openDialog('daily')); $('#char-button').addEventListener('click', () => openDialog('characters'));
+$('#daily-button').addEventListener('click', () => openDialog('daily')); $('#resume-run').addEventListener('click', resumeRun); $('#char-button').addEventListener('click', () => openDialog('characters'));
 $('#reroll-button').addEventListener('click', reroll); $('#banish-button').addEventListener('click', toggleBanish); $('#skip-button').addEventListener('click', skipUpgrade);
 $('#relic-cards').addEventListener('click', e => { const b = e.target.closest('[data-relic]'); if (b) takeRelic(b.dataset.relic); }); $('#relic-decline').addEventListener('click', declineRelic);
 $('#coach-close').addEventListener('click', nextCoach);
@@ -345,7 +367,7 @@ $('#stage-prev').addEventListener('click', () => cycleStage(-1)); $('#stage-next
 window.addEventListener('gamepadconnected', () => toast('ゲームパッドを接続しました。左スティックで移動、Aでダッシュ、Bでパルス。'));
 $('#chest-claim').addEventListener('click', e => { e.stopPropagation(); claimChest(); }); $('#chest-screen').addEventListener('click', () => { if (!chestDone) finishChest(); }); $('#retry-button').addEventListener('click', () => start({ daily: runInfo.daily })); $('#result-home').addEventListener('click', home);
 $('#resume-button').addEventListener('click', () => { game?.resume(); accumulator = 0; transition(); });
-$('#pause-button').addEventListener('click', () => { game?.pause(); transition(); });
+$('#pause-button').addEventListener('click', () => { game?.pause(); transition(); saveRun(); });
 $('#quit-button').addEventListener('click', () => { if (game) { game.state = 'dead'; game.emit('dead'); transition(); } });
 $('#nav-home').addEventListener('click', () => { if (game?.state === 'running') { game.pause(); transition(); } else if (game && ['paused', 'upgrade'].includes(game.state)) toast('作戦を終了するには、一時停止画面から終了してください。'); else if (game && hasUnfinishedRun()) skipEnding(); else home(); });
 for (const [id, fn] of [['#dash-button', () => game?.dash()], ['#pulse-button', () => game?.pulse()]]) { $(id).addEventListener('pointerdown', e => { e.preventDefault(); fn(); }); $(id).addEventListener('click', fn); }
@@ -371,7 +393,8 @@ touchArea.addEventListener('pointerdown', e => { if (game?.state !== 'running' |
 touchArea.addEventListener('pointermove', e => { if (e.pointerId !== stick.id) return; const r = $('#stage').getBoundingClientRect(), dx = e.clientX - r.left - stick.x, dy = e.clientY - r.top - stick.y, d = Math.hypot(dx, dy), max = 42, s = d > max ? max / d : 1; movement.x = dx * s / max; movement.y = dy * s / max; $('#joystick-knob').style.transform = `translate(calc(-50% + ${dx * s}px),calc(-50% + ${dy * s}px))`; });
 function release(e) { if (e.pointerId === stick.id) { stick.id = null; movement.x = movement.y = 0; $('#joystick').hidden = true; } }
 touchArea.addEventListener('pointerup', release); touchArea.addEventListener('pointercancel', release); touchArea.addEventListener('lostpointercapture', release);
-function autoPause() { clearInput(); if (game?.state === 'running') { game.pause(); transition(); } audio.setActive(false); }
+function autoPause() { clearInput(); if (game?.state === 'running') { game.pause(); transition(); } saveRun(); audio.setActive(false); }
+window.addEventListener('pagehide', saveRun);
 window.addEventListener('blur', autoPause); document.addEventListener('visibilitychange', () => { if (document.hidden) autoPause(); else { previous = performance.now(); accumulator = 0; audio.setActive(true); } }); window.addEventListener('focus', () => audio.setActive(true));
 let resizeQueued = false; new ResizeObserver(() => { if (resizeQueued) return; resizeQueued = true; requestAnimationFrame(() => { renderer.resize(); if (stick.id !== null) { stick.id = null; movement.x = movement.y = 0; $('#joystick').hidden = true; } resizeQueued = false; }); }).observe($('#stage'));
 
@@ -381,6 +404,17 @@ function renderShop(bought = '') {
   $('#app-dialog').scrollTop = scroll;
   content.querySelectorAll('[data-buy]').forEach(b => b.addEventListener('click', () => { if (!buy(profile, b.dataset.buy)) return; audio.effect('buy'); const got = checkProfileAchievements(profile); saveProfile(); updateStars(true); updateHome(); renderShop(b.dataset.buy); if (got.length) achievementToast(got); }));
   $('#refund-button').addEventListener('click', e => { if (e.target.dataset.confirm !== '1') { e.target.dataset.confirm = '1'; e.target.textContent = 'もう一度押すと払い戻します'; return; } const back = refundAll(profile); saveProfile(); updateStars(true); updateHome(); renderShop(); if (back) toast(`★ ${back.toLocaleString()} を払い戻しました`); });
+}
+function codexVisual(c) {
+  if (c.group === 'monster' || c.group === 'boss') { const name = c.id === 'elite' ? 'enemy0' : c.id.startsWith('boss_') ? 'enemy4_' + c.id.slice(5) : 'enemy' + c.id; try { return `<img src="${renderer.sprites[name].image.toDataURL()}" alt="">`; } catch { return ''; } }
+  if (c.group === 'relic') { const r = RELICS[c.id.slice(6)]; return `<span class="ci" style="--c:${r.color}">${icon(r.icon)}</span>`; }
+  const u = UPGRADES.find(x => x.id === c.id); return `<span class="ci" style="--c:${POP_COLORS[u.id] || u.color}">${icon(u.icon)}</span>`;
+}
+function codexText(c) { if (c.group === 'relic') return RELICS[c.id.slice(6)].desc; if (c.group === 'monster' || c.group === 'boss') return c.id === 'elite' ? '王冠をかぶった強敵。宝箱を落とす' : c.group === 'boss' ? STAGES[c.id.slice(5)].name + 'のボス' : ''; const u = UPGRADES.find(x => x.id === c.id); return u.description; }
+function renderCodex(group) {
+  const content = $('#dialog-content'), prog = codexProgress(profile), groups = [['monster', 'モンスター'], ['boss', 'ボス'], ['weapon', '武器'], ['support', '支援'], ['fusion', '合体'], ['relic', 'レリック']];
+  content.innerHTML = `<h2 id="dialog-title">図鑑 ${prog.found} / ${prog.total}（${Math.round(prog.ratio * 100)}%）</h2><div class="achieve-progress"><i style="width:${prog.ratio * 100}%"></i></div><div class="codex-tabs">${groups.map(([g, n]) => `<button data-group="${g}" aria-pressed="${g === group}">${n} ${CODEX.filter(c => c.group === g && profile.codex[c.id]).length}/${CODEX.filter(c => c.group === g).length}</button>`).join('')}</div><div class="codex-grid">${CODEX.filter(c => c.group === group).map(c => { const known = profile.codex[c.id]; return `<div class="codex-item ${known ? '' : 'unknown'}">${codexVisual(c)}<strong>${known ? c.name : '？？？'}</strong><small>${known ? codexText(c) : 'まだ出会っていない'}</small></div>`; }).join('')}</div><p class="record-note">出撃で出会った敵・使った強化・手に入れたレリックが記録されます。50%と100%で実績とスキンが解放！</p>`;
+  content.querySelectorAll('[data-group]').forEach(b => b.addEventListener('click', () => { audio.effect('ui'); renderCodex(b.dataset.group); }));
 }
 function openDialog(type) {
   dialogReturn = document.activeElement; if (game?.state === 'running') { game.pause(); transition(); } clearInput(); const content = $('#dialog-content');
@@ -410,8 +444,11 @@ function openDialog(type) {
     content.innerHTML = `<h2 id="dialog-title">実績 ${done} / ${ACHIEVEMENTS.length}</h2><div class="achieve-progress"><i style="width:${done / ACHIEVEMENTS.length * 100}%"></i></div><div class="achievement-list">${ACHIEVEMENTS.map(a => `<div class="achievement ${profile.achievements[a.id] ? 'done' : ''}">${icon('medal')}<div><strong>${a.name}</strong><span>${a.desc}</span></div><em>${profile.achievements[a.id] ? '達成！' : '★ ' + a.reward}</em></div>`).join('')}</div><p class="record-note">達成するとスターがもらえます。スターは工房で使えます。</p>`;
   } else if (type === 'characters') {
     $('#dialog-kicker').textContent = 'CHARACTERS';
-    content.innerHTML = `<h2 id="dialog-title">だれで出撃する？</h2><div class="char-grid">${Object.entries(CHARACTERS).map(([id, c]) => { const open = characterUnlocked(profile, id), u = UNLOCKS.find(x => x.id === id), a = u && ACHIEVEMENTS.find(x => x.id === u.achievement); const start = UPGRADES.find(x => x.id === c.start); return `<button class="char-card ${profile.character === id ? 'selected' : ''}" data-char="${id}" ${open ? '' : 'disabled'}><img src="${charImage(id)}" alt=""><strong>${c.name}</strong><small>${c.title}</small><p>${c.perk.split('・')[0]}<br>初期武器：${start.name}</p>${open ? (profile.charClears[id] ? '<span class="clear">★ CLEAR</span>' : '') : `<span class="lock">実績「${a.name}」で解放</span>`}</button>`; }).join('')}</div><p class="record-note">新しい武器も実績で解放されます：${UNLOCKS.filter(u => u.kind === 'weapon').map(u => `${u.label}${characterUnlocked(profile, 'keeper') && profile.achievements[u.achievement] ? '✓' : '（' + ACHIEVEMENTS.find(a => a.id === u.achievement).name + '）'}`).join('・')}</p>`;
+    content.innerHTML = `<h2 id="dialog-title">だれで出撃する？</h2><div class="settings-group">スキン（見た目だけ）</div><div class="skin-row">${Object.entries(SKINS).map(([id, k]) => { const open = skinUnlocked(profile, id), a = k.achievement && ACHIEVEMENTS.find(x => x.id === k.achievement); return `<button class="skin-swatch ${profile.skin === id ? 'selected' : ''}" data-skin="${id}" ${open ? '' : 'disabled'} title="${open ? k.name : '実績「' + a.name + '」で解放'}"><i class="${k.colors === 'rainbow' ? 'rainbow' : ''}" style="--c:${Array.isArray(k.colors) ? k.colors[0] : 'var(--coral)'}"></i>${open ? k.name : '🔒'}</button>`; }).join('')}</div><div class="char-grid">${Object.entries(CHARACTERS).map(([id, c]) => { const open = characterUnlocked(profile, id), u = UNLOCKS.find(x => x.id === id), a = u && ACHIEVEMENTS.find(x => x.id === u.achievement); const start = UPGRADES.find(x => x.id === c.start); return `<button class="char-card ${profile.character === id ? 'selected' : ''}" data-char="${id}" ${open ? '' : 'disabled'}><img src="${charImage(id, renderer.skin)}" alt=""><strong>${c.name}</strong><small>${c.title}</small><p>${c.perk.split('・')[0]}<br>初期武器：${start.name}</p>${open ? (profile.charClears[id] ? '<span class="clear">★ CLEAR</span>' : '') : `<span class="lock">実績「${a.name}」で解放</span>`}</button>`; }).join('')}</div><p class="record-note">新しい武器も実績で解放されます：${UNLOCKS.filter(u => u.kind === 'weapon').map(u => `${u.label}${characterUnlocked(profile, 'keeper') && profile.achievements[u.achievement] ? '✓' : '（' + ACHIEVEMENTS.find(a => a.id === u.achievement).name + '）'}`).join('・')}</p>`;
+    content.querySelectorAll('[data-skin]').forEach(b => b.addEventListener('click', () => { profile.skin = b.dataset.skin; saveProfile(); applyRenderOptions(); audio.effect('choose'); updateHome(); openDialog('characters'); }));
     content.querySelectorAll('[data-char]').forEach(b => b.addEventListener('click', () => { profile.character = b.dataset.char; saveProfile(); audio.effect('choose'); updateHome(); $('#app-dialog').close(); }));
+  } else if (type === 'codex') {
+    $('#dialog-kicker').textContent = 'CODEX'; renderCodex('monster');
   } else if (type === 'daily') {
     const cfg = dailyConfig(), d = describeDaily(cfg), rec = profile.daily[cfg.day]; $('#dialog-kicker').textContent = 'DAILY CHALLENGE';
     content.innerHTML = `<h2 id="dialog-title">今日のチャレンジ（${cfg.day.replace(/-/g, '/')}）</h2><p>今日だけの特別ルール。同じ日なら誰でも同じ夜になります。工房の強化は無効、腕だけが頼り！クリアでスター +50 のボーナス。</p><div class="daily-detail"><div><span>作戦</span><strong>${d.mode}</strong></div><div><span>ヒート</span><strong>${cfg.heat}・${d.heat.name}</strong></div>${d.mutators.map(m => `<div class="mutator"><strong>${m.name}</strong><small>${m.rule}</small></div>`).join('')}<div><span>今日のベスト</span><strong>${rec ? formatTime(rec.best) + (rec.won ? ' ★CLEAR' : '') : '--:--'}</strong></div><div><span>連続プレイ</span><strong>${profile.dailyStreak} 日</strong></div></div><button class="primary-button" id="daily-start">チャレンジ開始 <svg><use href="#i-arrow"/></svg></button>`;

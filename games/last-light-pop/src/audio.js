@@ -8,7 +8,7 @@ async function audioRequest(url, consume) {
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), AUDIO_FETCH_TIMEOUT);
   try { const response = await fetch(url, { signal: controller.signal }); if (!response.ok) throw new Error('Audio resource unavailable'); return await consume(response); } finally { clearTimeout(timer); }
 }
-export const EFFECT_NAMES = Object.freeze(['shot', 'kill', 'xp', 'hurt', 'dash', 'pulse', 'arc', 'nova', 'heal', 'boss', 'bossDown', 'level', 'choose', 'evolve', 'won', 'start', 'dead', 'combo', 'bossShot', 'ui', 'heartbeat', 'chest', 'tick', 'jackpot', 'achieve', 'reroll', 'banish', 'buy', 'elite', 'revive', 'skip', 'laser', 'special', 'bossPhase', 'event', 'unlock', 'charge', 'altar', 'relicOffer', 'relic']);
+export const EFFECT_NAMES = Object.freeze(['shot', 'kill', 'xp', 'hurt', 'dash', 'pulse', 'arc', 'nova', 'heal', 'boss', 'bossDown', 'level', 'choose', 'evolve', 'won', 'start', 'dead', 'combo', 'bossShot', 'ui', 'heartbeat', 'chest', 'tick', 'jackpot', 'achieve', 'reroll', 'banish', 'buy', 'elite', 'revive', 'skip', 'laser', 'special', 'bossPhase', 'event', 'unlock', 'charge', 'altar', 'relicOffer', 'relic', 'fusion', 'decoy']);
 export function parseAudioConfig(data, configURL) {
   const result = { music: null, effects: Object.create(null) };
   if (!data || typeof data !== 'object' || Array.isArray(data)) return result;
@@ -304,6 +304,8 @@ export class AudioEngine {
       case 'altar': chord([62, 65, 69, 74], .12, .9, 'triangle', .07, { verb: true }); noise(1, .05, 2000, 'bandpass', { end: 500, verb: true }); break;
       case 'relicOffer': chord([69, 72, 76, 81], .08, .7, 'sine', .1, { verb: true }); break;
       case 'relic': chord([72, 76, 79, 84, 88], .05, .6, 'sawtooth', .045, { cutoff: 6000, verb: true }); tone(80, .6, 'sine', .4, 35); break;
+      case 'fusion': noise(.9, .14, 300, 'bandpass', { end: 10000, swell: true, q: 2 }); chord([69, 73, 76, 81, 85, 88, 93, 97], .045, 1.1, 'sawtooth', .045, { at: .85, cutoff: 7000, verb: true }); tone(55, 1, 'sine', .55, 25, { at: .85 }); noise(.6, .12, 6000, 'highpass', { at: .85, verb: true }); break;
+      case 'decoy': chord([79, 75, 72], .07, .25, 'square', .05, { cutoff: 3000 }); noise(.4, .08, 1500, 'bandpass'); break;
       case 'heartbeat': tone(70, .16, 'sine', .45, 45); tone(66, .14, 'sine', .32, 42, { at: .2 }); break;
       case 'combo': { const n = Math.min(4, o.tier || 0); chord([72 + n * 2, 76 + n * 2, 79 + n * 2, 84 + n * 2], .035, .32, 'sawtooth', .04, { cutoff: 6000, verb: true }); noise(.3, .06, 2000, 'bandpass', { end: 10000, q: 1.5 }); break; }
       case 'evolve': noise(.6, .12, 400, 'bandpass', { end: 10000, swell: true, q: 2 }); chord([69, 73, 76, 81, 85, 88, 93], .05, .9, 'sawtooth', .04, { at: .55, cutoff: 6000, verb: true }); tone(60, .8, 'sine', .4, 30, { at: .55 }); break;
