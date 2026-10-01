@@ -7,6 +7,7 @@ import { ComboMeter, rankFor, musicIntensity } from './hype.js';
 
 const $ = s => document.querySelector(s); const $$ = s => [...document.querySelectorAll(s)];
 const icon = (name, cls = '') => `<svg class="${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+const APP_VERSION = 'V 2.6.0';
 const SETTINGS_KEY = 'lastlight-pop-settings-v1', RECORDS_KEY = 'lastlight-pop-records-v1', PROFILE_KEY = 'lastlight-pop-profile-v1';
 const DEFAULT_SETTINGS = { sound: true, music: 0.42, sfx: 0.6, quality: 'auto', vibration: true, heat: 0, shake: 1, flash: true, numbers: true, largeText: false, hints: true, voice: .9, subtitles: true, keyDash: 'Space', keyPulse: 'KeyQ' };
 const EMPTY_RECORDS = { runs: 0, wins: 0, totalKills: 0, bestKills: 0, bestTime: 0, bestCombo: 0, modes: {} };
@@ -26,6 +27,7 @@ renderer.setQuality(settings.quality); audio.musicVolume = settings.music; audio
 let mode = 'guard', game = null, ending = null, endingResultShown = false, demo = makeDemo(), prevState = 'home', previous = performance.now(), accumulator = 0, hudTimer = 0;
 let frameTime = 0, elapsedTime = 0, frameCount = 0, fps = 60, resultSaved = false, toastTimer = 0, announceTimer = 0, warnTimer = 0, dialogReturn = null, installPrompt = null, waitingSW = null, pendingReload = false;
 let heartbeatAt = 0, slowmo = 0, lastKills = 0, lastLevel = 1, lastArsenal = '', choosing = false, cooldownReady = { dash: true, pulse: true }, audioPrimed = false;
+let swRegistration = null;
 let runInfo = { daily: false, heat: 0, mutators: [], day: '' }, runResult = null, banishMode = false, chestTimers = [], chestDone = true;
 const STEP = 1 / 60, keys = new Set(), movement = { x: 0, y: 0 }, stick = { id: null, x: 0, y: 0 };
 
@@ -47,7 +49,7 @@ function start(opts = {}) {
 }
 // Shared run setup for a fresh start and for resuming a suspended run.
 function enterRun(resumed) {
-  ending = null; endingResultShown = false; runResult = null; clearInput(); audio.setStage(STAGES[game.stage].transpose); coachQueue.length = 0; hideCoach(); combo.reset(); resultSaved = false; lastArsenal = ''; lastKills = 0; lastLevel = 1; slowmo = 0; choosing = false;
+  ending = null; endingResultShown = false; runResult = null; clearInput(); audio.setStage(game.stage); coachQueue.length = 0; hideCoach(); combo.reset(); resultSaved = false; lastArsenal = ''; lastKills = 0; lastLevel = 1; slowmo = 0; choosing = false;
   prevState = ''; accumulator = 0; document.body.classList.add('playing'); renderer.camera.x = game.player.x; renderer.camera.y = game.player.y; renderer.resize();
   audioPrimed = true; audio.setScene('play'); void audio.unlock(); audio.setActive(true);
   $('#dash-button kbd').textContent = settings.keyDash.replace('Key', '').toUpperCase(); $('#pulse-button kbd').textContent = settings.keyPulse.replace('Key', '').toUpperCase();
@@ -81,12 +83,12 @@ function resumeRun() {
   const d = savedRun(); if (!d) { updateHome(); return; }
   try { game = Game.restore(d.game); } catch { clearRun(); toast('保存された出撃を読み込めませんでした。'); updateHome(); return; }
   runInfo = d.runInfo || { daily: false, heat: 0, mutators: [], day: '' }; if (game.state === 'running') game.state = 'paused'; enterRun(true);
-  combo.reset(); combo.best = d.combo?.best || 0; lastKills = game.kills; audio.setStage(STAGES[game.stage].transpose); prevState = ''; transition();
+  combo.reset(); combo.best = d.combo?.best || 0; lastKills = game.kills; audio.setStage(game.stage); prevState = ''; transition();
 }
 function home() {
   audio.stopVoice(); $('#subtitle').hidden = true;
   if (game && ['running', 'paused', 'upgrade', 'chest', 'relic'].includes(game.state)) finalizeRun(false); hideCoach(); clearRun();
-  game = null; ending = null; endingResultShown = false; audio.setScene('home'); clearInput(); prevState = 'home'; hideScreens(); $('#home-screen').hidden = false;
+  game = null; ending = null; endingResultShown = false; audio.setStage(homeSong()); audio.setScene('home'); clearInput(); prevState = 'home'; hideScreens(); $('#home-screen').hidden = false;
   document.body.classList.remove('playing'); $('#announcement').hidden = true; $('#warning-banner').hidden = true; $('#boss-panel').hidden = true; renderer.resize(); demo = makeDemo(); updateBest(); updateHome(); $('#start-button').focus({ preventScroll: true });
 }
 let shownChoices = '';
@@ -282,7 +284,9 @@ function applyRenderOptions() { renderer.opts = { shake: settings.shake, flash: 
 function charImage(id, skin = 'classic') { try { return renderer.sprites[renderer.hero(id, skin === 'rainbow' ? 'classic' : skin)].image.toDataURL(); } catch { return ''; } }
 function updateCharacter() { const id = characterUnlocked(profile, profile.character) ? profile.character : 'keeper', c = CHARACTERS[id]; $('#char-img').src = charImage(id, renderer.skin); $('#char-name').textContent = `${c.name}・${c.title}`; $('#char-perk').textContent = c.perk; }
 const STAGE_ORDER = Object.keys(STAGES), STAGE_COLORS = { wilds: ['#3a2a7c', '#7b5cd6'], frost: ['#2c4f86', '#4cc9f0'], candy: ['#7a2f6e', '#ff8fc7'] };
-function cycleStage(delta) { const i = STAGE_ORDER.indexOf(profile.stage), next = STAGE_ORDER[(i + delta + STAGE_ORDER.length) % STAGE_ORDER.length]; profile.stage = next; saveProfile(); audio.effect('ui'); demo = makeDemo(); updateHome(); }
+function cycleStage(delta) { const i = STAGE_ORDER.indexOf(profile.stage), next = STAGE_ORDER[(i + delta + STAGE_ORDER.length) % STAGE_ORDER.length]; profile.stage = next; saveProfile(); audio.effect('ui'); demo = makeDemo(); audio.setStage(homeSong()); updateHome(); }
+// The title screen previews the selected stage's song (locked stages fall back to the wilds).
+function homeSong() { return stageUnlocked(profile, profile.stage) ? profile.stage : 'wilds'; }
 function markNew(el, key, show) { if (!el) return; const fresh = show && !profile.seen[key]; el.classList.toggle('new-badge', fresh); if (fresh && !el.dataset.seenHook) { el.dataset.seenHook = '1'; el.addEventListener('click', () => { profile.seen[key] = true; saveProfile(); el.classList.remove('new-badge'); }, { capture: true }); } }
 function setHeat(delta) { const next = Math.max(0, Math.min(profile.heatUnlocked, settings.heat + delta)); if (next === settings.heat) return; settings.heat = next; save(SETTINGS_KEY, settings); audio.effect(delta > 0 ? 'elite' : 'ui'); updateHome(); }
 function achievementToast(list) { list.forEach((a, i) => setTimeout(() => { const el = document.createElement('div'); el.className = 'ach-toast'; el.innerHTML = `${icon('medal')}<div>実績「${a.name}」達成！<small>★ +${a.reward}</small></div>`; document.body.append(el); audio.effect('achieve'); setTimeout(() => el.remove(), 3300); }, i * 900)); }
@@ -358,7 +362,7 @@ function input() { let x = movement.x + pad.move.x, y = movement.y + pad.move.y;
 function syncBeat(now) {
   const info = audio.beatInfo();
   if (info) renderer.beat = info;
-  else { const beat = now / 1000 * MUSIC_BPM / 60; renderer.beat = { count: Math.floor(beat), phase: beat % 1, bar: Math.floor(beat / 4), energy: game ? .55 : .4 }; }
+  else { const beat = now / 1000 * (audio.song?.bpm || MUSIC_BPM) / 60; renderer.beat = { count: Math.floor(beat), phase: beat % 1, bar: Math.floor(beat / 4), energy: game ? .55 : .4 }; }
   if (game && game.state === 'running') audio.setIntensity(musicIntensity(game), !!game.boss?.alive);
   audio.setMuffle(!!game && ['paused', 'upgrade', 'chest', 'relic'].includes(game.state) || $('#app-dialog').open);
   if (game && game.state === 'running' && game.player.hp < game.player.maxHP * .3 && now - heartbeatAt > 820) { heartbeatAt = now; audio.effect('heartbeat'); speak('lowhp', { priority: 2, cooldown: 30 }); }
@@ -460,11 +464,12 @@ function openDialog(type) {
     $('#setting-sfx').addEventListener('input', e => { settings.sfx = e.target.value / 100; audio.sfxVolume = settings.sfx; audio.applyVolumes(); save(SETTINGS_KEY, settings); });
     $('#setting-quality').addEventListener('change', e => { settings.quality = e.target.value; renderer.setQuality(settings.quality); save(SETTINGS_KEY, settings); });
     $('#setting-vibration').addEventListener('change', e => { settings.vibration = e.target.checked; save(SETTINGS_KEY, settings); });
-    content.insertAdjacentHTML('beforeend', `<div class="settings-group">見え方・やさしさ</div><div class="settings-row"><div><label for="setting-shake">画面の揺れ</label><small>0で揺れなし</small></div><input id="setting-shake" type="range" min="0" max="100" value="${Math.round(settings.shake * 100)}"></div><div class="settings-row"><div><label for="setting-flash">画面のフラッシュ</label><small>光の点滅が苦手な方はオフに</small></div><input id="setting-flash" type="checkbox" ${settings.flash ? 'checked' : ''}></div><div class="settings-row"><label for="setting-numbers">ダメージ数字</label><input id="setting-numbers" type="checkbox" ${settings.numbers ? 'checked' : ''}></div><div class="settings-row"><label for="setting-large">文字を大きく</label><input id="setting-large" type="checkbox" ${settings.largeText ? 'checked' : ''}></div><div class="settings-row"><div><label for="setting-hints">ヒントを表示</label><small>初めての要素で一度だけ説明</small></div><input id="setting-hints" type="checkbox" ${settings.hints ? 'checked' : ''}></div><div class="settings-row"><span>ヒントをもう一度見る</span><button class="key-button" id="reset-tips">リセット</button></div><div class="settings-group">操作</div><div class="settings-row"><span>ダッシュのキー</span><button class="key-button" data-bind="keyDash">${settings.keyDash.replace('Key', '')}</button></div><div class="settings-row"><span>パルスのキー</span><button class="key-button" data-bind="keyPulse">${settings.keyPulse.replace('Key', '')}</button></div><p class="settings-note">ゲームパッド対応：左スティック移動・A ダッシュ・B/X パルス・Start 一時停止。メニューは十字キーで選んで A で決定、B で戻る。</p>`);
+    content.insertAdjacentHTML('beforeend', `<div class="settings-group">見え方・やさしさ</div><div class="settings-row"><div><label for="setting-shake">画面の揺れ</label><small>0で揺れなし</small></div><input id="setting-shake" type="range" min="0" max="100" value="${Math.round(settings.shake * 100)}"></div><div class="settings-row"><div><label for="setting-flash">画面のフラッシュ</label><small>光の点滅が苦手な方はオフに</small></div><input id="setting-flash" type="checkbox" ${settings.flash ? 'checked' : ''}></div><div class="settings-row"><label for="setting-numbers">ダメージ数字</label><input id="setting-numbers" type="checkbox" ${settings.numbers ? 'checked' : ''}></div><div class="settings-row"><label for="setting-large">文字を大きく</label><input id="setting-large" type="checkbox" ${settings.largeText ? 'checked' : ''}></div><div class="settings-row"><div><label for="setting-hints">ヒントを表示</label><small>初めての要素で一度だけ説明</small></div><input id="setting-hints" type="checkbox" ${settings.hints ? 'checked' : ''}></div><div class="settings-row"><span>ヒントをもう一度見る</span><button class="key-button" id="reset-tips">リセット</button></div><div class="settings-group">アプリ</div><div class="settings-row"><div><span>バージョン</span><small id="app-version">${APP_VERSION}</small></div><button class="key-button" id="check-update">更新を確認</button></div><div class="settings-group">操作</div><div class="settings-row"><span>ダッシュのキー</span><button class="key-button" data-bind="keyDash">${settings.keyDash.replace('Key', '')}</button></div><div class="settings-row"><span>パルスのキー</span><button class="key-button" data-bind="keyPulse">${settings.keyPulse.replace('Key', '')}</button></div><p class="settings-note">ゲームパッド対応：左スティック移動・A ダッシュ・B/X パルス・Start 一時停止。メニューは十字キーで選んで A で決定、B で戻る。</p>`);
     const persist = () => { save(SETTINGS_KEY, settings); applyRenderOptions(); };
     $('#setting-shake').addEventListener('input', e => { settings.shake = e.target.value / 100; persist(); });
     for (const [id, key] of [['setting-flash', 'flash'], ['setting-numbers', 'numbers'], ['setting-hints', 'hints']]) $('#' + id).addEventListener('change', e => { settings[key] = e.target.checked; persist(); });
     $('#setting-large').addEventListener('change', e => { settings.largeText = e.target.checked; document.body.classList.toggle('large-text', settings.largeText); persist(); });
+    $('#check-update').addEventListener('click', async e => { const b = e.target; if (!swRegistration) { b.textContent = '利用できません'; return; } b.textContent = '確認中…'; try { await swRegistration.update(); await new Promise(r => setTimeout(r, 1500)); b.textContent = swRegistration.waiting || swRegistration.installing ? '新しい版があります' : '最新です'; if (swRegistration.waiting) { waitingSW = swRegistration.waiting; $('#pwa-update').hidden = false; } } catch { b.textContent = 'オフラインです'; } });
     $('#reset-tips').addEventListener('click', e => { profile.tips = {}; saveProfile(); e.target.textContent = 'リセットしました'; });
     content.querySelectorAll('[data-bind]').forEach(b => b.addEventListener('click', () => { b.classList.add('listening'); b.textContent = 'キーを押して…'; const onKey = ev => { ev.preventDefault(); ev.stopPropagation(); if (ev.code !== 'Escape' && !/^(Key[WASD]|Arrow|Digit[123]|KeyP)/.test(ev.code)) settings[b.dataset.bind] = ev.code; b.classList.remove('listening'); b.textContent = settings[b.dataset.bind].replace('Key', ''); persist(); window.removeEventListener('keydown', onKey, true); }; window.addEventListener('keydown', onKey, true); }));
   } else if (type === 'shop') {
@@ -501,9 +506,15 @@ window.addEventListener('appinstalled', () => { $('#install-button').hidden = tr
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
-      const registration = await navigator.serviceWorker.register('./sw.js', { scope: './' });
-      function ready(worker) { waitingSW = worker; $('#pwa-update').hidden = false; }
-      if (registration.waiting) ready(registration.waiting);
+      const registration = await navigator.serviceWorker.register('./sw.js', { scope: './' }); swRegistration = registration;
+      function ready(worker) { waitingSW = worker; $('#pwa-update').hidden = false; toast('新しいバージョンがあります。「更新」で切り替わります。'); }
+      // A version downloaded earlier is applied right away at launch, before any run starts.
+      if (registration.waiting && navigator.serviceWorker.controller && !hasUnfinishedRun() && performance.now() < 8000) { waitingSW = registration.waiting; waitingSW.postMessage({ type: 'SKIP_WAITING' }); }
+      else if (registration.waiting) ready(registration.waiting);
+      // Installed PWAs are often resumed rather than reloaded, so also check on return and periodically.
+      const check = () => { if (navigator.onLine) registration.update().catch(() => { }); };
+      check(); setInterval(check, 30 * 60 * 1000);
+      let lastCheck = performance.now(); document.addEventListener('visibilitychange', () => { if (!document.hidden && performance.now() - lastCheck > 60000) { lastCheck = performance.now(); check(); } });
       registration.addEventListener('updatefound', () => { const worker = registration.installing; worker?.addEventListener('statechange', () => { if (worker.state === 'installed' && navigator.serviceWorker.controller) ready(worker); }); });
       let reloading = false, hadController = !!navigator.serviceWorker.controller;
       navigator.serviceWorker.addEventListener('controllerchange', () => { if (!hadController) { hadController = true; return; } if (reloading) return; if (hasUnfinishedRun()) { pendingReload = true; $('#pwa-update').hidden = false; toast('更新は作戦終了後に適用できます。'); return; } reloading = true; location.reload(); });
@@ -512,7 +523,7 @@ if ('serviceWorker' in navigator) {
 }
 $('#update-button').addEventListener('click', () => { if (hasUnfinishedRun()) { game.pause(); transition(); toast('結果画面で更新してください。'); return; } if (pendingReload) location.reload(); else waitingSW?.postMessage({ type: 'SKIP_WAITING' }); });
 if (profile.stats.runs === 0) { mode = 'patrol'; $$('[data-mode]').forEach(x => { x.classList.toggle('selected', x.dataset.mode === 'patrol'); x.setAttribute('aria-pressed', String(x.dataset.mode === 'patrol')); }); $('#mode-title').textContent = MODES.patrol.name; $('#mode-description').textContent = MODES.patrol.description + '（はじめての方におすすめ）'; }
-document.body.classList.toggle('large-text', settings.largeText); applyRenderOptions(); void audio.loadVoiceIndex();
+document.body.classList.toggle('large-text', settings.largeText); applyRenderOptions(); void audio.loadVoiceIndex(); audio.setStage(homeSong());
 syncSound(); updateBest(); updateHome(); connection(); requestAnimationFrame(frame);
 // Live module bindings are available to development tools without global hooks.
 export { game, renderer, audio, settings, records, combo, profile, updateHome };

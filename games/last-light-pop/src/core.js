@@ -47,9 +47,9 @@ export const ENEMY_TYPES = [
 ];
 // Stages: each has its own ground gimmick, extra monsters (unlocked by progress) and a boss variant.
 export const STAGES = Object.freeze({
-  wilds: { name:'夜の荒野', boss:'夜の主', gimmick:null, transpose:0, extra:[[.25,5],[.45,6]], rule:'突進イノシシとプルプルが出る' },
-  frost: { name:'氷の湖', boss:'氷の女王', gimmick:'ice', transpose:-5, extra:[[.15,8],[.35,10],[.55,5]], rule:'足元が滑る・カメ盾とスナイパー' },
-  candy: { name:'キャンディの森', boss:'キャンディ大王', gimmick:'syrup', transpose:3, extra:[[.15,6],[.35,9],[.5,5],[.6,10]], rule:'シロップで足が鈍る・ナースが回復' }
+  wilds: { name:'夜の荒野', boss:'夜の主', gimmick:null, extra:[[.25,5],[.45,6]], rule:'突進イノシシとプルプルが出る' },
+  frost: { name:'氷の湖', boss:'氷の女王', gimmick:'ice', extra:[[.15,8],[.35,10],[.55,5]], rule:'足元が滑る・カメ盾とスナイパー' },
+  candy: { name:'キャンディの森', boss:'キャンディ大王', gimmick:'syrup', extra:[[.15,6],[.35,9],[.5,5],[.6,10]], rule:'シロップで足が鈍る・ナースが回復' }
 });
 export const RELICS = Object.freeze({
   boomkill:{ name:'はじけるハート', icon:'heart', color:'#ff5f8a', desc:'撃破した敵が15%で小さく爆発する' },

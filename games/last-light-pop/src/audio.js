@@ -1,7 +1,7 @@
 // Original 138 BPM trance score and pop sound effects, synthesized entirely with Web Audio.
 // Optional MP3 replacements are local files configured in assets/audio-config.json.
-export const MUSIC_BPM = 138;
-const STEP = 60 / MUSIC_BPM / 4;
+import { SONGS } from './songs.js';
+export const MUSIC_BPM = SONGS.wilds.bpm; // title-screen default; each stage song sets its own tempo
 const PHRASE = 128; // 8 bars of 16ths
 const AUDIO_FETCH_TIMEOUT = 30_000;
 async function audioRequest(url, consume) {
@@ -25,25 +25,9 @@ export const midi = m => 440 * 2 ** ((m - 69) / 12);
 
 // --- composition -------------------------------------------------------------------------------
 // Uplifting minor-key loop (Am F C G) and a harmonic-minor boss loop (Am F Dm E), two bars per chord.
-export const PROGRESSIONS = Object.freeze({
-  main: [{ chord: [57, 60, 64], bass: 45 }, { chord: [57, 60, 65], bass: 41 }, { chord: [55, 60, 64], bass: 48 }, { chord: [55, 59, 62], bass: 43 }],
-  boss: [{ chord: [57, 60, 64], bass: 45 }, { chord: [57, 60, 65], bass: 41 }, { chord: [57, 62, 65], bass: 50 }, { chord: [56, 59, 64], bass: 40 }]
-});
-// Eighth-note lead per 8-bar phrase (0 = rest).
-const LEAD = [
-  76, 0, 81, 0, 84, 0, 83, 81, 76, 0, 81, 0, 84, 86, 84, 0,
-  77, 0, 81, 0, 84, 0, 83, 81, 77, 0, 81, 0, 84, 88, 86, 84,
-  79, 0, 84, 0, 88, 0, 86, 84, 79, 0, 84, 0, 86, 0, 84, 83,
-  79, 0, 83, 0, 86, 0, 84, 83, 81, 83, 84, 86, 88, 0, 91, 0
-];
-const BOSS_LEAD = [
-  81, 84, 88, 84, 81, 84, 89, 88, 81, 84, 88, 84, 93, 91, 89, 88,
-  81, 84, 89, 84, 81, 84, 89, 91, 93, 89, 84, 81, 89, 88, 86, 84,
-  86, 89, 93, 89, 86, 89, 94, 93, 86, 89, 93, 89, 98, 96, 94, 93,
-  88, 92, 95, 92, 88, 92, 95, 96, 98, 96, 95, 92, 88, 86, 84, 83
-];
-const ARP = [0, 1, 2, 3, 2, 1, 2, 3, 0, 1, 2, 3, 4, 3, 2, 1];
-const GATE = [1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1];
+// The default (wilds) song, kept for compatibility with tests and tools.
+export const PROGRESSIONS = Object.freeze({ main: SONGS.wilds.main, boss: SONGS.wilds.boss });
+export { SONGS };
 const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31, 33, 36];
 
 // Arrangement for a phrase. kind: intro | groove | break | drop | boss
@@ -68,7 +52,7 @@ export class AudioEngine {
     this.nodes = new Set(); this.musicNodes = new Set(); this.endingNodes = new Set(); this.lastEffects = new Map();
     this.musicBuffer = null; this.effectBuffers = Object.create(null); this.playingMusic = null;
     this.musicOffset = 0; this.musicStartedAt = 0; this.assetsReady = null; this.assetErrors = [];
-    this.scene = 'home'; this.intensity = 0; this.bossActive = false;
+    this.scene = 'home'; this.intensity = 0; this.bossActive = false; this.song = SONGS.wilds; this.songId = 'wilds'; this.stepDur = 60 / this.song.bpm / 4;
     this.phraseStep = 0; this.phrase = 0; this.phraseKind = 'intro'; this.current = arrangement('intro', 0, 0); this.xpChain = 0; this.lastXP = 0;
   }
   connect(context) {
@@ -86,7 +70,7 @@ export class AudioEngine {
     this.analyser = c.createAnalyser(); this.analyser.fftSize = 256; clip.connect(this.analyser); this.levels = new Uint8Array(this.analyser.frequencyBinCount);
     // Dotted-eighth delay and a generated stereo hall reverb.
     this.delayIn = c.createGain(); this.delayIn.gain.value = .32; const delay = c.createDelay(1), fb = c.createGain(), hp = c.createBiquadFilter();
-    delay.delayTime.value = STEP * 3; fb.gain.value = .38; hp.type = 'highpass'; hp.frequency.value = 600;
+    this.delay = delay; delay.delayTime.value = this.stepDur * 3; fb.gain.value = .38; hp.type = 'highpass'; hp.frequency.value = 600;
     this.delayIn.connect(delay); delay.connect(hp); hp.connect(fb); fb.connect(delay); hp.connect(this.pumpGain);
     this.reverbIn = c.createGain(); this.reverbIn.gain.value = .3; const verb = c.createConvolver(); verb.buffer = this.impulse(2.6); this.reverbIn.connect(verb); verb.connect(this.pumpGain);
     this.sfxVerb = c.createGain(); this.sfxVerb.gain.value = .22; this.sfxVerb.connect(verb);
@@ -134,7 +118,11 @@ export class AudioEngine {
     on = !!on; if (on === this.muffled) return; this.muffled = on; if (!this.ctx) return;
     const t = this.ctx.currentTime; this.musicBus.frequency.cancelScheduledValues(t); this.musicBus.frequency.setTargetAtTime(on ? 650 : 18000, t, on ? .08 : .2);
   }
-  setStage(semitones) { this.transpose = semitones | 0; }
+  // Switch to a stage's own song. The new tempo and material start from a fresh phrase.
+  setStage(id) {
+    const song = SONGS[id] || SONGS.wilds; if (song === this.song) return; this.song = song; this.songId = SONGS[id] ? id : 'wilds'; this.stepDur = 60 / song.bpm / 4;
+    if (this.delay) this.delay.delayTime.setTargetAtTime(this.stepDur * 3, this.ctx.currentTime, .05); this.startPhrase(this.scene === 'play' ? 'groove' : 'intro'); this.phrase = 0;
+  }
   setEnabled(value) { this.enabled = !!value; if (value) void this.unlock(); this.applyVolumes(); this.syncPlayback(); }
   setActive(value) { this.active = !!value; this.applyVolumes(); this.syncPlayback(); if (value && this.ctx) this.nextBeat = this.ctx.currentTime; }
   syncPlayback() {
@@ -178,7 +166,7 @@ export class AudioEngine {
   // Beat clock for visuals; null when the synth is not running.
   beatInfo() {
     if (!this.ctx || !this.enabled || !this.active || this.musicBuffer || this.ctx.state !== 'running') return null;
-    const pos = Math.max(0, this.step - (this.nextBeat - this.ctx.currentTime) / STEP), beat = pos / 4;
+    const pos = Math.max(0, this.step - (this.nextBeat - this.ctx.currentTime) / this.stepDur), beat = pos / 4;
     return { count: Math.floor(beat), phase: beat % 1, bar: Math.floor(beat / 4), energy: this.current.energy };
   }
   level() { if (!this.analyser) return 0; this.analyser.getByteFrequencyData(this.levels); let s = 0; for (let i = 0; i < 24; i++) s += this.levels[i]; return s / (24 * 255); }
@@ -191,7 +179,7 @@ export class AudioEngine {
   note(freq, time, duration = .2, type = 'sine', gain = .12, dest = this.pumpGain, o = {}) {
     if (!this.reserve(dest)) return;
     const c = this.ctx, osc = c.createOscillator(), env = c.createGain(), filter = c.createBiquadFilter(), nodes = [osc, filter, env];
-    osc.type = type; osc.frequency.setValueAtTime(freq, time); const shift = dest === this.sfxGain || dest === this.sfxVerb ? 0 : (this.transpose || 0) * 100; if (o.detune || shift) osc.detune.value = (o.detune || 0) + shift;
+    osc.type = type; osc.frequency.setValueAtTime(freq, time); if (o.detune) osc.detune.value = o.detune;
     if (o.end) osc.frequency.exponentialRampToValueAtTime(o.end, time + (o.glide || duration));
     filter.type = o.filter || 'lowpass'; filter.Q.value = o.q || .8; filter.frequency.setValueAtTime(o.cutoff || 8000, time);
     if (o.cutoffEnd) filter.frequency.exponentialRampToValueAtTime(o.cutoffEnd, time + (o.sweep || duration));
@@ -230,7 +218,7 @@ export class AudioEngine {
   kick(time, gain = .95) {
     this.note(150, time, .3, 'sine', gain * .85, this.drumGain, { end: 40, glide: .09 });
     this.note(2400, time, .012, 'square', .12, this.drumGain, { end: 300, cutoff: 5000 });
-    this.pumpGain.gain.cancelScheduledValues(time); this.pumpGain.gain.setValueAtTime(.22, time); this.pumpGain.gain.linearRampToValueAtTime(1, time + STEP * 3.2);
+    this.pumpGain.gain.cancelScheduledValues(time); this.pumpGain.gain.setValueAtTime(.22, time); this.pumpGain.gain.linearRampToValueAtTime(1, time + this.stepDur * 3.2);
   }
   clap(time, gain = .3) { for (let i = 0; i < 3; i++) this.noise(time + i * .011, i === 2 ? .2 : .03, gain * (i === 2 ? 1 : .6), this.drumGain, 1300, 'bandpass', { q: 1.1, verb: i === 2 }); }
   musicStep(step, time) {
@@ -239,43 +227,56 @@ export class AudioEngine {
     if (!this.bossActive && this.phraseKind === 'boss' && this.phraseStep % 64 === 0 && this.phraseStep > 0) { this.startPhrase('drop'); this.crash(time); }
     const ps = this.phraseStep++, bar = Math.floor(ps / 16), beat = ps % 16, kind = this.phraseKind;
     const a = arrangement(kind, this.scene === 'home' ? 0 : this.intensity, bar); this.current = a;
-    const prog = PROGRESSIONS[kind === 'boss' ? 'boss' : 'main'], chord = prog[Math.floor(bar / 2) % 4];
+    const song = this.song, S = this.stepDur, chord = song[kind === 'boss' ? 'boss' : 'main'][Math.floor(bar / 2) % 4];
+    // Swing delays the off 16ths (candy forest bounces, the others are straight).
+    if (song.swing && beat % 2 === 1) time += S * song.swing;
     const cutoff = 400 + 9000 * a.cutoff * a.cutoff;
     if (beat === 0 && !this.muffled) this.musicBus.frequency.setTargetAtTime(kind === 'break' && bar < 4 ? 2400 : 18000, time, .3);
     // Drums
     if (a.kick && beat % 4 === 0) this.kick(time);
-    if (a.clap && (beat === 4 || beat === 12)) this.clap(time);
-    if (a.hats) { const accent = beat % 4 === 2; this.noise(time, accent ? .05 : .025, accent ? .11 : .06, this.drumGain, 8500); }
+    if (a.clap) { if (song.clap === 'snare') { if (beat === 4 || beat === 12) this.noise(time, .14, .2, this.drumGain, 2600, 'bandpass', { q: .8, verb: true }); }
+      else { if (beat === 4 || beat === 12) this.clap(time); if (song.clap === 'double' && (beat === 14 || beat === 7 && bar % 2 === 1)) this.clap(time, .18); } }
+    if (a.hats && (song.hats === 16 || beat % 2 === 0)) { const accent = beat % 4 === 2; this.noise(time, accent ? .05 : .025, (accent ? .11 : .06) * (song.hats === 8 ? 1.2 : 1), this.drumGain, song.hats === 8 ? 10000 : 8500); }
     if (a.open && beat % 4 === 2) this.noise(time, .16, .1, this.drumGain, 7000);
     if (a.ride && beat % 2 === 0) this.noise(time, .3, .028, this.drumGain, 11000);
     if (a.roll) {
       const final = bar === 7 || kind === 'break', density = kind === 'break' ? (bar < 6 ? 4 : bar < 7 ? 2 : 1) : (beat >= 8 ? 1 : 2);
       if (final && ps % density === 0) this.noise(time, .09, .05 + (kind === 'break' ? (bar - 4) * .035 + beat * .002 : beat * .006), this.drumGain, 1700, 'bandpass', { q: .9, verb: true });
     }
-    if (a.riser && bar === 4 && beat === 0) { const d = STEP * 64; this.noise(time, d, .1, this.musicBus, 400, 'bandpass', { end: 9000, swell: true, q: 1.4 }); this.note(110, time, d, 'sawtooth', .025, this.musicBus, { end: 880, glide: d, attack: d * .9, cutoff: 3000 }); }
-    // Rolling trance bass: the three 16ths after every kick.
-    if (a.bass && beat % 4 !== 0) this.note(midi(chord.bass), time, STEP * .9, 'sawtooth', .07, this.pumpGain, { cutoff: Math.min(1800, cutoff * .25 + 240), cutoffEnd: 150, q: 2.2, release: STEP * .95 });
-    if (a.sub && beat % 4 !== 0) this.note(midi(chord.bass - 12), time, STEP * .9, 'sine', .09, this.pumpGain, { release: STEP * .9 });
-    // Gated supersaw chords: one sustained voice per bar shaped by a 16th-note gate.
-    if (a.gate && beat === 0) this.gateChord(chord.chord, time, cutoff, kind === 'boss' ? .5 : .44);
-    if (a.pad && beat === 0 && bar % 2 === 0) for (const n of chord.chord) this.saw(midi(n), time, STEP * 32, .075, this.pumpGain, { attack: .6, cutoff: 2200, spread: [-9, 9], verb: true, release: STEP * 32 });
-    if (a.arp) { const tones = [...chord.chord, chord.chord[0] + 12, chord.chord[1] + 12], n = tones[ARP[beat]] + 12; this.note(midi(n), time, STEP * 1.6, 'square', .16 * (a.energy + .4), this.pumpGain, { cutoff: Math.min(9000, cutoff * .8 + 900), cutoffEnd: 700, q: 4, echo: true, pan: (beat % 2 ? .35 : -.35) }); }
+    if (a.riser && bar === 4 && beat === 0) { const d = S * 64; this.noise(time, d, .1, this.musicBus, 400, 'bandpass', { end: 9000, swell: true, q: 1.4 }); this.note(110, time, d, 'sawtooth', .025, this.musicBus, { end: 880, glide: d, attack: d * .9, cutoff: 3000 }); }
+    // Bass: rolling 16ths after the kick (wilds), offbeat eighths (frost) or octave bounce (candy).
+    const bassHit = song.bass === 'pulse' ? beat % 4 === 2 : beat % 4 !== 0;
+    if (a.bass && bassHit) { const up = song.bass === 'bounce' && beat % 4 === 2 ? 12 : 0, len = song.bass === 'pulse' ? S * 1.8 : S * .9;
+      this.note(midi(chord.bass + up), time, len, song.bass === 'pulse' ? 'triangle' : 'sawtooth', song.bass === 'pulse' ? .14 : .07, this.pumpGain, { cutoff: Math.min(1800, cutoff * .25 + 240), cutoffEnd: 150, q: 2.2, release: len * 1.05 }); }
+    if (a.sub && bassHit) this.note(midi(chord.bass - 12), time, S * .9, 'sine', .09, this.pumpGain, { release: S * .9 });
+    // Gated chords: one sustained voice per bar shaped by the song's 16th-note gate.
+    if (a.gate && beat === 0) this.gateChord(chord.chord, time, cutoff, (kind === 'boss' ? .5 : .44) * (song.leadVoice.kind === 'bell' ? .8 : 1));
+    if (a.pad && beat === 0 && bar % 2 === 0) for (const n of chord.chord) this.saw(midi(n), time, S * 32, song.leadVoice.kind === 'bell' ? .1 : .075, this.pumpGain, { attack: song.leadVoice.kind === 'bell' ? 1.2 : .6, cutoff: song.leadVoice.kind === 'bell' ? 3200 : 2200, spread: [-9, 9], verb: true, release: S * 32 });
+    if (a.arp) { const av = song.arpVoice, tones = [...chord.chord, chord.chord[0] + 12, chord.chord[1] + 12], n = tones[song.arp[beat]] + av.octave;
+      this.note(midi(n), time, S * (av.type === 'sine' ? 3 : 1.6), av.type, av.gain * (a.energy + .4), this.pumpGain, { cutoff: Math.min(9000, cutoff * .8 + 900), cutoffEnd: av.cutoffEnd, q: av.type === 'sine' ? .7 : 4, echo: true, pan: (beat % 2 ? .35 : -.35) }); }
     if (a.lead && beat % 2 === 0) {
-      const seq = kind === 'boss' ? BOSS_LEAD : LEAD, n = seq[(Math.floor(ps / 2)) % 64];
-      if (n) this.saw(midi(n), time, STEP * (kind === 'boss' ? 1.8 : 3), kind === 'break' && bar < 4 ? .16 : .2, this.pumpGain, { width: 1, spread: [-16, -6, 6, 16], attack: .008, cutoff: kind === 'break' && bar < 4 ? 2200 : 6500, echo: true, verb: true, release: STEP * (kind === 'boss' ? 1.8 : 3.2) });
+      const seq = kind === 'boss' ? song.bossLead : song.lead, n = seq[(Math.floor(ps / 2)) % 64], lv = song.leadVoice, quiet = kind === 'break' && bar < 4;
+      if (n) this.leadNote(lv, midi(n), time, kind === 'boss' ? 1.8 : lv.release, quiet);
     }
     if (kind === 'boss' && beat === 0 && bar % 4 === 0) this.siren(time);
   }
+  // Lead timbres: detuned supersaw (wilds), glassy bell (frost) or chiptune pulse (candy).
+  leadNote(lv, freq, time, steps, quiet) {
+    const S = this.stepDur, len = S * steps, g = lv.gain * (quiet ? .8 : 1);
+    if (lv.kind === 'bell') { this.note(freq, time, len, 'triangle', g, this.pumpGain, { attack: .004, cutoff: lv.cutoff, echo: true, verb: true, release: len }); this.note(freq * 2, time, len * .6, 'sine', g * .45, this.pumpGain, { attack: .002, echo: true, verb: true, release: len * .6 }); this.note(freq * 3.01, time, S * 1.2, 'sine', g * .18, this.pumpGain, { attack: .001, release: S * 1.2 }); return; }
+    if (lv.kind === 'chip') { this.note(freq, time, len, 'square', g, this.pumpGain, { attack: .002, cutoff: lv.cutoff, cutoffEnd: 2500, echo: true, release: len, pan: -.15 }); this.note(freq * 1.005, time, len, 'square', g * .6, this.pumpGain, { attack: .002, cutoff: lv.cutoff * .7, release: len, pan: .15 }); return; }
+    this.saw(freq, time, len, g, this.pumpGain, { width: 1, spread: lv.spread, attack: .008, cutoff: quiet ? 2200 : lv.cutoff, echo: true, verb: true, release: len });
+  }
   gateChord(notes, time, cutoff, gain) {
     if (!this.reserve(this.pumpGain)) return;
-    const c = this.ctx, gate = c.createGain(), filter = c.createBiquadFilter(), bar = STEP * 16, nodes = [gate, filter];
+    const c = this.ctx, gate = c.createGain(), filter = c.createBiquadFilter(), bar = this.stepDur * 16, nodes = [gate, filter];
     gain /= notes.length; // nine oscillators share one gate
     filter.type = 'lowpass'; filter.frequency.value = Math.min(9000, cutoff); filter.Q.value = 1.2; gate.gain.setValueAtTime(0, time);
-    for (let i = 0; i < 16; i++) { const t = time + i * STEP; if (GATE[i]) { gate.gain.setValueAtTime(0, t); gate.gain.linearRampToValueAtTime(gain, t + .004); gate.gain.setValueAtTime(gain, t + STEP * .55); gate.gain.linearRampToValueAtTime(0, t + STEP * .85); } }
+    for (let i = 0; i < 16; i++) { const t = time + i * this.stepDur; if (this.song.gate[i]) { gate.gain.setValueAtTime(0, t); gate.gain.linearRampToValueAtTime(gain, t + .004); gate.gain.setValueAtTime(gain, t + this.stepDur * .55); gate.gain.linearRampToValueAtTime(0, t + this.stepDur * .85); } }
     filter.connect(gate); gate.connect(this.pumpGain); gate.connect(this.reverbIn);
     let first = null;
     for (const n of notes) for (const d of [-12, 0, 12]) {
-      const osc = c.createOscillator(), pan = c.createStereoPanner ? c.createStereoPanner() : null; osc.type = 'sawtooth'; osc.frequency.value = midi(n + 12); osc.detune.value = d + (Math.random() - .5) * 4 + (this.transpose || 0) * 100;
+      const osc = c.createOscillator(), pan = c.createStereoPanner ? c.createStereoPanner() : null; osc.type = 'sawtooth'; osc.frequency.value = midi(n + 12); osc.detune.value = d + (Math.random() - .5) * 4;
       if (pan) { pan.pan.value = d / 14; osc.connect(pan); pan.connect(filter); nodes.push(pan); } else osc.connect(filter);
       osc.start(time); osc.stop(time + bar + .02); nodes.push(osc); if (!first) first = osc;
     }
@@ -286,12 +287,12 @@ export class AudioEngine {
     this.noise(time, big ? 2.2 : 1.6, big ? .14 : .1, this.drumGain, 5000, 'highpass', { verb: true });
     if (big) { this.note(90, time, 1.4, 'sine', .5, this.drumGain, { end: 28 }); this.noise(time, .6, .2, this.drumGain, 900, 'lowpass'); }
   }
-  siren(time) { for (let i = 0; i < 4; i++) this.note(i % 2 ? 740 : 988, time + i * STEP * 4, STEP * 4, 'square', .022, this.musicBus, { cutoff: 2600, attack: .02, echo: true }); }
+  siren(time) { for (let i = 0; i < 4; i++) this.note(i % 2 ? 740 : 988, time + i * this.stepDur * 4, this.stepDur * 4, 'square', .022, this.musicBus, { cutoff: 2600, attack: .02, echo: true }); }
   schedule() {
     if (!this.ctx) return; const now = this.ctx.currentTime;
     if (!this.enabled || !this.active || this.musicBuffer) { this.nextBeat = now; return; }
     if (this.nextBeat < now - .2) this.nextBeat = now;
-    while (this.nextBeat < now + .14) { this.musicStep(this.step, this.nextBeat); this.nextBeat += STEP; this.step++; }
+    while (this.nextBeat < now + .14) { this.musicStep(this.step, this.nextBeat); this.nextBeat += this.stepDur; this.step++; }
   }
   // --- effects ----------------------------------------------------------------------------------
   effect(type, o = {}) {

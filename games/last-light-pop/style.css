@@ -258,7 +258,7 @@ kbd { display: inline-block; font-family: var(--num); font-size: 11px; font-weig
 .ending-screen[data-outcome="won"] h2 { color: var(--yellow); }
 .ending-skip { position: absolute; right: 20px; bottom: max(20px, env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 8px; padding: 10px 18px; font-weight: 900; color: var(--ink); background: var(--cream); border: var(--border); border-radius: 999px; box-shadow: var(--pop-sm); }
 
-.pwa-update { position: absolute; z-index: 20; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; padding: 8px 8px 8px 16px; background: var(--cream); color: var(--ink); border: var(--border); border-radius: 999px; box-shadow: var(--pop-sm); font-weight: 800; font-size: 14px; }
+.pwa-update { position: absolute; z-index: 30; animation: bump 1.2s ease-in-out 3; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; padding: 8px 8px 8px 16px; background: var(--cream); color: var(--ink); border: var(--border); border-radius: 999px; box-shadow: var(--pop-sm); font-weight: 800; font-size: 14px; }
 .pwa-update button { padding: 6px 14px; border-radius: 999px; border: var(--border); background: var(--yellow); font-weight: 900; }
 .corner-meta { position: absolute; z-index: 4; right: 14px; bottom: 8px; display: flex; gap: 12px; align-items: center; font-family: var(--num); font-size: 10px; font-weight: 800; letter-spacing: .1em; color: #b8a6efaa; pointer-events: none; }
 .corner-meta button { pointer-events: auto; font-size: 12px; }
