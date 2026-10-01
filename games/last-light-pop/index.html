@@ -33,12 +33,22 @@
 <symbol id="i-install" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></symbol>
 <symbol id="i-crown" viewBox="0 0 24 24"><path d="m3 8 4.5 4L12 5l4.5 7L21 8l-2 11H5Z"/></symbol>
 <symbol id="i-skull" viewBox="0 0 24 24"><path d="M12 3a8 8 0 0 0-5 14.2V21h10v-3.8A8 8 0 0 0 12 3Z"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/></symbol>
+<symbol id="i-chest" viewBox="0 0 24 24"><path d="M3 11h18v9H3ZM3 11a9 6 0 0 1 18 0M10 11v4h4v-4"/></symbol>
+<symbol id="i-reroll" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14-5L4 8M4 4v4h4M4 13a8 8 0 0 0 14 5l2-2M20 20v-4h-4"/></symbol>
+<symbol id="i-banish" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m6 6 12 12"/></symbol>
+<symbol id="i-skip" viewBox="0 0 24 24"><path d="m5 5 9 7-9 7ZM18 5v14"/></symbol>
+<symbol id="i-revive" viewBox="0 0 24 24"><path d="M12 21 3.5 12.5a5.7 5.7 0 0 1 8.5-7.6 5.7 5.7 0 0 1 8.5 7.6Z"/><path d="M12 9v6M9 12h6"/></symbol>
+<symbol id="i-shop" viewBox="0 0 24 24"><path d="m14 6 4-4 4 4-4 4ZM16 8 4 20M2 16l6 6"/></symbol>
+<symbol id="i-medal" viewBox="0 0 24 24"><circle cx="12" cy="15" r="6"/><path d="m8 2 4 7 4-7M12 12l1 2h2l-1.5 1.5.5 2-2-1-2 1 .5-2L9 14h2Z"/></symbol>
+<symbol id="i-calendar" viewBox="0 0 24 24"><path d="M3 5h18v16H3ZM3 10h18M8 2v5M16 2v5"/><path d="m10 15 2 2 3-4"/></symbol>
+<symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 22c-4 0-7-3-7-7 0-5 5-7 5-12 3 2 4 5 4 7 1-1 2-2 2-4 2 2 3 5 3 9 0 4-3 7-7 7Z"/></symbol>
 <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></symbol>
 </defs></svg>
 <div class="app-shell">
   <header class="topbar">
     <button class="brand" id="nav-home" aria-label="ホーム" title="ホーム"><span class="brand-star"><svg><use href="#i-light"/></svg></span><span class="brand-word">LAST LIGHT <b>POP</b></span></button>
     <div class="top-actions">
+      <button class="star-chip" data-dialog="shop" aria-label="スターと工房" title="工房"><span>★</span><b id="star-count">0</b></button>
       <span class="connection" id="connection"><i></i><span>LOCAL / READY</span></span>
       <button class="chip-button" data-dialog="help" aria-label="遊び方" title="遊び方"><svg><use href="#i-help"/></svg><span>遊び方</span></button>
       <button class="chip-button" data-dialog="records" aria-label="戦績" title="戦績"><svg><use href="#i-chart"/></svg><span>戦績</span></button>
@@ -67,10 +77,12 @@
             <button data-mode="eclipse" aria-pressed="false"><strong>極夜</strong><small>HARD</small></button>
           </div>
           <div class="mission-text"><h3 id="mode-title">灯火防衛</h3><p id="mode-description">武器を育て、夜の主を迎え撃つ。</p></div>
+          <div class="heat-row" role="group" aria-label="ヒート（難易度）"><button id="heat-down" class="heat-step" aria-label="ヒートを下げる">−</button><div class="heat-info"><span class="heat-flame"><svg><use href="#i-flame"/></svg><b id="heat-level">0</b></span><div><strong id="heat-name">ノーマル</strong><small id="heat-rule">いつもの夜</small></div><span class="heat-mult" id="heat-mult">★×1.00</span></div><button id="heat-up" class="heat-step" aria-label="ヒートを上げる">＋</button></div>
           <button id="start-button" class="primary-button"><span>出撃する</span><svg><use href="#i-arrow"/></svg></button>
+          <button id="daily-button" class="daily-button"><svg><use href="#i-calendar"/></svg><span><strong>今日のチャレンジ</strong><small id="daily-summary">—</small></span><em id="daily-badge"></em></button>
           <div class="mission-foot"><span><kbd>WASD</kbd> / タッチで移動</span><span>攻撃は自動！</span></div>
         </div>
-        <div class="home-bottom"><div class="best-record"><svg><use href="#i-clock"/></svg><small>BEST</small><span id="home-best">--:--</span></div><div class="best-record combo-best"><svg><use href="#i-light"/></svg><small>MAX COMBO</small><span id="home-combo">0</span></div></div>
+        <div class="home-bottom"><button class="home-sticker" data-dialog="shop" style="--c:var(--yellow)"><svg><use href="#i-shop"/></svg><span>工房</span><em id="shop-badge" hidden>!</em></button><button class="home-sticker" data-dialog="achievements" style="--c:var(--mint)"><svg><use href="#i-medal"/></svg><span>実績 <small id="achieve-count">0/0</small></span></button><div class="best-record"><svg><use href="#i-clock"/></svg><small>BEST</small><span id="home-best">--:--</span></div><div class="best-record combo-best"><svg><use href="#i-light"/></svg><small>MAX COMBO</small><span id="home-combo">0</span></div></div>
       </div>
       <div id="hud" class="hud" hidden>
         <div class="hud-top">
@@ -78,7 +90,7 @@
             <div class="hp-row"><span class="hp-icon"><svg><use href="#i-heart"/></svg></span><div class="health-track"><div id="hp-bar"></div><span id="hp-text">110 / 110</span></div></div>
             <div class="level-line"><span class="level-badge" id="level-text">LV. 01</span><div class="xp-track"><div id="xp-bar"></div></div></div>
           </div>
-          <div class="time-panel"><span class="hud-overline" id="mission-label">灯火防衛</span><strong id="time-text">00:00</strong><span id="time-target">/ 06:00</span></div>
+          <div class="time-panel"><span class="hud-overline" id="mission-label">灯火防衛</span><strong id="time-text">00:00</strong><span id="time-target">/ 06:00</span><span class="hud-chips" id="hud-chips"></span></div>
           <div class="hud-right"><div class="kill-stat"><svg><use href="#i-skull"/></svg><strong id="kills-text">0</strong></div><button class="round-button pause-button" id="pause-button" aria-label="一時停止" title="一時停止 (Esc / P)"><svg><use href="#i-pause"/></svg></button></div>
         </div>
         <div class="boss-panel" id="boss-panel" hidden><div class="boss-head"><svg><use href="#i-crown"/></svg><span id="boss-name">夜の主</span><small id="boss-hp"></small></div><div class="boss-track"><span id="boss-bar"></span></div></div>
@@ -95,15 +107,16 @@
       <div id="joystick" class="joystick" hidden><div id="joystick-knob"></div></div>
       <div class="announcement" id="announcement" role="status" hidden></div>
       <div class="warning-banner" id="warning-banner" hidden aria-hidden="true"><div class="stripe"></div><strong>WARNING!!</strong><span id="warning-text">夜の主が接近中</span><div class="stripe"></div></div>
-      <div class="screen-overlay" id="upgrade-screen" hidden><div class="upgrade-wrap"><div class="eyebrow levelup-eyebrow">★ LEVEL UP! ★</div><h2>パワーアップを選ぼう！</h2><div id="upgrade-cards" class="upgrade-cards"></div><span class="overlay-footnote">時間は停止中 ・ 数字キー 1 / 2 / 3 でも選べます</span></div></div>
+      <div class="screen-overlay" id="upgrade-screen" hidden><div class="upgrade-wrap"><div class="eyebrow levelup-eyebrow">★ LEVEL UP! ★</div><h2>パワーアップを選ぼう！</h2><div id="upgrade-cards" class="upgrade-cards"></div><div class="upgrade-actions"><button id="reroll-button" class="action-chip" style="--c:var(--sky)"><svg><use href="#i-reroll"/></svg>リロール <b id="reroll-count">1</b><kbd>R</kbd></button><button id="banish-button" class="action-chip" style="--c:var(--orange)" aria-pressed="false"><svg><use href="#i-banish"/></svg>除外 <b id="banish-count">1</b><kbd>X</kbd></button><button id="skip-button" class="action-chip" style="--c:var(--cream)"><svg><use href="#i-skip"/></svg>スキップ <small>HP+20</small><kbd>S</kbd></button></div><span class="overlay-footnote" id="upgrade-footnote">時間は停止中 ・ 数字キー 1 / 2 / 3 でも選べます</span></div></div>
+      <div class="screen-overlay chest-screen" id="chest-screen" hidden><div class="chest-wrap"><div class="chest-art" id="chest-art"><div class="chest-lid"></div><div class="chest-body"><i></i></div><div class="chest-rays"></div></div><div class="eyebrow chest-eyebrow" id="chest-eyebrow">TREASURE!</div><h2 id="chest-title">宝箱をゲット！</h2><div class="reels" id="chest-reels"></div><button id="chest-claim" class="primary-button chest-claim" hidden>受け取る <svg><use href="#i-arrow"/></svg></button><span class="overlay-footnote">クリック / Enter で演出をスキップ</span></div></div>
       <div class="screen-overlay" id="pause-screen" hidden><div class="compact-card pause-card"><span class="eyebrow">PAUSE</span><h2>ひと休み！</h2><p>灯火はちゃんと待っててくれるよ。</p><button id="resume-button" class="primary-button">つづける <svg><use href="#i-arrow"/></svg></button><button class="secondary-button" data-dialog="settings">設定をひらく</button><button id="quit-button" class="text-button">作戦を終了する</button></div></div>
       <div id="ending-screen" class="ending-screen" role="region" aria-labelledby="ending-title" hidden>
         <div class="ending-content"><span class="ending-kicker" id="ending-kicker">MISSION CLEAR</span><h2 id="ending-title" aria-live="polite">夜明け！</h2><p id="ending-copy">最後の灯火を、守り抜いた。</p></div>
         <button id="ending-skip" class="ending-skip">結果を見る <svg aria-hidden="true"><use href="#i-arrow"/></svg></button>
       </div>
-      <div class="screen-overlay" id="result-screen" hidden><div class="compact-card result-card"><div class="rank-stamp" id="result-rank">A</div><span class="eyebrow" id="result-eyebrow">NEXT NIGHT</span><h2 id="result-title">次の夜へ！</h2><p id="result-copy">その灯火は、まだあなたの中に。</p><div class="result-stats"><div><small>生存時間</small><strong id="result-time">00:00</strong></div><div><small>撃破数</small><strong id="result-kills">0</strong></div><div><small>レベル</small><strong id="result-level">1</strong></div><div><small>最大コンボ</small><strong id="result-combo">0</strong></div></div><div id="result-build" class="result-build"></div><div class="new-record" id="new-record" hidden>★ NEW RECORD! 自己ベスト更新 ★</div><button id="retry-button" class="primary-button">もう一回！ <svg><use href="#i-arrow"/></svg></button><button id="result-home" class="secondary-button">ホームへ</button></div></div>
+      <div class="screen-overlay" id="result-screen" hidden><div class="compact-card result-card"><div class="rank-stamp" id="result-rank">A</div><span class="eyebrow" id="result-eyebrow">NEXT NIGHT</span><h2 id="result-title">次の夜へ！</h2><p id="result-copy">その灯火は、まだあなたの中に。</p><div class="result-stats"><div><small>生存時間</small><strong id="result-time">00:00</strong></div><div><small>撃破数</small><strong id="result-kills">0</strong></div><div><small>レベル</small><strong id="result-level">1</strong></div><div><small>最大コンボ</small><strong id="result-combo">0</strong></div></div><div id="result-build" class="result-build"></div><div class="star-earned" id="star-earned"><div class="star-total">★ <b id="star-total">0</b><small id="star-mult"></small></div><ul id="star-lines"></ul></div><div class="unlocks" id="result-unlocks"></div><div class="new-record" id="new-record" hidden>★ NEW RECORD! 自己ベスト更新 ★</div><button id="retry-button" class="primary-button">もう一回！ <svg><use href="#i-arrow"/></svg></button><button id="result-home" class="secondary-button">ホームへ</button></div></div>
       <div class="pwa-update" id="pwa-update" hidden><span>新しいバージョンがあります</span><button id="update-button">更新</button></div>
-      <div class="corner-meta"><button class="text-button" id="install-button" hidden><svg><use href="#i-install"/></svg> インストール</button><span id="performance">CANVAS 2D</span><span class="version">V 2.0.0</span></div>
+      <div class="corner-meta"><button class="text-button" id="install-button" hidden><svg><use href="#i-install"/></svg> インストール</button><span id="performance">CANVAS 2D</span><span class="version">V 2.1.0</span></div>
     </section>
   </main>
 </div>

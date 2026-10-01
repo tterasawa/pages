@@ -137,6 +137,15 @@ function makeSprites() {
     oval(c, 0, 0, 10, 6, P.ink); oval(c, 0, 0, 8, 4, col); oval(c, 2, -1, 3.5, 1.6, P.white);
   }, 64);
   for (const [name, col] of [['foeA', P.tomato], ['foeB', P.orange]]) S[name] = sprite(c => { circle(c, 0, 0, 10, P.ink, 0); circle(c, 0, 0, 7.5, col, 0); circle(c, -2.2, -2.2, 2.6, P.white, 0); }, 24);
+  for (const [name, body, trim] of [['chest', P.coral, P.yellow], ['chestBig', P.purple, P.yellow]]) S[name] = sprite(c => {
+    shadow(c, 16, 20, 5);
+    roundRect(c, -18, -2, 36, 18, 4); ink(c, body, 3);
+    c.beginPath(); c.moveTo(-18, -2); c.quadraticCurveTo(-18, -18, 0, -18); c.quadraticCurveTo(18, -18, 18, -2); c.closePath(); ink(c, body, 3);
+    c.fillStyle = trim; c.fillRect(-4, -18, 8, 34); c.fillRect(-18, -4, 36, 5); c.strokeStyle = P.ink; c.lineWidth = 2.4; c.strokeRect(-4, -18, 8, 34); c.strokeRect(-18, -4, 36, 5);
+    roundRect(c, -5, -3, 10, 10, 3); ink(c, P.lemon, 2.4); circle(c, 0, 2, 1.8, P.ink, 0);
+    oval(c, -10, -12, 4, 2, '#ffffffaa', 0, null, -.4);
+  }, 48);
+  S.crown = sprite(c => { path(c, [[-10, 6], [-12, -6], [-5, 0], [0, -9], [5, 0], [12, -6], [10, 6]]); ink(c, P.yellow, 2.4); circle(c, 0, -9, 2, P.coral, 1.6); }, 32);
   S.blade = sprite(c => { star(c, 0, 0, 15, 5, 4, 0); ink(c, P.sky, 2.8); star(c, 0, 0, 8, 3, 4, Math.PI / 4); ink(c, P.white, 0); circle(c, 0, 0, 2.6, P.ink, 0); }, 40);
   S.bush = sprite(c => { shadow(c, 13, 26, 7); for (const [x, y, r] of [[-14, 4, 11], [14, 4, 11], [0, -4, 15], [-6, 7, 10], [7, 7, 10]]) circle(c, x, y, r, '#5cc98a', 3); for (const [x, y, r] of [[-14, 4, 11], [14, 4, 11], [0, -4, 15]]) circle(c, x, y - 1, r - 4, '#76dba0', 0); circle(c, -4, -9, 3, P.white + 'aa', 0); circle(c, 8, 3, 2.2, P.coral, 1.6); circle(c, -12, 1, 2, P.yellow, 1.4); }, 72);
   S.mushroom = sprite(c => { shadow(c, 13, 14, 5); roundRect(c, -5, -2, 10, 15, 4); ink(c, P.cream, 2.6); c.beginPath(); c.arc(0, -2, 15, Math.PI, 0); c.quadraticCurveTo(0, 3, -15, -2); ink(c, P.tomato, 2.8); circle(c, -7, -7, 2.8, P.white, 0); circle(c, 4, -11, 3.2, P.white, 0); circle(c, 9, -4, 2, P.white, 0); }, 48);
@@ -262,6 +271,14 @@ export class Renderer {
           this.kick = 1.2; this.zoomKick = .12; this.flash('#fff7d6', .45);
           if (effects) { this.confetti(e.x, e.y, heavy ? 120 : 30, 640); for (let i = 0; i < 4; i++) this.spawn('ring', e.x, e.y, { life: .5 + i * .15, size: 140 + i * 90, color: CONFETTI[i], grow: 1 }); this.comic(e.x, e.y - 70, 'K.O.!', P.yellow, 2); }
           break;
+        case 'eliteDown':
+          this.kick = Math.max(this.kick, .6); this.flash('#fff2b0', .15);
+          if (effects) { this.confetti(e.x, e.y, heavy ? 50 : 16, 520); this.spawn('ring', e.x, e.y, { life: .45, size: 150, color: P.yellow, grow: 1 }); this.comic(e.x, e.y - 50, 'GREAT!', P.yellow, 1.2); }
+          break;
+        case 'revive':
+          this.kick = 1; this.zoomKick = .1; this.flash('#ffffff', .4);
+          if (effects) { for (let i = 0; i < 3; i++) this.spawn('ring', e.x, e.y, { life: .5 + i * .15, size: 160 + i * 90, color: [P.lemon, P.mint, P.white][i], grow: 1 }); this.confetti(e.x, e.y, heavy ? 90 : 25, 560); this.comic(e.x, e.y - 100, 'REVIVE!!', P.mint, 1.5); }
+          break;
         case 'level':
           this.zoomKick = .05; this.flash(P.lemon, .2);
           if (effects && !home) { this.confetti(e.x, e.y, heavy ? 70 : 20, 520); this.spawn('ring', e.x, e.y, { life: .5, size: 160, color: P.yellow, grow: 1 }); this.comic(e.x, e.y - 100, 'LEVEL UP!', P.lemon, 1.25); }
@@ -348,18 +365,28 @@ export class Renderer {
     this.drawArena(x0, y0, x1, y1, game);
     const l = game.levels;
     if (l.frost) this.drawFrost(p, l.frost, game.time);
+    this.nearestChest = null; let chestDist = Infinity;
+    for (const g of game.gems) {
+      if (g.kind !== 'chest') continue; const d = Math.hypot(g.x - p.x, g.y - p.y); if (d < chestDist) { chestDist = d; this.nearestChest = g; }
+      if (g.x < x0 || g.x > x1 || g.y < y0 || g.y > y1) continue;
+      const big = g.value >= 2, bob = motion ? Math.sin(this.clock * 4 + g.phase) * 3 : 0, glow = .5 + Math.sin(this.clock * 6) * .2;
+      c.fillStyle = `rgba(255,210,63,${glow * .35})`; c.fillRect(g.x - 9, g.y - 150, 18, 150); c.fillStyle = `rgba(255,255,255,${glow * .3})`; c.fillRect(g.x - 3, g.y - 150, 6, 150);
+      c.fillStyle = '#ffd23f33'; c.beginPath(); c.ellipse(g.x, g.y + 12, 34, 12, 0, 0, TAU); c.fill();
+      this.sprite(big ? 'chestBig' : 'chest', g.x, g.y - 6 + bob, big ? 62 : 48, motion ? Math.sin(this.clock * 9) * .06 : 0);
+      if (motion && this.frame % 10 === 0) this.spawn('twinkle', g.x + (Math.random() - .5) * 50, g.y - 10 - Math.random() * 40, { life: .5, size: 10, color: P.lemon, vr: 5 });
+    }
     const gemFast = this.low || game.gems.length > 150 || game.enemies.length > 220;
     if (gemFast) {
       // Crowd fast path: pre-scaled gem bitmaps copied 1:1 in device pixels.
       const t = c.getTransform(); c.setTransform(1, 0, 0, 1, 0, 0); c.imageSmoothingEnabled = false;
       for (const g of game.gems) {
-        if (g.x < x0 || g.x > x1 || g.y < y0 || g.y > y1) continue;
+        if (g.kind === 'chest' || g.x < x0 || g.x > x1 || g.y < y0 || g.y > y1) continue;
         const bob = motion ? Math.sin(game.time * 4 + g.phase) * 2 : 0, name = g.kind === 'heal' ? 'heal' : g.value > 24 ? 'gemBig' : g.value > 6 ? 'gemMid' : 'gem';
         this.blit(name, this.sprites, false, t.e + g.x * t.a, t.f + (g.y + bob) * t.d, name === 'heal' ? 30 : name === 'gemBig' ? 28 : name === 'gemMid' ? 22 : 17);
       }
       c.setTransform(t); c.imageSmoothingEnabled = true;
     } else for (const g of game.gems) {
-      if (g.x < x0 || g.x > x1 || g.y < y0 || g.y > y1) continue;
+      if (g.kind === 'chest' || g.x < x0 || g.x > x1 || g.y < y0 || g.y > y1) continue;
       const bob = motion ? Math.sin(game.time * 4 + g.phase) * 2 : 0;
       if (g.kind === 'heal') this.sprite('heal', g.x, g.y + bob, 30 * (1 + pump * .12));
       else this.sprite(g.value > 24 ? 'gemBig' : g.value > 6 ? 'gemMid' : 'gem', g.x, g.y + bob, g.value > 24 ? 28 : g.value > 6 ? 22 : 17, motion ? Math.sin(game.time * 2 + g.phase) * .25 : 0);
@@ -374,9 +401,11 @@ export class Renderer {
       const size = ENEMY_SIZES[e.type], speed = e.type === 1 ? 14 : 7, wob = motion ? Math.sin(game.time * speed + e.phase) : 0;
       const hitPop = e.hit > 0 ? 1 + e.hit * 2.2 : 1, sqx = (1 + wob * .06) * hitPop, sqy = (1 - wob * .06) / Math.sqrt(hitPop) * (e.hit > 0 ? 1.05 : 1);
       const flip = e.x > p.x && e.type !== 3 && e.type !== 4, set = e.hit > .03 ? this.white : this.sprites, lift = Math.abs(wob) * (e.type === 1 ? 4 : 2);
-      if (fast && e.type !== 4) { this.blit('enemy' + e.type, set, flip, ox + (e.x - this.camera.x) * k, oy + (e.y - lift - this.camera.y) * k, size); continue; }
+      if (fast && e.type !== 4 && !e.elite) { this.blit('enemy' + e.type, set, flip, ox + (e.x - this.camera.x) * k, oy + (e.y - lift - this.camera.y) * k, size); continue; }
       if (fast) { c.setTransform(k, 0, 0, k, ox - this.camera.x * k, oy - this.camera.y * k); c.imageSmoothingEnabled = true; }
-      this.sprite('enemy' + e.type, e.x, e.y - lift, size, e.type === 1 ? wob * .12 : 0, 1, flip ? -sqx : sqx, sqy, set);
+      if (e.elite) { c.strokeStyle = P.yellow; c.lineWidth = 4; c.setLineDash([10, 8]); c.lineDashOffset = -this.clock * 40; c.beginPath(); c.ellipse(e.x, e.y + e.r * .6, e.r * 1.25, e.r * .5, 0, 0, TAU); c.stroke(); c.setLineDash([]); }
+      this.sprite('enemy' + e.type, e.x, e.y - lift, e.elite ? size * 1.45 : size, e.type === 1 ? wob * .12 : 0, 1, flip ? -sqx : sqx, sqy, set);
+      if (e.elite) { this.sprite('crown', e.x, e.y - e.r * 1.35 - lift + (motion ? Math.sin(this.clock * 5) * 2 : 0), 34); if (e.hp < e.maxHP) { const bw = 56, by = e.y - e.r * 1.7; roundRect(c, e.x - bw / 2 - 2, by - 2, bw + 4, 9, 4); c.fillStyle = P.ink; c.fill(); roundRect(c, e.x - bw / 2, by, Math.max(4, bw * e.hp / e.maxHP), 5, 2.5); c.fillStyle = P.yellow; c.fill(); } }
       if (e.slow > 0) { c.fillStyle = '#9be7ff55'; c.beginPath(); c.ellipse(e.x, e.y + e.r * .7, e.r + 4, 6, 0, 0, TAU); c.fill(); }
       if (e.type === 4) this.bossBar(e);
       if (fast) { c.setTransform(1, 0, 0, 1, 0, 0); c.imageSmoothingEnabled = false; }
@@ -408,6 +437,7 @@ export class Renderer {
     this.drawFx(x0, y0, x1, y1);
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     if (!home && !['won', 'dead'].includes(game.state) && game.boss?.alive) this.bossIndicator(game.boss, s);
+    if (!home && this.nearestChest && game.state === 'running') this.bossIndicator(this.nearestChest, s, P.yellow);
     if (this.hurtTime > 0 && motion) { const a = this.hurtTime / .35; c.strokeStyle = `rgba(255,70,110,${a * .55})`; c.lineWidth = 28; c.strokeRect(0, 0, w, h); }
     if (p.hp < p.maxHP * .3 && !home && game.state === 'running' && motion) { const a = (.18 + Math.sin(this.clock * 7) * .1); c.strokeStyle = `rgba(255,70,110,${a})`; c.lineWidth = 18; c.strokeRect(0, 0, w, h); }
     if (this.flashTime > 0 && this.flashColor) { c.globalAlpha = this.flashTime / this.flashMax * .55; c.fillStyle = this.flashColor; c.fillRect(0, 0, w, h); c.globalAlpha = 1; }
@@ -482,11 +512,11 @@ export class Renderer {
     roundRect(c, e.x - w / 2 - 3, y - 3, w + 6, 12, 6); c.fillStyle = P.ink; c.fill();
     roundRect(c, e.x - w / 2, y, Math.max(6, w * e.hp / e.maxHP), 6, 3); c.fillStyle = P.magenta; c.fill();
   }
-  bossIndicator(boss, s) {
+  bossIndicator(boss, s, color = P.magenta) {
     const dx = (boss.x - this.camera.x) * s, dy = (boss.y - this.camera.y) * s, w = this.width, h = this.height; if (Math.abs(dx) < w / 2 - 45 && Math.abs(dy) < h / 2 - 65) return;
     const angle = Math.atan2(dy, dx), extent = Math.min((w / 2 - 44) / (Math.abs(Math.cos(angle)) || 1), (h / 2 - 96) / (Math.abs(Math.sin(angle)) || 1));
     const x = w / 2 + Math.cos(angle) * extent, y = h / 2 + Math.sin(angle) * extent, c = this.ctx, pulse = 1 + Math.sin(this.clock * 10) * .12;
-    c.save(); c.translate(x, y); c.rotate(angle); c.scale(pulse, pulse); path(c, [[16, 0], [-8, -12], [-3, 0], [-8, 12]]); ink(c, P.magenta, 3.5); c.restore();
+    c.save(); c.translate(x, y); c.rotate(angle); c.scale(pulse, pulse); path(c, [[16, 0], [-8, -12], [-3, 0], [-8, 12]]); ink(c, color, 3.5); c.restore();
   }
   drawEnding(game, ending) {
     const c = this.ctx, w = this.width, h = this.height, p = ending.progress, ease = p * p * (3 - 2 * p), won = ending.kind === 'won';

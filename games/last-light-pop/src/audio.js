@@ -8,7 +8,7 @@ async function audioRequest(url, consume) {
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), AUDIO_FETCH_TIMEOUT);
   try { const response = await fetch(url, { signal: controller.signal }); if (!response.ok) throw new Error('Audio resource unavailable'); return await consume(response); } finally { clearTimeout(timer); }
 }
-export const EFFECT_NAMES = Object.freeze(['shot', 'kill', 'xp', 'hurt', 'dash', 'pulse', 'arc', 'nova', 'heal', 'boss', 'bossDown', 'level', 'choose', 'evolve', 'won', 'start', 'dead', 'combo', 'bossShot', 'ui', 'heartbeat']);
+export const EFFECT_NAMES = Object.freeze(['shot', 'kill', 'xp', 'hurt', 'dash', 'pulse', 'arc', 'nova', 'heal', 'boss', 'bossDown', 'level', 'choose', 'evolve', 'won', 'start', 'dead', 'combo', 'bossShot', 'ui', 'heartbeat', 'chest', 'tick', 'jackpot', 'achieve', 'reroll', 'banish', 'buy', 'elite', 'revive', 'skip']);
 export function parseAudioConfig(data, configURL) {
   const result = { music: null, effects: Object.create(null) };
   if (!data || typeof data !== 'object' || Array.isArray(data)) return result;
@@ -261,7 +261,7 @@ export class AudioEngine {
   // --- effects ----------------------------------------------------------------------------------
   effect(type, o = {}) {
     if (!this.ctx || !this.enabled || !this.active || !EFFECT_NAMES.includes(type)) return;
-    const t = this.ctx.currentTime, spacing = { shot: .075, kill: .045, xp: .05, arc: .09, nova: .1, bossShot: .3, ui: .04, heartbeat: .5 }[type] || .04;
+    const t = this.ctx.currentTime, spacing = { shot: .075, kill: .045, xp: .05, arc: .09, nova: .1, bossShot: .3, ui: .04, heartbeat: .5, tick: .02 }[type] || .04;
     if (t - (this.lastEffects.get(type) ?? -Infinity) < spacing) return; this.lastEffects.set(type, t);
     const dest = this.sfxGain, buffer = this.effectBuffers[type], ending = type === 'won' || type === 'dead';
     if (buffer) { if (!this.reserve(dest)) return; const s = this.ctx.createBufferSource(); s.buffer = buffer; s.connect(dest); this.track(s, dest, [s], ending); s.start(t); return; }
@@ -284,6 +284,16 @@ export class AudioEngine {
       case 'level': chord([72, 76, 79, 84, 88, 91], .045, .25, 'square', .055, { cutoff: 5000 }); noise(.4, .08, 1000, 'bandpass', { end: 9000, q: 2 }); break;
       case 'choose': chord([84, 91], .04, .2, 'triangle', .1, { verb: true }); noise(.08, .05, 7000, 'highpass'); break;
       case 'ui': tone(1600, .04, 'sine', .05, 2000); break;
+      case 'chest': noise(.5, .1, 500, 'bandpass', { end: 8000, q: 2 }); chord([76, 79, 84, 88], .06, .4, 'square', .06, { at: .3, verb: true }); tone(90, .4, 'sine', .4, 40, { at: .3 }); break;
+      case 'tick': tone(1800 + (o.step || 0) * 60, .03, 'square', .045, null, { cutoff: 5000 }); break;
+      case 'jackpot': chord([72, 76, 79, 84, 88, 91, 96], .05, .6, 'sawtooth', .045, { cutoff: 7000, verb: true }); noise(.8, .1, 7000, 'highpass', { verb: true }); tone(60, .7, 'sine', .45, 30); break;
+      case 'achieve': chord([84, 88, 91, 96], .07, .45, 'triangle', .1, { verb: true }); tone(2093, .3, 'sine', .05, null, { at: .3 }); break;
+      case 'reroll': noise(.18, .1, 1200, 'bandpass', { end: 5000, q: 3 }); chord([79, 84], .05, .12, 'square', .05); break;
+      case 'banish': tone(400, .25, 'sawtooth', .08, 90, { cutoff: 2000 }); noise(.15, .08, 800, 'lowpass'); break;
+      case 'buy': chord([79, 84, 88], .04, .25, 'square', .07, { cutoff: 5000 }); tone(2637, .15, 'sine', .05, null, { at: .12 }); break;
+      case 'elite': tone(300, .3, 'square', .06, 600, { cutoff: 3000 }); tone(150, .4, 'sawtooth', .1, 75, { cutoff: 900 }); break;
+      case 'revive': noise(.7, .12, 300, 'bandpass', { end: 9000, swell: true, q: 2 }); chord([69, 76, 81, 88], .05, .9, 'sawtooth', .05, { at: .5, cutoff: 6000, verb: true }); tone(70, .6, 'sine', .45, 30, { at: .5 }); break;
+      case 'skip': chord([76, 72], .06, .15, 'triangle', .08); break;
       case 'heartbeat': tone(70, .16, 'sine', .45, 45); tone(66, .14, 'sine', .32, 42, { at: .2 }); break;
       case 'combo': { const n = Math.min(4, o.tier || 0); chord([72 + n * 2, 76 + n * 2, 79 + n * 2, 84 + n * 2], .035, .32, 'sawtooth', .04, { cutoff: 6000, verb: true }); noise(.3, .06, 2000, 'bandpass', { end: 10000, q: 1.5 }); break; }
       case 'evolve': noise(.6, .12, 400, 'bandpass', { end: 10000, swell: true, q: 2 }); chord([69, 73, 76, 81, 85, 88, 93], .05, .9, 'sawtooth', .04, { at: .55, cutoff: 6000, verb: true }); tone(60, .8, 'sine', .4, 30, { at: .55 }); break;
