@@ -1,12 +1,12 @@
 // Persistent progression: the workshop (permanent upgrades), achievements, star rewards,
 // heat unlocks and the daily challenge. Pure functions over a plain profile object.
-import { MODES, HEATS, MUTATORS, META_DEFAULT, CHARACTERS } from './core.js';
+import { MODES, HEATS, MUTATORS, META_DEFAULT, META_CURVES, CHARACTERS, STAGES } from './core.js';
 
 export const SHOP = Object.freeze([
-  { id: 'hp', name: 'がんじょう', icon: 'heart', color: 'var(--coral)', max: 5, base: 72, step: 54, effect: r => `最大HP +${r * 10}` },
-  { id: 'power', name: 'パワー', icon: 'power', color: 'var(--purple)', max: 5, base: 90, step: 72, effect: r => `与ダメージ +${r * 5}%` },
-  { id: 'speed', name: 'すばやさ', icon: 'dash', color: 'var(--mint)', max: 5, base: 72, step: 54, effect: r => `移動速度 +${r * 4}%` },
-  { id: 'growth', name: 'まなび', icon: 'leaf', color: 'var(--yellow)', max: 5, base: 90, step: 72, effect: r => `獲得経験値 +${r * 6}%` },
+  { id: 'hp', name: 'がんじょう', icon: 'heart', color: 'var(--coral)', max: 5, base: 72, step: 54, effect: r => `最大HP +${META_CURVES.hp[r]}` },
+  { id: 'power', name: 'パワー', icon: 'power', color: 'var(--purple)', max: 5, base: 90, step: 72, effect: r => `与ダメージ +${Math.round(META_CURVES.power[r] * 100)}%` },
+  { id: 'speed', name: 'すばやさ', icon: 'dash', color: 'var(--mint)', max: 5, base: 72, step: 54, effect: r => `移動速度 +${Math.round(META_CURVES.speed[r] * 100)}%` },
+  { id: 'growth', name: 'まなび', icon: 'leaf', color: 'var(--yellow)', max: 5, base: 90, step: 72, effect: r => `獲得経験値 +${Math.round(META_CURVES.growth[r] * 100)}%` },
   { id: 'magnet', name: 'ひきよせ', icon: 'magnet', color: 'var(--teal)', max: 3, base: 54, step: 54, effect: r => `回収範囲 +${r * 15}%` },
   { id: 'regen', name: 'いやし', icon: 'heart', color: 'var(--pink)', max: 3, base: 108, step: 90, effect: r => `毎秒HP +${(r * .15).toFixed(2)}` },
   { id: 'reroll', name: 'ひきなおし', icon: 'reroll', color: 'var(--sky)', max: 3, base: 144, step: 108, effect: r => `リロール ${1 + r}回 / 出撃` },
@@ -44,6 +44,11 @@ export const ACHIEVEMENTS = Object.freeze([
   { id: 'endless-20', name: '夜の住人', desc: 'エンドレスで20分生き残る', reward: 300, test: (r) => r.mode === 'endless' && r.time >= 1200 },
   { id: 'specials-5', name: 'おたからハンター', desc: '1回の出撃で特殊アイテムを5個拾う', reward: 60, test: (r) => r.specials >= 5 },
   { id: 'all-chars', name: 'みんなで夜明け', desc: '4人すべてのキャラクターでクリア', reward: 300, test: (r, p) => Object.keys(CHARACTERS).every(id => p.charClears[id]) },
+  { id: 'stage-wilds', name: '荒野の夜明け', desc: '夜の荒野でクリア', reward: 60, test: (r) => r.won && r.stage === 'wilds' && r.mode !== 'endless' },
+  { id: 'stage-frost', name: '氷上の舞', desc: '氷の湖でクリア', reward: 120, test: (r) => r.won && r.stage === 'frost' },
+  { id: 'stage-candy', name: 'あまい夜明け', desc: 'キャンディの森でクリア', reward: 180, test: (r) => r.won && r.stage === 'candy' },
+  { id: 'relic-3', name: 'コレクター', desc: '1回の出撃でレリックを3つ集める', reward: 80, test: (r) => r.relics >= 3 },
+  { id: 'cursed', name: '呪いをはねのけて', desc: '呪いを受けたままクリア', reward: 120, test: (r) => r.won && r.curses >= 1 },
   { id: 'workshop', name: '工房マスター', desc: '工房の強化をすべて最大にする', reward: 300, test: (r, p) => SHOP.every(i => (p.meta[i.id] || 0) >= i.max) }
 ]);
 
@@ -55,12 +60,15 @@ export const UNLOCKS = Object.freeze([
   { kind: 'weapon', id: 'rain', achievement: 'clear-guard', label: '星降りの夜' },
   { kind: 'character', id: 'runner', achievement: 'clear-patrol', label: 'ソラ' },
   { kind: 'character', id: 'knight', achievement: 'elite-5', label: 'ガンテツ' },
-  { kind: 'character', id: 'witch', achievement: 'combo-100', label: 'ミント' }
+  { kind: 'character', id: 'witch', achievement: 'combo-100', label: 'ミント' },
+  { kind: 'stage', id: 'frost', achievement: 'stage-wilds', label: '氷の湖' },
+  { kind: 'stage', id: 'candy', achievement: 'stage-frost', label: 'キャンディの森' }
 ]);
 export const isUnlocked = (profile, u) => !!profile.achievements[u.achievement];
 export function lockedWeapons(profile) { return UNLOCKS.filter(u => u.kind === 'weapon' && !isUnlocked(profile, u)).map(u => u.id); }
+export function stageUnlocked(profile, id) { const u = UNLOCKS.find(x => x.kind === 'stage' && x.id === id); return !u || isUnlocked(profile, u); }
 export function characterUnlocked(profile, id) { const u = UNLOCKS.find(x => x.kind === 'character' && x.id === id); return !u || isUnlocked(profile, u); }
-export function emptyProfile() { return { stars: 0, earned: 0, meta: { ...META_DEFAULT }, achievements: {}, heatUnlocked: 0, stats: { runs: 0, wins: 0, kills: 0, chests: 0, evolves: 0 }, daily: {}, dailyStreak: 0, lastDaily: '', charClears: {}, endlessBest: 0, character: 'keeper' }; }
+export function emptyProfile() { return { stars: 0, earned: 0, meta: { ...META_DEFAULT }, achievements: {}, heatUnlocked: 0, stats: { runs: 0, wins: 0, kills: 0, chests: 0, evolves: 0 }, daily: {}, dailyStreak: 0, lastDaily: '', charClears: {}, endlessBest: 0, character: 'keeper', stage: 'wilds', tips: {}, seen: {} }; }
 const int = (v, min = 0, max = 1e9) => Number.isFinite(v) ? Math.max(min, Math.min(max, Math.floor(v))) : min;
 export function sanitizeProfile(raw) {
   const p = emptyProfile(); if (!raw || typeof raw !== 'object') return p;
@@ -69,7 +77,8 @@ export function sanitizeProfile(raw) {
   for (const a of ACHIEVEMENTS) if (Number.isFinite(raw.achievements?.[a.id])) p.achievements[a.id] = raw.achievements[a.id];
   for (const k of Object.keys(p.stats)) p.stats[k] = int(raw.stats?.[k]);
   for (const id of Object.keys(CHARACTERS)) if (raw.charClears?.[id] === true) p.charClears[id] = true;
-  p.endlessBest = Number.isFinite(raw.endlessBest) ? Math.max(0, raw.endlessBest) : 0; p.character = CHARACTERS[raw.character] ? raw.character : 'keeper';
+  p.endlessBest = Number.isFinite(raw.endlessBest) ? Math.max(0, raw.endlessBest) : 0; p.character = CHARACTERS[raw.character] ? raw.character : 'keeper'; p.stage = STAGES[raw.stage] ? raw.stage : 'wilds';
+  for (const k of ['tips', 'seen']) if (raw[k] && typeof raw[k] === 'object') for (const [id, v] of Object.entries(raw[k]).slice(0, 100)) if (v === true && /^[\w-]{1,32}$/.test(id)) p[k][id] = true;
   if (raw.daily && typeof raw.daily === 'object') for (const [d, v] of Object.entries(raw.daily).slice(-60)) if (/^\d{4}-\d{2}-\d{2}$/.test(d) && v && typeof v === 'object') p.daily[d] = { best: Number.isFinite(v.best) ? Math.max(0, v.best) : 0, won: v.won === true, kills: int(v.kills) };
   return p;
 }

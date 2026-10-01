@@ -568,3 +568,40 @@ dialog::backdrop { background: #170a35cc; }
 @media (max-height: 560px) and (orientation: landscape) { .char-chip { margin-top: 4px; padding: 3px 8px; } .char-chip img { width: 32px; height: 32px; } .char-chip small { display: none; } }
 .dmg-row b { white-space: nowrap; }
 @media (max-width: 640px) { .dmg-row b small { display: none; } .dmg-row { grid-template-columns: 20px 84px 1fr 38px; } }
+/* ---------- v2.3: stages, relics, coach marks, accessibility ---------- */
+.stage-row { display: grid; grid-template-columns: 34px 1fr 34px; gap: 6px; align-items: center; margin: 0 0 10px; }
+.stage-row .heat-step { height: 34px; font-size: 20px; }
+.stage-info { display: flex; flex-direction: column; align-items: center; padding: 4px 8px; border-radius: 14px; border: var(--border); background: linear-gradient(100deg, var(--st1, #3a2a7c), var(--st2, #5440a6)); color: var(--white); text-shadow: 0 2px 0 var(--ink); min-width: 0; }
+.stage-info strong { font-size: 15px; font-weight: 900; }
+.stage-info small { font-size: 11px; font-weight: 800; opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.stage-row[data-locked="1"] .stage-info { filter: grayscale(.8) brightness(.8); }
+.relic-screen { background: radial-gradient(circle at 50% 45%, #9b5de5aa, #170a35ee), repeating-conic-gradient(from 0deg at 50% 50%, #ffffff12 0 10deg, transparent 10deg 20deg); }
+.relic-eyebrow { background: var(--purple); color: var(--white); }
+.relic-eyebrow span { color: var(--lemon); }
+.curse-note { display: inline-block; margin: -8px 0 16px; padding: 8px 16px; border-radius: 14px; border: var(--border); background: #2b1240; color: var(--pink); font-weight: 900; box-shadow: var(--pop-sm); }
+.relic-card .upgrade-top { background: var(--c); }
+.relic-card { background: linear-gradient(170deg, #fdf8ff, #efe4ff); }
+#relic-slots { display: flex; gap: 4px; margin-top: 8px; }
+#relic-slots span { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--ink); background: var(--c); box-shadow: 0 2px 0 var(--ink); }
+#relic-slots span svg { width: 14px; height: 14px; color: var(--ink); fill: var(--white); stroke-width: 2; }
+#relic-slots span.curse { background: #2b1240; } #relic-slots span.curse svg { color: var(--pink); fill: none; }
+.coach { position: absolute; z-index: 25; left: 50%; bottom: 128px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; width: min(560px, calc(100% - 24px)); padding: 10px 10px 10px 12px; border-radius: 18px; border: 4px solid var(--ink); background: var(--lemon); color: var(--ink); box-shadow: 0 6px 0 var(--ink); animation: coach-in .45s cubic-bezier(.3, 1.7, .5, 1) both; pointer-events: auto; }
+.coach-icon { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--coral); border: 3px solid var(--ink); }
+.coach-icon svg { width: 20px; height: 20px; fill: var(--yellow); stroke-width: 2; }
+.coach p { flex: 1; margin: 0; font-size: 14px; font-weight: 800; line-height: 1.5; }
+.coach p b { color: var(--coral); }
+.coach button { flex: none; padding: 6px 14px; border-radius: 12px; border: 3px solid var(--ink); background: var(--white); font-weight: 900; }
+.coach.upper { bottom: auto; top: 14px; }
+@keyframes coach-in { from { transform: translate(-50%, 30px) scale(.8); opacity: 0; } }
+.new-badge { position: relative; }
+.new-badge::after { content: "NEW"; position: absolute; top: -9px; right: -6px; z-index: 2; font-family: var(--num); font-size: 10px; font-weight: 900; padding: 1px 6px; border-radius: 8px; border: 2px solid var(--ink); background: var(--coral); color: var(--white); animation: bump 1.2s ease-in-out infinite; pointer-events: none; }
+.mode-tabs button:disabled { opacity: .45; cursor: default; }
+.key-button { padding: 4px 10px; border-radius: 10px; border: var(--border); background: var(--white); font-family: var(--num); font-weight: 900; min-width: 90px; }
+.key-button.listening { background: var(--yellow); animation: blink .6s steps(2) infinite; }
+.settings-group { margin-top: 14px; font-size: 13px; font-weight: 900; color: var(--purple); letter-spacing: .1em; }
+body.large-text .hero-copy, body.large-text .mission-text p, body.large-text .upgrade-card p, body.large-text #dialog-content p, body.large-text .coach p, body.large-text .heat-info small, body.large-text .daily-button small { font-size: 16px; }
+body.large-text .upgrade-card h3 { font-size: 25px; } body.large-text #hp-text { font-size: 17px; } body.large-text .announcement { font-size: clamp(26px, 4.2vw, 46px); }
+body.large-text .weapon-slot small, body.large-text .hud-overline, body.large-text #time-target { font-size: 13px; }
+:focus-visible { outline: 4px solid var(--lemon) !important; outline-offset: 3px; }
+.pad-focus { outline: 4px solid var(--lemon) !important; outline-offset: 3px; }
+@media (max-width: 640px) { .coach { bottom: 190px; } .coach p { font-size: 13px; } .stage-row { margin-bottom: 8px; } }

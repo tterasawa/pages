@@ -1,5 +1,5 @@
-import { Game, MODES, UPGRADES, HEATS, MUTATORS, EVOLVE_PAIRS, SLOT_LIMIT, CHARACTERS, EVENTS, formatTime } from './core.js';
-import { SHOP, shopCost, ACHIEVEMENTS, sanitizeProfile, buy, refundAll, recordRun, checkProfileAchievements, UNLOCKS, lockedWeapons, characterUnlocked, dailyConfig, describeDaily, heatMultiplier, localDate } from './meta.js';
+import { Game, MODES, UPGRADES, HEATS, MUTATORS, EVOLVE_PAIRS, SLOT_LIMIT, CHARACTERS, EVENTS, STAGES, RELICS, CURSES, formatTime } from './core.js';
+import { SHOP, shopCost, ACHIEVEMENTS, sanitizeProfile, buy, refundAll, recordRun, checkProfileAchievements, UNLOCKS, lockedWeapons, characterUnlocked, stageUnlocked, dailyConfig, describeDaily, heatMultiplier, localDate } from './meta.js';
 import { Renderer } from './render.js';
 import { AudioEngine, MUSIC_BPM } from './audio.js';
 import { EndingSequence } from './ending.js';
@@ -8,14 +8,14 @@ import { ComboMeter, rankFor, musicIntensity } from './hype.js';
 const $ = s => document.querySelector(s); const $$ = s => [...document.querySelectorAll(s)];
 const icon = (name, cls = '') => `<svg class="${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
 const SETTINGS_KEY = 'lastlight-pop-settings-v1', RECORDS_KEY = 'lastlight-pop-records-v1', PROFILE_KEY = 'lastlight-pop-profile-v1';
-const DEFAULT_SETTINGS = { sound: true, music: 0.42, sfx: 0.6, quality: 'auto', vibration: true, heat: 0 };
+const DEFAULT_SETTINGS = { sound: true, music: 0.42, sfx: 0.6, quality: 'auto', vibration: true, heat: 0, shake: 1, flash: true, numbers: true, largeText: false, hints: true, keyDash: 'Space', keyPulse: 'KeyQ' };
 const EMPTY_RECORDS = { runs: 0, wins: 0, totalKills: 0, bestKills: 0, bestTime: 0, bestCombo: 0, modes: {} };
 export const POP_COLORS = Object.freeze({ boomer: 'var(--yellow)', laser: 'var(--sky)', mine: 'var(--coral)', rain: 'var(--purple)', crit: 'var(--mint)', tempo: 'var(--orange)', pulse: 'var(--lemon)', bomb: 'var(--ink-soft)', other: '#cfc6ea', bolt: 'var(--yellow)', orbit: 'var(--sky)', arc: 'var(--orange)', frost: '#9be7ff', drone: 'var(--pink)', nova: 'var(--coral)', power: 'var(--purple)', haste: 'var(--mint)', magnet: 'var(--teal)', vital: 'var(--pink)', regen: 'var(--mint)' });
 function read(key, fallback) { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } }
 function save(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); return true; } catch { return false; } }
 function number(v, fallback, min, max) { return typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback; }
 const rawSettings = read(SETTINGS_KEY, {}), settings = { ...DEFAULT_SETTINGS };
-if (rawSettings && typeof rawSettings === 'object') { settings.sound = rawSettings.sound !== false; settings.music = number(rawSettings.music, DEFAULT_SETTINGS.music, 0, 1); settings.sfx = number(rawSettings.sfx, DEFAULT_SETTINGS.sfx, 0, 1); settings.quality = ['auto', 'low', 'high'].includes(rawSettings.quality) ? rawSettings.quality : 'auto'; settings.vibration = rawSettings.vibration !== false; settings.heat = Math.floor(number(rawSettings.heat, 0, 0, 8)); }
+if (rawSettings && typeof rawSettings === 'object') { settings.sound = rawSettings.sound !== false; settings.music = number(rawSettings.music, DEFAULT_SETTINGS.music, 0, 1); settings.sfx = number(rawSettings.sfx, DEFAULT_SETTINGS.sfx, 0, 1); settings.quality = ['auto', 'low', 'high'].includes(rawSettings.quality) ? rawSettings.quality : 'auto'; settings.vibration = rawSettings.vibration !== false; settings.heat = Math.floor(number(rawSettings.heat, 0, 0, 8)); settings.shake = number(rawSettings.shake, 1, 0, 1); for (const k of ['flash', 'numbers', 'hints']) settings[k] = rawSettings[k] !== false; settings.largeText = rawSettings.largeText === true; for (const k of ['keyDash', 'keyPulse']) if (typeof rawSettings[k] === 'string' && /^[A-Za-z0-9]{2,20}$/.test(rawSettings[k])) settings[k] = rawSettings[k]; }
 const profile = sanitizeProfile(read(PROFILE_KEY, null)); settings.heat = Math.min(settings.heat, profile.heatUnlocked);
 function saveProfile() { if (!save(PROFILE_KEY, profile)) toast('この環境では進行状況を保存できません。'); }
 const rawRecords = read(RECORDS_KEY, {}), records = { ...EMPTY_RECORDS, modes: {} };
@@ -29,41 +29,44 @@ let heartbeatAt = 0, slowmo = 0, lastKills = 0, lastLevel = 1, lastArsenal = '',
 let runInfo = { daily: false, heat: 0, mutators: [], day: '' }, runResult = null, banishMode = false, chestTimers = [], chestDone = true;
 const STEP = 1 / 60, keys = new Set(), movement = { x: 0, y: 0 }, stick = { id: null, x: 0, y: 0 };
 
-function makeDemo() { const g = new Game('guard', 32489); g.start(); g.levels.orbit = 3; g.levels.frost = 1; g.levels.drone = 2; g.levels.arc = 1; g.player.invincible = 9999; g.viewRadius = 400; g.time = 12; for (let i = 0; i < 40; i++) { const e = g.spawnEnemy(i % 7 === 0 ? 2 : i % 5 === 0 ? 3 : i % 3 === 0 ? 1 : 0); const a = g.rng() * Math.PI * 2, r = 150 + g.rng() * 370; e.x = Math.cos(a) * r; e.y = Math.sin(a) * r; } return g; }
+function makeDemo() { const g = new Game('guard', 32489, { stage: typeof profile !== 'undefined' && stageUnlocked(profile, profile.stage) ? profile.stage : 'wilds' }); g.start(); g.levels.orbit = 3; g.levels.frost = 1; g.levels.drone = 2; g.levels.arc = 1; g.player.invincible = 9999; g.viewRadius = 400; g.time = 12; for (let i = 0; i < 40; i++) { const e = g.spawnEnemy(i % 7 === 0 ? 2 : i % 5 === 0 ? 3 : i % 3 === 0 ? 1 : 0); const a = g.rng() * Math.PI * 2, r = 150 + g.rng() * 370; e.x = Math.cos(a) * r; e.y = Math.sin(a) * r; } return g; }
 function clearInput() { keys.clear(); movement.x = movement.y = 0; stick.id = null; $('#joystick').hidden = true; }
 function syncSound() { for (const b of $$('.sound-toggle')) { b.classList.toggle('muted', !settings.sound); b.setAttribute('aria-pressed', String(settings.sound)); } for (const s of $$('.sound-label')) s.textContent = settings.sound ? 'SOUND ON' : 'SOUND OFF'; }
 function setSound(v) { settings.sound = v; audio.setEnabled(v); save(SETTINGS_KEY, settings); syncSound(); if (v) audio.effect('choose'); }
 function toast(message) { $('#toast').textContent = message; $('#toast').hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => $('#toast').hidden = true, 3500); }
 function announce(message, kind = '') { const el = $('#announcement'); el.textContent = message; el.className = 'announcement ' + kind; el.hidden = true; void el.offsetWidth; el.hidden = false; clearTimeout(announceTimer); announceTimer = setTimeout(() => el.hidden = true, 2600); }
 function warning(text) { const el = $('#warning-banner'); $('#warning-text').textContent = text; el.hidden = true; void el.offsetWidth; el.hidden = false; clearTimeout(warnTimer); warnTimer = setTimeout(() => el.hidden = true, 3000); }
-function hideScreens() { $$('#home-screen,#hud,#upgrade-screen,#chest-screen,#pause-screen,#ending-screen,#result-screen').forEach(x => x.hidden = true); }
+function hideScreens() { $$('#home-screen,#hud,#upgrade-screen,#chest-screen,#relic-screen,#pause-screen,#ending-screen,#result-screen').forEach(x => x.hidden = true); }
 function primeAudio() { if (audioPrimed || !settings.sound) return; audioPrimed = true; audio.setScene(game ? 'play' : 'home'); void audio.unlock(); }
 
 function start(opts = {}) {
   const daily = !!opts.daily;
   if (daily) { const cfg = dailyConfig(); runInfo = { daily: true, heat: cfg.heat, mutators: cfg.mutators, day: cfg.day }; game = new Game(cfg.mode, cfg.seed, { heat: cfg.heat, mutators: cfg.mutators }); }
-  else { runInfo = { daily: false, heat: settings.heat, mutators: [], day: '' }; game = new Game(mode, Date.now(), { heat: settings.heat, meta: profile.meta, character: characterUnlocked(profile, profile.character) ? profile.character : 'keeper', locked: lockedWeapons(profile) }); }
-  ending = null; endingResultShown = false; runResult = null; clearInput(); game.start(); combo.reset(); resultSaved = false; lastArsenal = ''; lastKills = 0; lastLevel = 1; slowmo = 0; choosing = false;
+  else { runInfo = { daily: false, heat: settings.heat, mutators: [], day: '' }; game = new Game(mode, Date.now(), { stage: stageUnlocked(profile, profile.stage) ? profile.stage : 'wilds', heat: settings.heat, meta: profile.meta, character: characterUnlocked(profile, profile.character) ? profile.character : 'keeper', locked: lockedWeapons(profile) }); }
+  ending = null; endingResultShown = false; runResult = null; clearInput(); game.start(); audio.setStage(STAGES[game.stage].transpose); coachQueue.length = 0; hideCoach(); combo.reset(); resultSaved = false; lastArsenal = ''; lastKills = 0; lastLevel = 1; slowmo = 0; choosing = false;
   prevState = ''; accumulator = 0; document.body.classList.add('playing'); renderer.camera.x = game.player.x; renderer.camera.y = game.player.y; renderer.resize();
   audioPrimed = true; audio.setScene('play'); void audio.unlock(); audio.setActive(true);
-  $('#mission-label').textContent = MODES[game.mode].name;
+  $('#dash-button kbd').textContent = settings.keyDash.replace('Key', '').toUpperCase(); $('#pulse-button kbd').textContent = settings.keyPulse.replace('Key', '').toUpperCase();
+  $('#mission-label').textContent = `${MODES[game.mode].name}・${STAGES[game.stage].name}`;
   $('#hud-chips').innerHTML = (runInfo.daily ? `<span class="daily">DAILY ${runInfo.day.slice(5).replace('-', '/')}</span>` : '') + (runInfo.heat ? `<span>ヒート${runInfo.heat}</span>` : '') + runInfo.mutators.map(id => `<span class="daily">${MUTATORS[id].name}</span>`).join(''); $('#time-target').textContent = '/ ' + formatTime(game.duration); $('#movement-hint').hidden = false; $('#announcement').hidden = true; $('#warning-banner').hidden = true; $('#combo').hidden = true;
-  transition(); updateHUD(); renderer.celebrate('start', game); announce('READY… GO!!'); $('#stage').focus({ preventScroll: true });
+  transition(); updateHUD(); renderer.celebrate('start', game); announce('READY… GO!!');
+  coach('move', '<b>動いて</b>キラキラを集めよう！攻撃は自動。ピンチは<b>ダッシュ</b>で回避、囲まれたら<b>パルス</b>！'); if (game.stage === 'frost') coach('ice', '氷の湖は<b>足元が滑る</b>！早めに方向を変えよう。'); if (game.stage === 'candy') coach('syrup', 'ピンクの<b>シロップ</b>に入ると足が鈍る。敵も遅くなるよ。'); $('#stage').focus({ preventScroll: true });
 }
 function home() {
-  if (game && ['running', 'paused', 'upgrade', 'chest'].includes(game.state)) finalizeRun(false);
+  if (game && ['running', 'paused', 'upgrade', 'chest', 'relic'].includes(game.state)) finalizeRun(false); hideCoach();
   game = null; ending = null; endingResultShown = false; audio.setScene('home'); clearInput(); prevState = 'home'; hideScreens(); $('#home-screen').hidden = false;
   document.body.classList.remove('playing'); $('#announcement').hidden = true; $('#warning-banner').hidden = true; $('#boss-panel').hidden = true; renderer.resize(); demo = makeDemo(); updateBest(); updateHome(); $('#start-button').focus({ preventScroll: true });
 }
 function transition() {
   if (!game || game.state === prevState) return; prevState = game.state; clearInput(); hideScreens(); $('#hud').hidden = false;
-  if (game.state === 'upgrade') { choosing = false; renderUpgrades(); $('#upgrade-screen').hidden = false; $('#upgrade-cards button')?.focus({ preventScroll: true }); }
-  else if (game.state === 'chest') { $('#chest-screen').hidden = false; playChest(); }
+  if (game.state === 'upgrade') { choosing = false; renderUpgrades(); coach('level', 'レベルアップ！<b>1つ選ぼう</b>。武器は4つ・支援も4つまで持てるよ。'); if (game.level >= 4) coach('reroll', '欲しいカードがない？<b>リロール</b>で引き直し、<b>除外</b>で二度と出なくできる。'); $('#upgrade-screen').hidden = false; $('#upgrade-cards button')?.focus({ preventScroll: true }); }
+  else if (game.state === 'chest') { $('#chest-screen').hidden = false; playChest(); coach('chest', '宝箱は<b>1〜5個</b>の強化が当たる！5個なら大当たり！'); }
+  else if (game.state === 'relic') { renderRelics(); $('#relic-screen').hidden = false; $('#relic-cards button')?.focus({ preventScroll: true }); coach('relic', '<b>レリック</b>はルールを変える特別な力。祭壇のレリックには<b>呪い</b>が付くので、受け取るか見極めよう。'); }
   else if (game.state === 'paused') { $('#pause-screen').hidden = false; $('#resume-button').focus({ preventScroll: true }); }
   else if (game.state === 'dead' || game.state === 'won') beginEnding();
 }
 function beginEnding() {
-  ending = new EndingSequence(game.state, { reducedMotion: renderer.reduced }); endingResultShown = false; combo.finish();
+  ending = new EndingSequence(game.state, { reducedMotion: renderer.reduced }); endingResultShown = false; combo.finish(); hideCoach();
   audio.setScene('ending'); renderResult(); $('#hud').hidden = true; $('#announcement').hidden = true; $('#warning-banner').hidden = true; clearTimeout(announceTimer);
   const won = ending.kind === 'won', screen = $('#ending-screen'); screen.dataset.outcome = ending.kind; screen.style.setProperty('--ending-text', ending.reducedMotion ? 1 : 0); screen.hidden = false;
   $('#ending-kicker').textContent = won ? 'MISSION CLEAR!!' : 'GAME OVER'; $('#ending-title').textContent = won ? '夜明けだ！' : 'やられた〜！';
@@ -72,7 +75,7 @@ function beginEnding() {
 }
 function finishEnding() { if (!ending || !ending.done || endingResultShown) return; endingResultShown = true; $('#ending-screen').hidden = true; $('#result-screen').hidden = false; countUp(); $('#retry-button').focus({ preventScroll: true }); }
 function skipEnding() { if (ending && !endingResultShown) { ending.skip(); finishEnding(); } }
-function hasUnfinishedRun() { return !!game && (['running', 'paused', 'upgrade', 'chest'].includes(game.state) || !!ending && !endingResultShown); }
+function hasUnfinishedRun() { return !!game && (['running', 'paused', 'upgrade', 'chest', 'relic'].includes(game.state) || !!ending && !endingResultShown); }
 
 function evolveHint(u) {
   const lv = game.levels[u.id];
@@ -135,7 +138,51 @@ function finishChest() {
   $('#chest-claim').hidden = false; $('#chest-claim').focus({ preventScroll: true });
 }
 function claimChest() { if (!chestDone || game?.state !== 'chest') return; game.claimChest(); accumulator = 0; prevState = ''; transition(); updateHUD(); }
-function runSummary(won) { const st = game.stats; return { mode: game.mode, won, time: game.time, kills: game.kills, level: game.level, heat: runInfo.heat, combo: combo.best, evolves: st.evolves, jackpots: st.jackpots, elites: st.elites, bossKills: st.bossKills, bossHits: st.bossHits, chests: st.chests, daily: runInfo.daily, specials: st.specials, character: game.character }; }
+// --- relics ---------------------------------------------------------------------------------
+function renderRelics() {
+  const o = game.relicOffer; $('#relic-eyebrow').innerHTML = o.source === 'altar' ? '<span>☠</span> 呪いの祭壇 <span>☠</span>' : '★ BOSS RELIC ★'; $('#relic-title').textContent = o.source === 'altar' ? '力がほしいか…？' : 'レリックを1つ選ぼう';
+  const note = $('#curse-note'); note.hidden = !o.curse; if (o.curse) note.textContent = `受け取ると呪い「${CURSES[o.curse].name}」：${CURSES[o.curse].desc}`;
+  $('#relic-cards').innerHTML = o.choices.map((id, i) => { const r = RELICS[id]; return `<button class="upgrade-card relic-card" data-relic="${id}" style="--c:${r.color}" aria-label="${r.name}を受け取る"><div class="upgrade-top"><span>RELIC</span><kbd>${i + 1}</kbd></div><div class="upgrade-icon">${icon(r.icon)}</div><h3>${r.name}</h3><p>${r.desc}</p></button>`; }).join('');
+}
+function takeRelic(id) { if (game?.state !== 'relic' || choosing) return; choosing = true; const card = $(`[data-relic="${id}"]`); const apply = () => { choosing = false; if (game.takeRelic(id)) { prevState = ''; transition(); updateHUD(); } }; if (card && !renderer.reduced) { card.classList.add('picked'); setTimeout(apply, 170); } else apply(); }
+function declineRelic() { if (game?.state === 'relic' && !choosing && game.declineRelic()) { prevState = ''; transition(); } }
+// --- coach marks: one-time, non-blocking hints ------------------------------------------------
+const coachQueue = []; let coachTimer = 0;
+function coach(id, html, force = false) { if (!force && (!settings.hints || profile.tips[id])) return; if (game && ['won', 'dead'].includes(game.state)) return; profile.tips[id] = true; saveProfile(); coachQueue.push(html); if ($('#coach').hidden) nextCoach(); }
+function nextCoach() { clearTimeout(coachTimer); const html = coachQueue.shift(); if (!html) { $('#coach').hidden = true; return; } $('#coach-text').innerHTML = html; const el = $('#coach'); el.hidden = true; void el.offsetWidth; el.hidden = false; el.classList.toggle('upper', !!game && ['upgrade', 'chest', 'relic'].includes(game.state)); coachTimer = setTimeout(nextCoach, 6500); }
+function hideCoach() { clearTimeout(coachTimer); coachQueue.length = 0; $('#coach').hidden = true; }
+// --- gamepad -----------------------------------------------------------------------------------
+const pad = { prev: [], move: { x: 0, y: 0 }, navAt: 0, active: false };
+function padButtons() { const gp = [...(navigator.getGamepads?.() || [])].find(g => g && g.connected); if (!gp) { pad.move.x = pad.move.y = 0; return null; } return gp; }
+function visibleButtons() {
+  const layer = $('#app-dialog').open ? $('#app-dialog') : [...$$('.screen-overlay:not([hidden]), #ending-screen:not([hidden])')].pop() || (game ? $('#hud') : $('#home-screen'));
+  return [...layer.querySelectorAll('button:not(:disabled), input, select')].filter(b => { const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== 'hidden'; });
+}
+function navigate(dx, dy) {
+  const list = visibleButtons(); if (!list.length) return; const cur = list.includes(document.activeElement) ? document.activeElement : null;
+  if (!cur) { list[0].focus({ preventScroll: false }); return; }
+  const a = cur.getBoundingClientRect(), ax = a.left + a.width / 2, ay = a.top + a.height / 2; let best = null, score = Infinity;
+  for (const b of list) { if (b === cur) continue; const r = b.getBoundingClientRect(), bx = r.left + r.width / 2 - ax, by = r.top + r.height / 2 - ay, along = bx * dx + by * dy; if (along <= 4) continue; const s = along + Math.abs(bx * dy - by * dx) * 2.2; if (s < score) { score = s; best = b; } }
+  if (best) { best.focus({ preventScroll: false }); audio.effect('ui'); }
+}
+function pollPad(now) {
+  const gp = padButtons(); if (!gp) return; const b = gp.buttons.map(x => x.pressed), was = i => pad.prev[i], hit = i => b[i] && !was(i);
+  const ax = Math.abs(gp.axes[0]) > .22 ? gp.axes[0] : 0, ay = Math.abs(gp.axes[1]) > .22 ? gp.axes[1] : 0;
+  const dirX = (b[15] ? 1 : 0) - (b[14] ? 1 : 0) || (Math.abs(ax) > .6 ? Math.sign(ax) : 0), dirY = (b[13] ? 1 : 0) - (b[12] ? 1 : 0) || (Math.abs(ay) > .6 ? Math.sign(ay) : 0);
+  if (b.some(Boolean)) { pad.active = true; primeAudio(); }
+  if (game?.state === 'running' && !$('#app-dialog').open) {
+    pad.move.x = ax; pad.move.y = ay;
+    if (hit(0)) game.dash(); if (hit(1) || hit(2)) game.pulse(); if (hit(9)) { game.pause(); transition(); }
+  } else {
+    pad.move.x = pad.move.y = 0;
+    if ((dirX || dirY) && now - pad.navAt > 190) { pad.navAt = now; navigate(dirX, dirY); } if (!dirX && !dirY) pad.navAt = 0;
+    if (hit(0)) { const el = document.activeElement; if (el && el !== document.body && visibleButtons().includes(el)) el.click(); else visibleButtons()[0]?.focus(); }
+    if (hit(1)) { if ($('#app-dialog').open) $('#app-dialog').close(); else if (game?.state === 'paused') { game.resume(); transition(); } else if (game?.state === 'relic') declineRelic(); else if (ending && !endingResultShown) skipEnding(); }
+    if (hit(3) && game?.state === 'upgrade') reroll(); if (hit(9) && game?.state === 'paused') { game.resume(); transition(); }
+  }
+  pad.prev = b;
+}
+function runSummary(won) { const st = game.stats; return { mode: game.mode, won, time: game.time, kills: game.kills, level: game.level, heat: runInfo.heat, combo: combo.best, evolves: st.evolves, jackpots: st.jackpots, elites: st.elites, bossKills: st.bossKills, bossHits: st.bossHits, chests: st.chests, daily: runInfo.daily, specials: st.specials, character: game.character, stage: game.stage, relics: st.relics, curses: game.curses.length }; }
 function finalizeRun(won) { if (!game || resultSaved) return runResult; const best = storeResult(won); runResult = { best, ...recordRun(profile, runSummary(won), runInfo.day || localDate()) }; saveProfile(); updateStars(true); return runResult; }
 function storeResult(won) {
   if (!game || resultSaved) return false; resultSaved = true;
@@ -161,6 +208,7 @@ function renderResult() {
   if (game.endless) { $('#result-title').textContent = `${formatTime(game.time)} 生き残った！`; $('#result-eyebrow').textContent = 'ENDLESS NIGHT'; $('#result-copy').textContent = `自己ベスト ${formatTime(profile.endlessBest)}`; }
   $('#result-unlocks').innerHTML = res.newlyUnlocked.map(u => `<div class="unlock new">${icon(u.kind === 'weapon' ? UPGRADES.find(x => x.id === u.id).icon : 'user')}${u.kind === 'weapon' ? '新しい武器' : '新キャラクター'}「${u.label}」が解放された！<small>NEW!</small></div>`).join('') + (res.heatUnlocked ? `<div class="unlock heat">${icon('flame')}ヒート${res.heatUnlocked}「${HEATS[res.heatUnlocked].name}」が解放された！<small>★×${heatMultiplier(res.heatUnlocked).toFixed(2)}</small></div>` : '') + res.unlocked.map(a => `<div class="unlock">${icon('medal')}実績「${a.name}」達成！<small>★ +${a.reward}</small></div>`).join('');
   if (res.unlocked.length) setTimeout(() => audio.effect('achieve'), 1400); if (res.newlyUnlocked.length) setTimeout(() => audio.effect('unlock'), 2000);
+  $('#result-relics').innerHTML = [...game.relics].map(id => `<span style="--c:${RELICS[id].color}">${icon(RELICS[id].icon)} ${RELICS[id].name}</span>`).join('');
   $('#result-build').innerHTML = UPGRADES.filter(u => u.tag === 'WEAPON' && game.levels[u.id] > 0).map(u => `<span style="--c:${POP_COLORS[u.id]}" title="${u.name}">${icon(u.icon)} ${game.levels[u.id] === 5 ? '★MAX' : 'Lv' + game.levels[u.id]}</span>`).join('');
 }
 function countUp() {
@@ -180,10 +228,22 @@ function updateHome() {
   const badge = $('#daily-badge'); badge.textContent = rec?.won ? 'CLEAR' : rec ? formatTime(rec.best) : 'NEW'; badge.className = rec?.won ? 'done' : '';
   $('#achieve-count').textContent = `${Object.keys(profile.achievements).length}/${ACHIEVEMENTS.length}`;
   updateCharacter();
+  const st = STAGES[profile.stage], open = stageUnlocked(profile, profile.stage), srow = $('#stage-row'), anyStage = STAGE_ORDER.some(id => id !== 'wilds' && stageUnlocked(profile, id));
+  srow.hidden = !anyStage; srow.dataset.locked = open ? 0 : 1; $('#stage-name').textContent = (open ? '' : '🔒 ') + st.name; const su = UNLOCKS.find(u => u.kind === 'stage' && u.id === profile.stage);
+  $('#stage-rule').textContent = open ? st.rule : `実績「${ACHIEVEMENTS.find(a => a.id === su.achievement).name}」で解放`; srow.style.setProperty('--st1', STAGE_COLORS[profile.stage][0]); srow.style.setProperty('--st2', STAGE_COLORS[profile.stage][1]);
+  $('#start-button').disabled = !open; markNew(srow, 'stage', anyStage);
+  $('.heat-row').hidden = profile.heatUnlocked < 1; markNew($('.heat-row'), 'heat', profile.heatUnlocked >= 1);
+  $('#daily-button').hidden = profile.stats.runs < 1; markNew($('#daily-button'), 'daily', profile.stats.runs >= 1);
+  const endlessOpen = !!profile.achievements['first-clear'], et = $('[data-mode="endless"]'); et.disabled = !endlessOpen; et.title = endlessOpen ? 'エンドレス' : '初クリアで解放'; markNew(et, 'endless', endlessOpen); if (!endlessOpen && mode === 'endless') $('[data-mode="guard"]').click();
+  const anyChar = Object.keys(CHARACTERS).some(id => id !== 'keeper' && characterUnlocked(profile, id)); $('#char-button').hidden = !anyChar; markNew($('#char-button'), 'chars', anyChar);
   $('#shop-badge').hidden = !SHOP.some(i => profile.stars >= shopCost(i, profile.meta[i.id] || 0));
 }
+function applyRenderOptions() { renderer.opts = { shake: settings.shake, flash: settings.flash, numbers: settings.numbers }; }
 function charImage(id) { try { return renderer.sprites['player_' + id].image.toDataURL(); } catch { return ''; } }
 function updateCharacter() { const id = characterUnlocked(profile, profile.character) ? profile.character : 'keeper', c = CHARACTERS[id]; $('#char-img').src = charImage(id); $('#char-name').textContent = `${c.name}・${c.title}`; $('#char-perk').textContent = c.perk; }
+const STAGE_ORDER = Object.keys(STAGES), STAGE_COLORS = { wilds: ['#3a2a7c', '#7b5cd6'], frost: ['#2c4f86', '#4cc9f0'], candy: ['#7a2f6e', '#ff8fc7'] };
+function cycleStage(delta) { const i = STAGE_ORDER.indexOf(profile.stage), next = STAGE_ORDER[(i + delta + STAGE_ORDER.length) % STAGE_ORDER.length]; profile.stage = next; saveProfile(); audio.effect('ui'); demo = makeDemo(); updateHome(); }
+function markNew(el, key, show) { if (!el) return; const fresh = show && !profile.seen[key]; el.classList.toggle('new-badge', fresh); if (fresh && !el.dataset.seenHook) { el.dataset.seenHook = '1'; el.addEventListener('click', () => { profile.seen[key] = true; saveProfile(); el.classList.remove('new-badge'); }, { capture: true }); } }
 function setHeat(delta) { const next = Math.max(0, Math.min(profile.heatUnlocked, settings.heat + delta)); if (next === settings.heat) return; settings.heat = next; save(SETTINGS_KEY, settings); audio.effect(delta > 0 ? 'elite' : 'ui'); updateHome(); }
 function achievementToast(list) { list.forEach((a, i) => setTimeout(() => { const el = document.createElement('div'); el.className = 'ach-toast'; el.innerHTML = `${icon('medal')}<div>実績「${a.name}」達成！<small>★ +${a.reward}</small></div>`; document.body.append(el); audio.effect('achieve'); setTimeout(() => el.remove(), 3300); }, i * 900)); }
 function updateBest() { $('#home-best').textContent = records.bestTime ? formatTime(records.bestTime) : '--:--'; $('#home-combo').textContent = records.bestCombo.toLocaleString(); }
@@ -195,16 +255,17 @@ function updateHUD() {
   $('#xp-bar').style.width = `${Math.min(100, game.xp / game.xpNext * 100)}%`; $('#time-text').textContent = formatTime(game.time);
   const overtime = !game.endless && game.time >= game.duration && !game.finalKilled; $('#time-target').textContent = game.endless ? `∞ BEST ${formatTime(profile.endlessBest)}` : overtime ? '夜の主をたおせ！' : '/ ' + formatTime(game.duration);
   $('#status-chips').innerHTML = (game.freeze > 0 ? `<span class="freeze">FREEZE ${Math.ceil(game.freeze)}</span>` : '') + (game.starPower > 0 ? `<span class="star">★ STAR ${Math.ceil(game.starPower)}</span>` : '') + (game.eventKind === 'meteor' && game.eventTimer > 0 ? `<span class="event">流星群 ${Math.ceil(game.eventTimer)}</span>` : ''); $('#time-target').classList.toggle('alert', overtime);
-  $('#kills-text').textContent = game.kills.toLocaleString(); $('#movement-hint').hidden = game.time > 7;
+  $('#kills-text').textContent = game.kills.toLocaleString(); $('#movement-hint').hidden = settings.hints || game.time > 7;
   for (const [key, cd, max] of [['dash', p.dashCD, 3 * (1 - game.levels.haste * .08)], ['pulse', p.pulseCD, 18]]) {
     const btn = $(`#${key}-button`), label = $(`#${key}-cooldown`), ready = cd <= 0;
     label.textContent = ready ? '' : Math.ceil(cd); label.style.setProperty('--cd', Math.max(0, Math.min(1, cd / max))); btn.disabled = !ready || game.state !== 'running';
     if (ready && !cooldownReady[key]) { btn.classList.remove('ready'); void btn.offsetWidth; btn.classList.add('ready'); } cooldownReady[key] = ready;
   }
-  const signature = UPGRADES.map(u => game.levels[u.id]).join(',');
+  const signature = UPGRADES.map(u => game.levels[u.id]).join(',') + [...game.relics].join() + game.curses.join();
   if (signature !== lastArsenal) {
     const before = lastArsenal.split(','); lastArsenal = signature; const equipped = UPGRADES.filter(u => u.tag === 'WEAPON' && game.levels[u.id] > 0), weapons = UPGRADES;
     $('#arsenal-slots').innerHTML = equipped.map(u => { const i = weapons.indexOf(u), fresh = before.length > 1 && Number(before[i]) !== game.levels[u.id]; return `<div class="weapon-slot ${game.levels[u.id] === 5 ? 'evolved' : ''} ${fresh ? 'fresh' : ''}" style="--c:${POP_COLORS[u.id]}" title="${u.name} Lv.${game.levels[u.id]}">${icon(u.icon)}<small>${game.levels[u.id] === 5 ? 'MAX' : 'Lv' + game.levels[u.id]}</small></div>`; }).join('') + '<div class="weapon-slot empty"></div>'.repeat(Math.max(0, SLOT_LIMIT.WEAPON - equipped.length));
+    $('#relic-slots').innerHTML = [...game.relics].map(id => `<span style="--c:${RELICS[id].color}" title="${RELICS[id].name}：${RELICS[id].desc}">${icon(RELICS[id].icon)}</span>`).join('') + game.curses.map(id => `<span class="curse" title="呪い：${CURSES[id].name}（${CURSES[id].desc}）">${icon('skull')}</span>`).join('');
     const supports = UPGRADES.filter(u => u.tag === 'SUPPORT' && game.levels[u.id] > 0); $('#support-slots').innerHTML = supports.map(u => `<div class="weapon-slot" style="--c:${POP_COLORS[u.id]}" title="${u.name} Lv.${game.levels[u.id]}">${icon(u.icon)}<small>${game.levels[u.id]}</small></div>`).join('') + '<div class="weapon-slot empty"></div>'.repeat(Math.max(0, SLOT_LIMIT.SUPPORT - supports.length));
   }
   const boss = game.boss; $('#boss-panel').hidden = !boss?.alive;
@@ -225,8 +286,13 @@ function processEvents(g, muted = false) {
   const terminal = g.events.some(e => e.type === 'won' || e.type === 'dead'); if (terminal && !muted) audio.setScene('ending');
   for (const e of g.events) {
     if (muted || terminal && !['won', 'dead'].includes(e.type)) continue;
-    if (e.type !== 'kill' && e.type !== 'chest') audio.effect(e.type, e);
-    if (e.type === 'elite') announce('エリート出現！宝箱を持ってるぞ！', 'combo-call');
+    if (e.type !== 'kill' && e.type !== 'chest') audio.effect(e.type === 'relicOffer' && e.source === 'altar' ? 'altar' : e.type, e);
+    if (e.type === 'elite') { announce('エリート出現！宝箱を持ってるぞ！', 'combo-call'); coach('elite', '<b>王冠のエリート</b>は宝箱を落とす！優先して倒そう。'); }
+    if (e.type === 'boss') coach('boss', '<b>夜の主</b>が来た！弱るほど攻撃が激しくなる。<b>赤い円</b>は攻撃の予告だから離れよう。');
+    if (e.type === 'special') coach('special', '<b>光る泡</b>は特殊アイテム。爆弾・時間停止・スターなど、拾うと一発逆転！');
+    if (e.type === 'event') coach('event', '時間イベント発生！流星群の<b>赤い円</b>には近づかないで。');
+    if (e.type === 'charge') coach('charge', '<b>オレンジの線</b>はイノシシの突進ルート。横に避けよう！');
+    if (e.type === 'altar') { announce('呪いの祭壇が現れた…', 'danger'); coach('altar', '<b>祭壇</b>に触れるとレリックが手に入る。ただし呪い付き…。'); }
     if (e.type === 'event') { warning({ siege: 'モンスターに包囲された！', stampede: '大暴走が迫ってくる！', meteor: '流星群が降ってくる！赤い円を避けろ！' }[e.kind]); $('#warning-banner strong').textContent = EVENTS[e.kind].length > 2 ? EVENTS[e.kind] + '!!' : EVENTS[e.kind] + '！！'; }
     if (e.type === 'boss') $('#warning-banner strong').textContent = 'WARNING!!';
     if (e.type === 'bossPhase') announce(e.phase >= 3 ? '夜の主が本気になった！赤い円に注意！' : '夜の主が怒った！手下を呼んだぞ！', 'danger');
@@ -239,18 +305,18 @@ function processEvents(g, muted = false) {
   }
   g.events.length = 0;
 }
-function input() { let x = movement.x, y = movement.y; if (keys.has('KeyA') || keys.has('ArrowLeft')) x--; if (keys.has('KeyD') || keys.has('ArrowRight')) x++; if (keys.has('KeyW') || keys.has('ArrowUp')) y--; if (keys.has('KeyS') || keys.has('ArrowDown')) y++; return { x, y }; }
+function input() { let x = movement.x + pad.move.x, y = movement.y + pad.move.y; if (keys.has('KeyA') || keys.has('ArrowLeft')) x--; if (keys.has('KeyD') || keys.has('ArrowRight')) x++; if (keys.has('KeyW') || keys.has('ArrowUp')) y--; if (keys.has('KeyS') || keys.has('ArrowDown')) y++; return { x, y }; }
 function syncBeat(now) {
   const info = audio.beatInfo();
   if (info) renderer.beat = info;
   else { const beat = now / 1000 * MUSIC_BPM / 60; renderer.beat = { count: Math.floor(beat), phase: beat % 1, bar: Math.floor(beat / 4), energy: game ? .55 : .4 }; }
   if (game && game.state === 'running') audio.setIntensity(musicIntensity(game), !!game.boss?.alive);
-  audio.setMuffle(!!game && ['paused', 'upgrade', 'chest'].includes(game.state) || $('#app-dialog').open);
+  audio.setMuffle(!!game && ['paused', 'upgrade', 'chest', 'relic'].includes(game.state) || $('#app-dialog').open);
   if (game && game.state === 'running' && game.player.hp < game.player.maxHP * .3 && now - heartbeatAt > 820) { heartbeatAt = now; audio.effect('heartbeat'); }
 }
 function frame(now) {
   const presentationElapsed = Math.max(0, (now - previous) / 1000), elapsed = Math.min(presentationElapsed, .1), frameEnding = ending; previous = now;
-  const begin = performance.now(), active = !document.hidden && !$('#app-dialog').open; syncBeat(now);
+  pollPad(now); const begin = performance.now(), active = !document.hidden && !$('#app-dialog').open; syncBeat(now);
   const scale = slowmo > 0 ? .3 : 1; slowmo = Math.max(0, slowmo - elapsed); accumulator = Math.min(.1, accumulator + elapsed * scale);
   if (game) {
     if (active && game.state === 'running') { const v = input(); while (accumulator >= STEP) { game.update(STEP, v); accumulator -= STEP; if (game.state !== 'running') break; } } else accumulator = 0;
@@ -273,6 +339,10 @@ $('#start-button').addEventListener('click', () => start());
 $('#heat-down').addEventListener('click', () => setHeat(-1)); $('#heat-up').addEventListener('click', () => setHeat(1));
 $('#daily-button').addEventListener('click', () => openDialog('daily')); $('#char-button').addEventListener('click', () => openDialog('characters'));
 $('#reroll-button').addEventListener('click', reroll); $('#banish-button').addEventListener('click', toggleBanish); $('#skip-button').addEventListener('click', skipUpgrade);
+$('#relic-cards').addEventListener('click', e => { const b = e.target.closest('[data-relic]'); if (b) takeRelic(b.dataset.relic); }); $('#relic-decline').addEventListener('click', declineRelic);
+$('#coach-close').addEventListener('click', nextCoach);
+$('#stage-prev').addEventListener('click', () => cycleStage(-1)); $('#stage-next').addEventListener('click', () => cycleStage(1));
+window.addEventListener('gamepadconnected', () => toast('ゲームパッドを接続しました。左スティックで移動、Aでダッシュ、Bでパルス。'));
 $('#chest-claim').addEventListener('click', e => { e.stopPropagation(); claimChest(); }); $('#chest-screen').addEventListener('click', () => { if (!chestDone) finishChest(); }); $('#retry-button').addEventListener('click', () => start({ daily: runInfo.daily })); $('#result-home').addEventListener('click', home);
 $('#resume-button').addEventListener('click', () => { game?.resume(); accumulator = 0; transition(); });
 $('#pause-button').addEventListener('click', () => { game?.pause(); transition(); });
@@ -288,11 +358,12 @@ window.addEventListener('keydown', e => {
   if ($('#app-dialog').open) return;
   if (ending && !endingResultShown) { if (['Enter', 'Space', 'Escape'].includes(e.code)) { e.preventDefault(); if (!e.repeat) skipEnding(); } return; }
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault(); if (e.repeat) return;
+  if (game?.state === 'relic') { if (['Digit1', 'Digit2', 'Digit3'].includes(e.code)) { const id = game.relicOffer.choices[Number(e.code.at(-1)) - 1]; if (id) takeRelic(id); } if (e.code === 'Escape') declineRelic(); return; }
   if (game?.state === 'chest') { if (['Enter', 'Space'].includes(e.code)) { e.preventDefault(); if (!e.repeat) chestDone ? claimChest() : finishChest(); } return; }
   if (game?.state === 'upgrade' && e.code === 'KeyR') { reroll(); return; } if (game?.state === 'upgrade' && e.code === 'KeyX') { toggleBanish(); return; } if (game?.state === 'upgrade' && e.code === 'KeyS') { skipUpgrade(); return; }
   if (game?.state === 'upgrade' && ['Digit1', 'Digit2', 'Digit3'].includes(e.code)) { const u = game.choices[Number(e.code.at(-1)) - 1]; if (u) choose(u.id); return; }
   if (['Escape', 'KeyP'].includes(e.code) && game) { if (game.state === 'running') game.pause(); else if (game.state === 'paused') game.resume(); transition(); accumulator = 0; return; }
-  if (game?.state !== 'running') return; keys.add(e.code); if (e.code === 'Space') game.dash(); if (e.code === 'KeyQ') game.pulse();
+  if (game?.state !== 'running') return; keys.add(e.code); if (e.code === settings.keyDash) game.dash(); if (e.code === settings.keyPulse) game.pulse();
 });
 window.addEventListener('keyup', e => keys.delete(e.code));
 const touchArea = $('#game-canvas');
@@ -325,6 +396,13 @@ function openDialog(type) {
     $('#setting-sfx').addEventListener('input', e => { settings.sfx = e.target.value / 100; audio.sfxVolume = settings.sfx; audio.applyVolumes(); save(SETTINGS_KEY, settings); });
     $('#setting-quality').addEventListener('change', e => { settings.quality = e.target.value; renderer.setQuality(settings.quality); save(SETTINGS_KEY, settings); });
     $('#setting-vibration').addEventListener('change', e => { settings.vibration = e.target.checked; save(SETTINGS_KEY, settings); });
+    content.insertAdjacentHTML('beforeend', `<div class="settings-group">見え方・やさしさ</div><div class="settings-row"><div><label for="setting-shake">画面の揺れ</label><small>0で揺れなし</small></div><input id="setting-shake" type="range" min="0" max="100" value="${Math.round(settings.shake * 100)}"></div><div class="settings-row"><div><label for="setting-flash">画面のフラッシュ</label><small>光の点滅が苦手な方はオフに</small></div><input id="setting-flash" type="checkbox" ${settings.flash ? 'checked' : ''}></div><div class="settings-row"><label for="setting-numbers">ダメージ数字</label><input id="setting-numbers" type="checkbox" ${settings.numbers ? 'checked' : ''}></div><div class="settings-row"><label for="setting-large">文字を大きく</label><input id="setting-large" type="checkbox" ${settings.largeText ? 'checked' : ''}></div><div class="settings-row"><div><label for="setting-hints">ヒントを表示</label><small>初めての要素で一度だけ説明</small></div><input id="setting-hints" type="checkbox" ${settings.hints ? 'checked' : ''}></div><div class="settings-row"><span>ヒントをもう一度見る</span><button class="key-button" id="reset-tips">リセット</button></div><div class="settings-group">操作</div><div class="settings-row"><span>ダッシュのキー</span><button class="key-button" data-bind="keyDash">${settings.keyDash.replace('Key', '')}</button></div><div class="settings-row"><span>パルスのキー</span><button class="key-button" data-bind="keyPulse">${settings.keyPulse.replace('Key', '')}</button></div><p class="settings-note">ゲームパッド対応：左スティック移動・A ダッシュ・B/X パルス・Start 一時停止。メニューは十字キーで選んで A で決定、B で戻る。</p>`);
+    const persist = () => { save(SETTINGS_KEY, settings); applyRenderOptions(); };
+    $('#setting-shake').addEventListener('input', e => { settings.shake = e.target.value / 100; persist(); });
+    for (const [id, key] of [['setting-flash', 'flash'], ['setting-numbers', 'numbers'], ['setting-hints', 'hints']]) $('#' + id).addEventListener('change', e => { settings[key] = e.target.checked; persist(); });
+    $('#setting-large').addEventListener('change', e => { settings.largeText = e.target.checked; document.body.classList.toggle('large-text', settings.largeText); persist(); });
+    $('#reset-tips').addEventListener('click', e => { profile.tips = {}; saveProfile(); e.target.textContent = 'リセットしました'; });
+    content.querySelectorAll('[data-bind]').forEach(b => b.addEventListener('click', () => { b.classList.add('listening'); b.textContent = 'キーを押して…'; const onKey = ev => { ev.preventDefault(); ev.stopPropagation(); if (ev.code !== 'Escape' && !/^(Key[WASD]|Arrow|Digit[123]|KeyP)/.test(ev.code)) settings[b.dataset.bind] = ev.code; b.classList.remove('listening'); b.textContent = settings[b.dataset.bind].replace('Key', ''); persist(); window.removeEventListener('keydown', onKey, true); }; window.addEventListener('keydown', onKey, true); }));
   } else if (type === 'shop') {
     $('#dialog-kicker').textContent = 'WORKSHOP'; renderShop();
   } else if (type === 'achievements') {
@@ -366,6 +444,8 @@ if ('serviceWorker' in navigator) {
   });
 }
 $('#update-button').addEventListener('click', () => { if (hasUnfinishedRun()) { game.pause(); transition(); toast('結果画面で更新してください。'); return; } if (pendingReload) location.reload(); else waitingSW?.postMessage({ type: 'SKIP_WAITING' }); });
+if (profile.stats.runs === 0) { mode = 'patrol'; $$('[data-mode]').forEach(x => { x.classList.toggle('selected', x.dataset.mode === 'patrol'); x.setAttribute('aria-pressed', String(x.dataset.mode === 'patrol')); }); $('#mode-title').textContent = MODES.patrol.name; $('#mode-description').textContent = MODES.patrol.description + '（はじめての方におすすめ）'; }
+document.body.classList.toggle('large-text', settings.largeText); applyRenderOptions();
 syncSound(); updateBest(); updateHome(); connection(); requestAnimationFrame(frame);
 // Live module bindings are available to development tools without global hooks.
-export { game, renderer, audio, settings, records, combo, profile };
+export { game, renderer, audio, settings, records, combo, profile, updateHome };

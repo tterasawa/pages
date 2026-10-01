@@ -10,8 +10,10 @@ export const PALETTE = Object.freeze({
 });
 const P = PALETTE;
 const CONFETTI = [P.coral, P.yellow, P.mint, P.sky, P.purple, P.orange, P.pink, P.white];
-const ENEMY_COLORS = [P.tomato, P.orange, P.teal, P.purple, P.magenta];
-const ENEMY_SIZES = [64, 62, 84, 62, 132];
+const ENEMY_COLORS = [P.tomato, P.orange, P.teal, P.purple, P.magenta, P.orange, P.mint, P.mint, P.sky, P.pink, P.purple];
+const ENEMY_SIZES = [64, 62, 84, 62, 132, 74, 70, 40, 78, 62, 62];
+// Per-stage palettes: [ground, alt checker, dots, sparkle, boss body, boss shade]
+const STAGE_LOOK = { wilds: ['#3a2a7c', '#41308a', '#5440a6', '#6d58c4', '#f15bb5', '#c93f92'], frost: ['#2c4f86', '#335a96', '#5b86c4', '#cfe8ff', '#4cc9f0', '#2a9fd0'], candy: ['#7a2f6e', '#863879', '#b14f99', '#ffb3d9', '#ff9f1c', '#e07b00'] };
 const COMIC_WORDS = ['POP!', 'BAM!', 'POW!', 'ZAP!', 'BOOM!', 'WHAM!'];
 const FONT = '"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Arial Rounded MT Bold","Nunito","Segoe UI",system-ui,sans-serif';
 
@@ -113,19 +115,36 @@ function makeSprites() {
     path(c, [[-6, 15], [-3, 21], [0, 15], [3, 21], [6, 15]]); ink(c, P.purple, 2.4);
     shine(c, -8, -9, 3.6, 2);
   }, 72);
-  S.enemy4 = sprite(c => {
+  const bossOf = (body, shade, crown) => sprite(c => {
     shadow(c, 42, 40);
     path(c, [[-30, 0], [-46, 22], [-30, 40], [30, 40], [46, 22], [30, 0]]); ink(c, '#7b2cbf', 3.5);
     for (const s of [-1, 1]) { path(c, [[s * 20, -26], [s * 34, -48], [s * 32, -20]]); ink(c, P.cream, 3.5); }
-    circle(c, 0, 4, 36, P.magenta, 4);
-    c.save(); c.beginPath(); c.arc(0, 4, 36, 0, TAU); c.clip(); oval(c, 0, 34, 44, 18, '#c93f92'); c.restore(); circle(c, 0, 4, 36, null, 4);
-    path(c, [[-24, -26], [-26, -48], [-13, -36], [0, -54], [13, -36], [26, -48], [24, -26]]); ink(c, P.yellow, 3.5);
+    circle(c, 0, 4, 36, body, 4);
+    c.save(); c.beginPath(); c.arc(0, 4, 36, 0, TAU); c.clip(); oval(c, 0, 34, 44, 18, shade); c.restore(); circle(c, 0, 4, 36, null, 4);
+    path(c, [[-24, -26], [-26, -48], [-13, -36], [0, -54], [13, -36], [26, -48], [24, -26]]); ink(c, crown, 3.5);
     circle(c, 0, -38, 4, P.coral, 2.4); circle(c, -17, -33, 2.8, P.sky, 2); circle(c, 17, -33, 2.8, P.mint, 2);
     eye(c, -13, -4, 8.5, [.2, .45], 1.2); eye(c, 13, -4, 8.5, [-.2, .45], -1.2);
     c.beginPath(); c.moveTo(-18, 14); c.quadraticCurveTo(0, 30, 18, 14); c.closePath(); ink(c, P.ink, 3);
     path(c, [[-14, 15], [-10, 21], [-6, 17], [-2, 23], [2, 17], [6, 23], [10, 17], [14, 15]]); ink(c, P.white, 0);
     shine(c, -18, -14, 7, 3.4);
   }, 140);
+  S.enemy4 = S.enemy4_wilds = bossOf(P.magenta, '#c93f92', P.yellow); S.enemy4_frost = bossOf(P.sky, '#2a9fd0', P.white); S.enemy4_candy = bossOf(P.orange, '#e07b00', P.pink);
+  S.enemy5 = sprite(c => { shadow(c, 18, 20); oval(c, 0, 2, 20, 14, P.orange, 3); oval(c, 0, 9, 16, 6, '#e07b00'); oval(c, 0, 2, 20, 14, null, 3); path(c, [[14, -4], [24, -10], [20, 2]]); ink(c, P.cream, 2.4); path(c, [[-6, -12], [-2, -20], [3, -12]]); ink(c, '#e07b00', 2.4); eye(c, 9, -3, 3.4, [.6, .2], 1); oval(c, 18, 4, 4, 3, '#ffbe4d', 2); for (const x of [-12, -4, 4, 12]) { c.fillStyle = P.ink; c.fillRect(x - 2, 13, 4, 7); } shine(c, -8, -6, 5, 2.2); }, 72);
+  S.enemy6 = sprite(c => { shadow(c, 18, 18); c.beginPath(); c.moveTo(-19, 14); c.quadraticCurveTo(-22, -18, 0, -18); c.quadraticCurveTo(22, -18, 19, 14); c.closePath(); ink(c, P.mint, 3); oval(c, 0, 10, 16, 5, '#22b884'); eye(c, -6, -2, 4, [0, .4]); eye(c, 6, -2, 4, [0, .4]); c.beginPath(); c.arc(0, 6, 3, 0, Math.PI); c.lineWidth = 2; c.strokeStyle = P.ink; c.stroke(); shine(c, -9, -10, 4, 2.4); }, 64);
+  S.enemy7 = sprite(c => { shadow(c, 9, 10); c.beginPath(); c.moveTo(-10, 8); c.quadraticCurveTo(-12, -10, 0, -10); c.quadraticCurveTo(12, -10, 10, 8); c.closePath(); ink(c, '#7af5c4', 2.4); eye(c, -3, -1, 2.2, [0, .4]); eye(c, 3, -1, 2.2, [0, .4]); }, 36);
+  S.enemy8 = sprite(c => { shadow(c, 18, 20); for (const x of [-14, 14]) oval(c, x, 12, 5, 4, '#2a9fd0', 2.4); oval(c, -20, -2, 6, 5, '#7bd8f5', 2.4); oval(c, 0, 0, 18, 14, P.sky, 3); for (const [x, y] of [[-7, -4], [6, -4], [0, 5]]) { path(c, [[x - 5, y], [x, y - 4], [x + 5, y], [x, y + 4]]); ink(c, '#2a9fd0', 1.8); } eye(c, -21, -3, 2.2, [-.5, 0]); shine(c, -6, -9, 5, 2); }, 72);
+  S.shield = sprite(c => { c.beginPath(); c.arc(0, 0, 26, -1.1, 1.1); c.lineWidth = 6; c.strokeStyle = P.ink; c.stroke(); c.lineWidth = 3.5; c.strokeStyle = P.white; c.stroke(); }, 64);
+  S.enemy9 = sprite(c => { shadow(c, 16, 14); oval(c, 0, 6, 12, 11, P.white, 3); c.fillStyle = P.coral; c.fillRect(-2, 0, 4, 12); c.fillRect(-6, 4, 12, 4); circle(c, 0, -9, 10, P.pink, 3); roundRect(c, -8, -21, 16, 7, 3); ink(c, P.white, 2.4); c.fillStyle = P.coral; c.fillRect(-1.5, -20, 3, 5); c.fillRect(-3.5, -18.5, 7, 2); eye(c, -3.5, -9, 2.2, [0, .3]); eye(c, 3.5, -9, 2.2, [0, .3]); }, 60);
+  S.enemy10 = sprite(c => { shadow(c, 16, 14); oval(c, 0, 4, 12, 13, P.purple, 3); circle(c, 0, -10, 9, '#7d3fc9', 3); roundRect(c, -9, -14, 18, 6, 3); ink(c, P.ink, 0); circle(c, 4, -11, 2.4, P.coral, 0); roundRect(c, 6, -2, 20, 5, 2); ink(c, P.ink, 0); }, 60);
+  S.altar = sprite(c => { shadow(c, 26, 26, 7); path(c, [[-24, 26], [-18, 6], [18, 6], [24, 26]]); ink(c, '#5b4a8a', 3); roundRect(c, -20, 0, 40, 9, 3); ink(c, '#7a68ad', 3); star(c, 0, -18, 15, 6.5); ink(c, P.purple, 3); star(c, 0, -18, 7, 3); ink(c, P.pink, 0); for (const x of [-14, 14]) { c.fillStyle = P.ink; c.fillRect(x - 2, -10, 4, 12); oval(c, x, -14, 3, 5, P.orange, 1.6); } }, 72);
+  S.relicOrb = sprite(c => { circle(c, 0, 0, 14, P.purple, 3); star(c, 0, 0, 8, 3.5); ink(c, P.lemon, 2); }, 40);
+  const prop = (fn, size) => sprite(fn, size);
+  S.snowman = prop(c => { shadow(c, 22, 16, 5); circle(c, 0, 10, 13, P.white, 3); circle(c, 0, -8, 9, P.white, 3); path(c, [[0, -8], [10, -6], [0, -5]]); ink(c, P.orange, 1.6); circle(c, -3, -10, 1.4, P.ink, 0); circle(c, 3, -10, 1.4, P.ink, 0); c.fillStyle = P.coral; c.fillRect(-9, -2, 18, 4); }, 56);
+  S.iceShard = prop(c => { shadow(c, 14, 18, 5); for (const [x, h, w, col] of [[-8, 18, 6, '#bfe9ff'], [8, 14, 5, '#e8fbff'], [0, 26, 7, '#9be7ff']]) { path(c, [[x - w, 13], [x, 13 - h], [x + w, 13]]); ink(c, col, 2.6); } }, 56);
+  S.snowPine = prop(c => { shadow(c, 26, 20, 6); c.fillStyle = P.ink; c.fillRect(-3, 10, 6, 14); for (const [y, w] of [[12, 22], [0, 17], [-12, 12]]) { path(c, [[-w, y], [0, y - 20], [w, y]]); ink(c, '#2ec4b6', 3); path(c, [[-w * .5, y - 8], [0, y - 20], [w * .5, y - 8]]); ink(c, P.white, 0); } }, 72);
+  S.lollipop = prop(c => { shadow(c, 26, 10, 4); c.fillStyle = P.cream; c.fillRect(-2, -4, 4, 30); c.strokeStyle = P.ink; c.lineWidth = 2; c.strokeRect(-2, -4, 4, 30); circle(c, 0, -14, 13, P.pink, 3); c.strokeStyle = P.white; c.lineWidth = 3; c.beginPath(); for (let a = 0; a < 12; a += .3) c.lineTo(Math.cos(a) * a * .9, -14 + Math.sin(a) * a * .9); c.stroke(); }, 64);
+  S.cupcake = prop(c => { shadow(c, 16, 16, 5); path(c, [[-13, 2], [13, 2], [9, 16], [-9, 16]]); ink(c, P.sky, 2.6); circle(c, 0, -2, 12, P.cream, 2.6); circle(c, 0, -10, 8, P.pink, 2.4); circle(c, 0, -18, 3.5, P.tomato, 2); }, 48);
+  S.gumdrop = prop(c => { shadow(c, 12, 14, 4); c.beginPath(); c.moveTo(-13, 12); c.quadraticCurveTo(-12, -12, 0, -12); c.quadraticCurveTo(12, -12, 13, 12); c.closePath(); ink(c, P.yellow, 2.6); for (const [x, y] of [[-4, -2], [5, 3], [0, 7]]) circle(c, x, y, 1.6, P.white, 0); }, 40);
   S.gem = sprite(c => { path(c, [[0, -9], [7, -1], [0, 9], [-7, -1]]); ink(c, P.mint, 2.4); path(c, [[0, -9], [0, 9], [-7, -1]]); ink(c, '#22b884', 0); path(c, [[-7, -1], [7, -1], [0, 9], [-7, -1]]); ink(c, null, 2.4); oval(c, -2.2, -3.5, 1.6, 2.6, P.white, 0, null, .5); }, 26);
   S.gemBig = sprite(c => { star(c, 0, 0, 11, 5.4); ink(c, P.yellow, 2.6); star(c, 0, 1.3, 6, 3); ink(c, P.lemon, 0); oval(c, -3, -3.5, 1.8, 2.8, P.white, 0, null, .6); }, 30);
   S.gemMid = sprite(c => { path(c, [[0, -10], [8, -2], [0, 10], [-8, -2]]); ink(c, P.sky, 2.4); path(c, [[0, -10], [0, 10], [-8, -2]]); ink(c, '#2a9fd0', 0); path(c, [[-8, -2], [8, -2], [0, 10]]); ink(c, null, 2.4); oval(c, -2.5, -4, 1.7, 2.8, P.white, 0, null, .5); }, 28);
@@ -176,11 +195,11 @@ function makeSprites() {
   return S;
 }
 
-function makeTerrain() {
+function makeTerrain(look = STAGE_LOOK.wilds) {
   const t = canvas(256), c = t.getContext('2d'), rng = seeded(41);
-  c.fillStyle = P.ground; c.fillRect(0, 0, 256, 256);
-  c.fillStyle = P.groundAlt; for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) if ((x + y) % 2) c.fillRect(x * 64, y * 64, 64, 64);
-  c.fillStyle = P.groundDot; for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { c.beginPath(); c.arc(x * 64 + 32, y * 64 + 32, 3.2, 0, TAU); c.fill(); }
+  c.fillStyle = look[0]; c.fillRect(0, 0, 256, 256);
+  c.fillStyle = look[1]; for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) if ((x + y) % 2) c.fillRect(x * 64, y * 64, 64, 64);
+  c.fillStyle = look[2]; for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { c.beginPath(); c.arc(x * 64 + 32, y * 64 + 32, 3.2, 0, TAU); c.fill(); }
   for (let i = 0; i < 22; i++) { c.fillStyle = rng() > .5 ? '#6d58c455' : '#2e206455'; const x = rng() * 256, y = rng() * 256, r = 1 + rng() * 1.6; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); }
   return t;
 }
@@ -190,16 +209,17 @@ export class Renderer {
   constructor(el) {
     this.canvas = el; this.ctx = el.getContext('2d', { alpha: false }); this.sprites = makeSprites();
     this.white = {}; this.ghost = {};
-    for (let i = 0; i < 5; i++) this.white['enemy' + i] = tinted(this.sprites['enemy' + i], P.white);
+    for (let i = 0; i < 11; i++) this.white['enemy' + i] = tinted(this.sprites['enemy' + i], P.white);
+    for (const st of ['wilds', 'frost', 'candy']) this.white['enemy4_' + st] = tinted(this.sprites['enemy4_' + st], P.white);
     this.ghost.player = tinted(this.sprites.player, P.sky);
     this.width = 1; this.height = 1; this.scale = 1; this.camera = { x: 0, y: 0 }; this.quality = 'auto'; this.autoLow = false;
     this.reduced = matchMedia('(prefers-reduced-motion: reduce)').matches; this.frame = 0; this.clock = 0; this.drawnEnemies = 0;
     this.densityW = 1; this.density = new Uint8Array(1); this.endSnapshot = null; this.endSequence = null; this.endPaintedAge = null;
     this.beat = { phase: 0, count: 0, bar: 0, energy: .5 }; this.lastBeat = -1; this.tiles = [];
     this.fx = []; this.fxPool = []; this.numbers = 0; this.kick = 0; this.zoomKick = 0; this.flashColor = null; this.flashTime = 0; this.flashMax = 1;
-    this.comicCooldown = 0; this.hurtTime = 0; this.combo = 0; this.lastHome = null;
+    this.opts = { shake: 1, flash: true, numbers: true }; this.comicCooldown = 0; this.hurtTime = 0; this.combo = 0; this.lastHome = null;
     const rand = seeded(911); this.endBits = Array.from({ length: 120 }, () => ({ angle: rand() * TAU, speed: .25 + rand() * .75, size: 4 + rand() * 7, spin: rand() * TAU, drift: rand() - .5, color: CONFETTI[Math.floor(rand() * CONFETTI.length)], x: rand(), delay: rand() * .4 }));
-    this.terrain = makeTerrain(); this.pattern = this.ctx.createPattern(this.terrain, 'repeat');
+    this.terrains = Object.fromEntries(Object.entries(STAGE_LOOK).map(([k, v]) => [k, makeTerrain(v)])); this.terrain = this.terrains.wilds; this.pattern = this.ctx.createPattern(this.terrain, 'repeat');
     this.lantern = radial(256, [[0, '#ffe9a066'], [.35, '#ffd27a2a'], [1, '#ffd27a00']]);
     this.resize();
   }
@@ -245,7 +265,7 @@ export class Renderer {
   }
   confetti(x, y, n, speed = 420) { this.burst(x, y, n, CONFETTI, speed, { type: 'confetti', life: 1.4, size: 8, g: 520, drag: 2.2, lift: 160 }); }
   comic(x, y, text, color = P.yellow, size = 1) { if (this.reduced) return; this.spawn('comic', x, y, { life: .62, size: 34 * size, color, text, rot: (Math.random() - .5) * .5, vy: -30 }); }
-  flash(color, time = .18) { if (this.reduced) return; this.flashColor = color; this.flashTime = this.flashMax = time; }
+  flash(color, time = .18) { if (this.reduced || !this.opts.flash) return; this.flashColor = color; this.flashTime = this.flashMax = time; }
   ingest(game, home) {
     const fx = game.fx; if (!fx || !fx.length) return;
     const effects = !this.reduced, heavy = !this.low;
@@ -253,7 +273,7 @@ export class Renderer {
     for (const e of fx) {
       switch (e.k) {
         case 'hit':
-          if (effects && numbers < 6 && this.numbers < (heavy ? 46 : 18) && (e.b >= 10 || Math.random() < (e.a >= 20 ? 1 : .55))) {
+          if (effects && this.opts.numbers && numbers < 6 && this.numbers < (heavy ? 46 : 18) && (e.b >= 10 || Math.random() < (e.a >= 20 ? 1 : .55))) {
             numbers++; this.numbers++; const crit = e.b >= 10, big = e.a >= 40 || crit;
             this.spawn('num', e.x + (Math.random() - .5) * 34, e.y - 14 - Math.random() * 18, { vx: (Math.random() - .5) * 120, vy: -170 - Math.random() * 60, g: 360, drag: 1.5, life: .7, size: crit ? 28 : big ? 24 : 16 + Math.min(6, e.a / 8), text: String(Math.round(e.a)) + (crit ? '!' : ''), color: crit ? P.coral : big ? P.yellow : P.white });
           }
@@ -290,6 +310,9 @@ export class Renderer {
         case 'special': { const words = ['MAGNET!', 'BOMB!!', 'FREEZE!', 'STAR POWER!'], cols = [P.coral, P.orange, P.sky, P.yellow]; this.flash(e.a === 1 ? '#ffffff' : e.a === 2 ? '#c9f3ff' : '#fff7d6', e.a === 1 ? .5 : .25); this.kick = Math.max(this.kick, e.a === 1 ? 1.1 : .4); this.zoomKick = .07;
           if (effects) { this.spawn('ring', e.x, e.y, { life: .6, size: e.a === 1 ? 700 : 260, color: cols[e.a], grow: 1 }); this.confetti(e.x, e.y, heavy ? 60 : 18, 520); this.comic(e.x, e.y - 100, words[e.a], cols[e.a], 1.4); } break; }
         case 'bossPhase': this.flash('#ff5a5f', .3); this.kick = Math.max(this.kick, .9); if (effects) { this.spawn('ring', e.x, e.y, { life: .5, size: 220, color: P.magenta, grow: 1 }); this.comic(e.x, e.y - 90, e.a >= 3 ? 'RAGE!!' : 'ANGRY!', P.tomato, 1.5); } break;
+        case 'heal': if (effects) { this.spawn('ring', e.x, e.y, { life: .45, size: e.a, color: P.pink, grow: 1 }); for (let k = 0; k < 6; k++) this.spawn('twinkle', e.x + (Math.random() - .5) * e.a, e.y + (Math.random() - .5) * e.a, { life: .5, size: 9, color: P.mint, vy: -40 }); } break;
+        case 'shieldBreak': if (effects) { this.burst(e.x, e.y, 10, [P.white, P.sky], 300, { type: 'spark', size: 10, life: .3 }); this.comic(e.x, e.y - 30, 'BREAK!', P.sky, .7); } break;
+        case 'relic': this.flash('#e5d4ff', .3); this.zoomKick = .08; if (effects) { for (let k = 0; k < 3; k++) this.spawn('ring', e.x, e.y, { life: .5 + k * .15, size: 120 + k * 80, color: [P.purple, P.pink, P.lemon][k], grow: 1 }); this.confetti(e.x, e.y, heavy ? 60 : 18, 480); this.comic(e.x, e.y - 100, 'RELIC!', P.purple, 1.3); } break;
         case 'eliteDown':
           this.kick = Math.max(this.kick, .6); this.flash('#fff2b0', .15);
           if (effects) { this.confetti(e.x, e.y, heavy ? 50 : 16, 520); this.spawn('ring', e.x, e.y, { life: .45, size: 150, color: P.yellow, grow: 1 }); this.comic(e.x, e.y - 50, 'GREAT!', P.yellow, 1.2); }
@@ -369,14 +392,18 @@ export class Renderer {
     game.viewRadius = Math.min(800, Math.hypot(w / this.scale, h / this.scale) / 2); game.effects = !this.low && !this.reduced;
     const tx = p.x - (home && w > 900 ? w / s * .02 : 0), ty = p.y + (home ? h / s * (w > 900 ? .02 : .12) : 0), lerp = home ? .05 : Math.min(1, dt * 8);
     this.camera.x += (tx - this.camera.x) * lerp; this.camera.y += (ty - this.camera.y) * lerp;
-    c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); c.fillStyle = P.ground; c.fillRect(0, 0, w, h);
-    let sx = 0, sy = 0; const shake = motion ? game.shake * 14 + this.kick * 9 : 0;
+    const stage = game.stage || 'wilds', look = STAGE_LOOK[stage] || STAGE_LOOK.wilds; this.terrain = this.terrains[stage] || this.terrains.wilds; this.look = look; this.stage = stage;
+    c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); c.fillStyle = look[0]; c.fillRect(0, 0, w, h);
+    let sx = 0, sy = 0; const shake = motion ? (game.shake * 14 + this.kick * 9) * this.opts.shake : 0;
     if (shake > 0) { sx = (Math.random() - .5) * shake * 2; sy = (Math.random() - .5) * shake * 2; }
     c.translate(w / 2 + sx, h / 2 + sy); c.scale(s, s); c.translate(-this.camera.x, -this.camera.y);
     const hw = w / s / 2 + 90, hh = h / s / 2 + 90, x0 = this.camera.x - hw, y0 = this.camera.y - hh, x1 = this.camera.x + hw, y1 = this.camera.y + hh;
     for (let ty0 = Math.floor(y0 / 256) * 256; ty0 < y1; ty0 += 256) for (let tx0 = Math.floor(x0 / 256) * 256; tx0 < x1; tx0 += 256) c.drawImage(this.terrain, tx0, ty0, 256.5, 256.5);
     if (!this.low && game.enemies.length < 400) this.drawTiles(game, dt);
+    for (const q of game.puddles || []) { if (q.x + q.r < x0 || q.x - q.r > x1 || q.y + q.r < y0 || q.y - q.r > y1) continue; c.fillStyle = '#ff8fc788'; c.beginPath(); c.ellipse(q.x, q.y, q.r, q.r * .7, 0, 0, TAU); c.fill(); c.fillStyle = '#ffffff44'; c.beginPath(); c.ellipse(q.x - q.r * .3, q.y - q.r * .2, q.r * .3, q.r * .12, -.3, 0, TAU); c.fill(); }
+    if (stage === 'frost' && !this.low) { c.strokeStyle = '#ffffff1c'; c.lineWidth = 3; for (let gx = Math.floor(x0 / 200); gx <= x1 / 200; gx++) { const bx = gx * 200; c.beginPath(); c.moveTo(bx, y0); c.lineTo(bx + 120, y1); c.stroke(); } }
     this.drawGround(x0, y0, x1, y1, game);
+    for (const f of game.fires || []) { const a = Math.min(1, f.t); c.fillStyle = `rgba(255,159,28,${.55 * a})`; c.beginPath(); c.arc(f.x, f.y + Math.sin(this.clock * 20 + f.x) * 2, 16 + Math.sin(this.clock * 30 + f.y) * 3, 0, TAU); c.fill(); c.fillStyle = `rgba(255,240,122,${.7 * a})`; c.beginPath(); c.arc(f.x, f.y, 7, 0, TAU); c.fill(); }
     // Night-to-dawn tint as the run progresses.
     const progress = home ? 0 : Math.min(1, game.time / game.duration);
     if (progress > .55) { c.fillStyle = `rgba(255,140,170,${(progress - .55) * .16})`; c.fillRect(x0, y0, hw * 2, hh * 2); }
@@ -384,10 +411,10 @@ export class Renderer {
     this.drawArena(x0, y0, x1, y1, game);
     const l = game.levels;
     if (l.frost) this.drawFrost(p, l.frost, game.time);
-    for (const h of game.hazards || []) { const t = 1 - h.t / h.max; c.fillStyle = `rgba(255,90,95,${.12 + t * .25})`; c.beginPath(); c.arc(h.x, h.y, h.r, 0, TAU); c.fill(); c.fillStyle = `rgba(255,90,95,${.35})`; c.beginPath(); c.arc(h.x, h.y, h.r * t, 0, TAU); c.fill(); c.strokeStyle = P.tomato; c.lineWidth = 4; c.setLineDash([12, 8]); c.lineDashOffset = -this.clock * 50; c.beginPath(); c.arc(h.x, h.y, h.r, 0, TAU); c.stroke(); c.setLineDash([]); if (t > .7 && this.frame % 6 < 3) { c.strokeStyle = P.white; c.lineWidth = 3; c.beginPath(); c.arc(h.x, h.y, h.r - 4, 0, TAU); c.stroke(); } }
+    for (const h of game.hazards || []) { const t = 1 - h.t / h.max; c.fillStyle = `rgba(255,90,95,${.12 + t * .25})`; c.beginPath(); c.arc(h.x, h.y, h.r, 0, TAU); c.fill(); c.fillStyle = `rgba(255,90,95,${.35})`; c.beginPath(); c.arc(h.x, h.y, h.r * t, 0, TAU); c.fill(); c.save(); c.beginPath(); c.arc(h.x, h.y, h.r, 0, TAU); c.clip(); c.strokeStyle = '#ffffff55'; c.lineWidth = 4; c.beginPath(); for (let k = -h.r * 2; k < h.r * 2; k += 16) { c.moveTo(h.x + k, h.y - h.r); c.lineTo(h.x + k + h.r * 2, h.y + h.r); } c.stroke(); c.restore(); c.strokeStyle = P.tomato; c.lineWidth = 4; c.setLineDash([12, 8]); c.lineDashOffset = -this.clock * 50; c.beginPath(); c.arc(h.x, h.y, h.r, 0, TAU); c.stroke(); c.setLineDash([]); if (t > .7 && this.frame % 6 < 3) { c.strokeStyle = P.white; c.lineWidth = 3; c.beginPath(); c.arc(h.x, h.y, h.r - 4, 0, TAU); c.stroke(); } }
     for (const m of game.mines || []) this.sprite(m.arm <= 0 && this.frame % 20 < 10 ? 'mineLit' : 'mine', m.x, m.y, 30);
     for (const st of game.strikes || []) { const t = Math.max(0, st.t / st.max); c.strokeStyle = '#fff07aaa'; c.lineWidth = 3; c.beginPath(); c.arc(st.x, st.y, st.r * (1 - t * .5), 0, TAU); c.stroke(); this.sprite('fallStar', st.x + t * 60, st.y - t * 240, 60, .25); }
-    for (const g of game.gems) { if (g.kind !== 'special' || g.x < x0 || g.x > x1 || g.y < y0 || g.y > y1) continue; const bob = motion ? Math.sin(this.clock * 5 + g.phase) * 4 : 0; c.strokeStyle = CONFETTI[(this.frame >> 3) & 7]; c.lineWidth = 3; c.beginPath(); c.arc(g.x, g.y + bob, 20 + Math.sin(this.clock * 8) * 2, 0, TAU); c.stroke(); this.sprite('sp' + g.value, g.x, g.y + bob, 38); }
+    for (const g of game.gems) { if (g.kind === 'altar' && g.x >= x0 && g.x <= x1 && g.y >= y0 && g.y <= y1) { c.fillStyle = '#9b5de533'; c.beginPath(); c.ellipse(g.x, g.y + 18, 46, 16, 0, 0, TAU); c.fill(); this.sprite('altar', g.x, g.y + (motion ? Math.sin(this.clock * 3) * 2 : 0), 78); if (motion && this.frame % 8 === 0) this.spawn('twinkle', g.x + (Math.random() - .5) * 60, g.y - Math.random() * 50, { life: .6, size: 10, color: P.pink, vr: 4 }); continue; } if (g.kind !== 'special' || g.x < x0 || g.x > x1 || g.y < y0 || g.y > y1) continue; const bob = motion ? Math.sin(this.clock * 5 + g.phase) * 4 : 0; c.strokeStyle = CONFETTI[(this.frame >> 3) & 7]; c.lineWidth = 3; c.beginPath(); c.arc(g.x, g.y + bob, 20 + Math.sin(this.clock * 8) * 2, 0, TAU); c.stroke(); this.sprite('sp' + g.value, g.x, g.y + bob, 38); }
     this.nearestChest = null; let chestDist = Infinity;
     for (const g of game.gems) {
       if (g.kind !== 'chest') continue; const d = Math.hypot(g.x - p.x, g.y - p.y); if (d < chestDist) { chestDist = d; this.nearestChest = g; }
@@ -403,13 +430,13 @@ export class Renderer {
       // Crowd fast path: pre-scaled gem bitmaps copied 1:1 in device pixels.
       const t = c.getTransform(); c.setTransform(1, 0, 0, 1, 0, 0); c.imageSmoothingEnabled = false;
       for (const g of game.gems) {
-        if (g.kind === 'chest' || g.kind === 'special' || g.x < x0 || g.x > x1 || g.y < y0 || g.y > y1) continue;
+        if (g.kind === 'chest' || g.kind === 'special' || g.kind === 'altar' || g.x < x0 || g.x > x1 || g.y < y0 || g.y > y1) continue;
         const bob = motion ? Math.sin(game.time * 4 + g.phase) * 2 : 0, name = g.kind === 'heal' ? 'heal' : g.value > 24 ? 'gemBig' : g.value > 6 ? 'gemMid' : 'gem';
         this.blit(name, this.sprites, false, t.e + g.x * t.a, t.f + (g.y + bob) * t.d, name === 'heal' ? 30 : name === 'gemBig' ? 28 : name === 'gemMid' ? 22 : 17);
       }
       c.setTransform(t); c.imageSmoothingEnabled = true;
     } else for (const g of game.gems) {
-      if (g.kind === 'chest' || g.kind === 'special' || g.x < x0 || g.x > x1 || g.y < y0 || g.y > y1) continue;
+      if (g.kind === 'chest' || g.kind === 'special' || g.kind === 'altar' || g.x < x0 || g.x > x1 || g.y < y0 || g.y > y1) continue;
       const bob = motion ? Math.sin(game.time * 4 + g.phase) * 2 : 0;
       if (g.kind === 'heal') this.sprite('heal', g.x, g.y + bob, 30 * (1 + pump * .12));
       else this.sprite(g.value > 24 ? 'gemBig' : g.value > 6 ? 'gemMid' : 'gem', g.x, g.y + bob, g.value > 24 ? 28 : g.value > 6 ? 22 : 17, motion ? Math.sin(game.time * 2 + g.phase) * .25 : 0);
@@ -424,10 +451,13 @@ export class Renderer {
       const size = ENEMY_SIZES[e.type], speed = e.type === 1 ? 14 : 7, wob = motion ? Math.sin(game.time * speed + e.phase) : 0;
       const hitPop = e.hit > 0 ? 1 + e.hit * 2.2 : 1, sqx = (1 + wob * .06) * hitPop, sqy = (1 - wob * .06) / Math.sqrt(hitPop) * (e.hit > 0 ? 1.05 : 1);
       const flip = e.x > p.x && e.type !== 3 && e.type !== 4, set = e.hit > .03 ? this.white : this.sprites, lift = Math.abs(wob) * (e.type === 1 ? 4 : 2);
-      if (fast && e.type !== 4 && !e.elite) { this.blit('enemy' + e.type, set, flip, ox + (e.x - this.camera.x) * k, oy + (e.y - lift - this.camera.y) * k, size); continue; }
+      const tele = (e.type === 5 || e.type === 10) && e.ai === 1;
+      if (fast && e.type !== 4 && !e.elite && !tele && !(e.type === 8 && e.shield > 0)) { this.blit('enemy' + e.type, set, flip, ox + (e.x - this.camera.x) * k, oy + (e.y - lift - this.camera.y) * k, size); continue; }
       if (fast) { c.setTransform(k, 0, 0, k, ox - this.camera.x * k, oy - this.camera.y * k); c.imageSmoothingEnabled = true; }
       if (e.elite) { c.strokeStyle = P.yellow; c.lineWidth = 4; c.setLineDash([10, 8]); c.lineDashOffset = -this.clock * 40; c.beginPath(); c.ellipse(e.x, e.y + e.r * .6, e.r * 1.25, e.r * .5, 0, 0, TAU); c.stroke(); c.setLineDash([]); }
-      this.sprite('enemy' + e.type, e.x, e.y - lift, e.elite ? size * 1.45 : size, e.type === 1 ? wob * .12 : 0, 1, flip ? -sqx : sqx, sqy, set);
+      if (tele) { const len = e.type === 5 ? 420 : 640, a = 1 - e.aiT / (e.type === 5 ? .75 : .8); c.strokeStyle = e.type === 5 ? `rgba(255,159,28,${.4 + a * .5})` : `rgba(255,90,95,${.3 + a * .6})`; c.lineWidth = e.type === 5 ? 26 * (1 - a * .5) : 3 + a * 3; c.setLineDash(e.type === 5 ? [16, 10] : [6, 6]); c.beginPath(); c.moveTo(e.x, e.y); c.lineTo(e.x + e.cx * len, e.y + e.cy * len); c.stroke(); c.setLineDash([]); }
+      this.sprite(e.type === 4 ? 'enemy4_' + (this.stage || 'wilds') : 'enemy' + e.type, e.x, e.y - lift, e.elite ? size * 1.45 : size, e.type === 1 ? wob * .12 : 0, 1, flip ? -sqx : sqx, sqy, set);
+      if (e.type === 8 && e.shield > 0) this.sprite('shield', e.x, e.y - lift, 64, Math.atan2(p.y - e.y, p.x - e.x), .5 + e.shield * .17);
       if (e.elite) { this.sprite('crown', e.x, e.y - e.r * 1.35 - lift + (motion ? Math.sin(this.clock * 5) * 2 : 0), 34); if (e.hp < e.maxHP) { const bw = 56, by = e.y - e.r * 1.7; roundRect(c, e.x - bw / 2 - 2, by - 2, bw + 4, 9, 4); c.fillStyle = P.ink; c.fill(); roundRect(c, e.x - bw / 2, by, Math.max(4, bw * e.hp / e.maxHP), 5, 2.5); c.fillStyle = P.yellow; c.fill(); } }
       if (e.slow > 0) { c.fillStyle = '#9be7ff55'; c.beginPath(); c.ellipse(e.x, e.y + e.r * .7, e.r + 4, 6, 0, 0, TAU); c.fill(); }
       if (e.type === 4) this.bossBar(e);
@@ -464,7 +494,7 @@ export class Renderer {
     if (!home && !['won', 'dead'].includes(game.state) && game.boss?.alive) this.bossIndicator(game.boss, s);
     if (!home && this.nearestChest && game.state === 'running') this.bossIndicator(this.nearestChest, s, P.yellow);
     if (game.freeze > 0) { c.fillStyle = `rgba(155,231,255,${Math.min(.28, game.freeze * .08)})`; c.fillRect(0, 0, w, h); c.strokeStyle = '#e8fbffcc'; c.lineWidth = 14; c.strokeRect(0, 0, w, h); }
-    if (this.hurtTime > 0 && motion) { const a = this.hurtTime / .35; c.strokeStyle = `rgba(255,70,110,${a * .55})`; c.lineWidth = 28; c.strokeRect(0, 0, w, h); }
+    if (this.hurtTime > 0 && motion && this.opts.flash) { const a = this.hurtTime / .35; c.strokeStyle = `rgba(255,70,110,${a * .55})`; c.lineWidth = 28; c.strokeRect(0, 0, w, h); }
     if (p.hp < p.maxHP * .3 && !home && game.state === 'running' && motion) { const a = (.18 + Math.sin(this.clock * 7) * .1); c.strokeStyle = `rgba(255,70,110,${a})`; c.lineWidth = 18; c.strokeRect(0, 0, w, h); }
     if (this.flashTime > 0 && this.flashColor) { c.globalAlpha = this.flashTime / this.flashMax * .55; c.fillStyle = this.flashColor; c.fillRect(0, 0, w, h); c.globalAlpha = 1; }
   }
@@ -503,16 +533,17 @@ export class Renderer {
     for (let gy = Math.floor(y0 / cell); gy <= Math.ceil(y1 / cell); gy++) for (let gx = Math.floor(x0 / cell); gx <= Math.ceil(x1 / cell); gx++) {
       const rng = seeded((gx * 73856093 ^ gy * 19349663) >>> 0); const x = gx * cell + 20 + rng() * 130, y = gy * cell + 20 + rng() * 130, kind = rng();
       if (Math.hypot(x, y + 200) < 150) continue;
-      if (kind < .14) this.prop('bush', x, y, 70 + Math.round(rng() * 3) * 9);
-      else if (kind < .25) this.prop('mushroom', x, y, 40 + Math.round(rng() * 2) * 8);
-      else if (kind < .32) this.prop('crystal', x, y, 50 + Math.round(rng() * 2) * 7);
+      const set = this.stage === 'frost' ? ['snowPine', 'snowman', 'iceShard'] : this.stage === 'candy' ? ['lollipop', 'cupcake', 'gumdrop'] : ['bush', 'mushroom', 'crystal'];
+      if (kind < .14) this.prop(set[0], x, y, 70 + Math.round(rng() * 3) * 9);
+      else if (kind < .25) this.prop(set[1], x, y, 40 + Math.round(rng() * 2) * 8);
+      else if (kind < .32) this.prop(set[2], x, y, 50 + Math.round(rng() * 2) * 7);
       else if (kind < .36) this.sprite('lamp', x, y, 76, 0, 1, 1, 1 + (this.reduced ? 0 : Math.pow(1 - this.beat.phase, 4) * .05));
-      else if (kind < .6) { const c = this.ctx; c.fillStyle = '#6d58c4'; star(c, x, y, 3.5, 1.4, 4, 0); c.fill(); }
+      else if (kind < .6) { const c = this.ctx; c.fillStyle = this.look[3]; star(c, x, y, 3.5, 1.4, 4, 0); c.fill(); }
     }
     if (x0 < 170 && x1 > -170 && y0 < -60 && y1 > -380) {
       const c = this.ctx; c.fillStyle = '#ffd23f22'; c.beginPath(); c.ellipse(0, -170, 120, 50, 0, 0, TAU); c.fill();
       c.strokeStyle = '#ffd23f55'; c.lineWidth = 3; c.setLineDash([10, 12]); c.lineDashOffset = -game.time * 12; c.beginPath(); c.ellipse(0, -170, 140, 60, 0, 0, TAU); c.stroke(); c.setLineDash([]);
-      this.sprite('tower', 0, -230, 170); this.sprite('bush', -90, -180, 70); this.sprite('mushroom', 80, -170, 44);
+      this.sprite('tower', 0, -230, 170); const deco = this.stage === 'frost' ? ['snowPine', 'snowman'] : this.stage === 'candy' ? ['lollipop', 'cupcake'] : ['bush', 'mushroom']; this.sprite(deco[0], -90, -180, 70); this.sprite(deco[1], 80, -170, 44);
     }
   }
   drawCoreParticles(game, x0, y0, x1, y1, layer) {
