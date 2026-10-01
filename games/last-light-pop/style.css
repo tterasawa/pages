@@ -631,3 +631,14 @@ body.large-text .weapon-slot small, body.large-text .hud-overline, body.large-te
 .skin-swatch.selected { background: var(--lemon); box-shadow: 0 0 0 3px var(--yellow); }
 .skin-swatch:disabled { opacity: .5; cursor: default; }
 .skin-swatch .rainbow { background: conic-gradient(var(--coral), var(--yellow), var(--mint), var(--sky), var(--purple), var(--coral)); }
+
+/* ---------- v2.5: voice subtitles ---------- */
+.subtitle { position: absolute; z-index: 24; left: 50%; bottom: 214px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; max-width: min(620px, calc(100% - 24px)); padding: 8px 16px 8px 8px; border-radius: 18px; border: 3px solid var(--ink); background: #fff6e3f2; color: var(--ink); box-shadow: var(--pop-sm); pointer-events: none; animation: sub-in .3s cubic-bezier(.3, 1.6, .5, 1) both; }
+.subtitle img { width: 44px; height: 44px; object-fit: contain; flex: none; border-radius: 12px; background: var(--c, var(--yellow)); border: 2px solid var(--ink); }
+.subtitle b { display: block; font-size: 11px; font-weight: 900; color: var(--purple); letter-spacing: .06em; }
+.subtitle span { display: block; font-size: 16px; font-weight: 900; line-height: 1.4; }
+.subtitle.boss { background: #2b1240f2; color: var(--white); border-color: var(--pink); } .subtitle.boss b { color: var(--pink); }
+body.large-text .subtitle span { font-size: 19px; }
+@keyframes sub-in { from { transform: translate(-50%, 12px) scale(.9); opacity: 0; } }
+@media (max-width: 640px) { .subtitle { bottom: 284px; } .subtitle span { font-size: 14px; } .subtitle img { width: 36px; height: 36px; } }
+@media (max-height: 560px) and (orientation: landscape) { .subtitle { bottom: 64px; } }

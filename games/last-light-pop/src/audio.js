@@ -62,7 +62,8 @@ export function arrangement(kind, intensity, bar) {
 export class AudioEngine {
   constructor() {
     this.ctx = null; this.master = null; this.musicGain = null; this.sfxGain = null;
-    this.enabled = false; this.active = true; this.musicDuck = 1; this.musicVolume = .4; this.sfxVolume = .6;
+    this.enabled = false; this.active = true; this.musicDuck = 1; this.musicVolume = .4; this.sfxVolume = .6; this.voiceVolume = .9; this.voiceDuck = 1;
+    this.voiceIndex = null; this.voiceBuffers = new Map(); this.voiceLoads = new Map(); this.voicePlaying = null; this.voiceQueue = [];
     this.step = 0; this.nextBeat = 0; this.scheduler = null; this.voices = 0; this.musicVoices = 0;
     this.nodes = new Set(); this.musicNodes = new Set(); this.endingNodes = new Set(); this.lastEffects = new Map();
     this.musicBuffer = null; this.effectBuffers = Object.create(null); this.playingMusic = null;
@@ -78,6 +79,7 @@ export class AudioEngine {
     this.pumpGain = c.createGain(); this.pumpGain.connect(this.musicBus);
     this.drumGain = c.createGain(); this.drumGain.connect(this.musicBus);
     this.musicGain.connect(this.master); this.sfxGain.connect(this.master);
+    this.voiceGain = c.createGain(); this.voiceGain.gain.value = 0; this.voiceGain.connect(this.master);
     const comp = c.createDynamicsCompressor(); comp.threshold.value = -14; comp.knee.value = 10; comp.ratio.value = 6; comp.attack.value = .004; comp.release.value = .16;
     const clip = c.createWaveShaper(), curve = new Float32Array(2048); for (let i = 0; i < curve.length; i++) { const x = i / 1023.5 - 1; curve[i] = Math.tanh(x * 1.15) / Math.tanh(1.15) * .97; } clip.curve = curve;
     this.master.connect(comp); comp.connect(clip); clip.connect(c.destination);
@@ -116,7 +118,8 @@ export class AudioEngine {
   }
   applyVolumes() {
     if (!this.ctx) return; const t = this.ctx.currentTime, on = this.enabled && this.active;
-    this.musicGain.gain.setTargetAtTime(on ? this.musicVolume * this.musicDuck : 0, t, .05);
+    this.musicGain.gain.setTargetAtTime(on ? this.musicVolume * this.musicDuck * this.voiceDuck : 0, t, this.voiceDuck < 1 ? .03 : .3);
+    if (this.voiceGain) this.voiceGain.gain.setTargetAtTime(on ? this.voiceVolume : 0, t, .02);
     this.sfxGain.gain.setTargetAtTime(on ? this.sfxVolume : 0, t, .02);
   }
   setScene(scene) {
@@ -141,6 +144,37 @@ export class AudioEngine {
       this.playingMusic = s; this.musicStartedAt = this.ctx.currentTime; s.onended = () => s.disconnect(); s.start(0, this.musicOffset % s.buffer.duration);
     } else if (this.playingMusic) { this.musicOffset = (this.musicOffset + this.ctx.currentTime - this.musicStartedAt) % this.musicBuffer.duration; const s = this.playingMusic; this.playingMusic = null; s.stop(); }
   }
+  // --- character voices: local MP3s listed in assets/voice/voices.json ------------------------
+  async loadVoiceIndex() {
+    if (this.voiceIndex) return this.voiceIndex;
+    try { const url = new URL('../assets/voice/voices.json', import.meta.url), data = await audioRequest(url, r => r.json()); this.voiceIndex = Object.fromEntries((data.lines || []).map(l => [l.id, { ...l, url: new URL(l.file, new URL('../', import.meta.url)).href }])); }
+    catch { this.voiceIndex = {}; }
+    return this.voiceIndex;
+  }
+  // Decode a set of lines ahead of time so they can start without delay.
+  async preloadVoices(ids) {
+    if (!this.ctx) return; const index = await this.loadVoiceIndex();
+    await Promise.all(ids.filter(id => index[id] && !this.voiceBuffers.has(id)).map(id => {
+      if (!this.voiceLoads.has(id)) this.voiceLoads.set(id, audioRequest(index[id].url, r => r.arrayBuffer()).then(b => this.ctx.decodeAudioData(b)).then(buf => { this.voiceBuffers.set(id, buf); }).catch(() => { }).finally(() => this.voiceLoads.delete(id)));
+      return this.voiceLoads.get(id);
+    }));
+  }
+  // One line at a time. A higher priority interrupts; queue:true waits for the current line.
+  playVoice(id, { priority = 1, queue = false } = {}) {
+    const line = this.voiceIndex?.[id]; if (!line) return null;
+    if (!this.ctx || !this.enabled || !this.active) return { ...line, silent: true };
+    const buffer = this.voiceBuffers.get(id); if (!buffer) { void this.preloadVoices([id]); return null; }
+    if (this.voicePlaying) {
+      if (queue) { if (this.voiceQueue.length < 2) this.voiceQueue.push([id, priority]); return null; }
+      if (priority <= this.voicePlaying.priority) return null;
+      try { this.voicePlaying.source.onended = null; this.voicePlaying.source.stop(); } catch { }
+    }
+    const source = this.ctx.createBufferSource(); source.buffer = buffer; source.connect(this.voiceGain);
+    this.voicePlaying = { id, source, priority }; this.voiceDuck = .5; this.applyVolumes();
+    source.onended = () => { source.disconnect(); this.voicePlaying = null; const next = this.voiceQueue.shift(); if (next) this.playVoice(next[0], { priority: next[1] }); if (!this.voicePlaying) { this.voiceDuck = 1; this.applyVolumes(); } };
+    source.start(); this.lastVoice = { id, at: this.ctx.currentTime }; return { ...line, duration: buffer.duration };
+  }
+  stopVoice() { this.voiceQueue.length = 0; if (this.voicePlaying) { try { this.voicePlaying.source.onended = null; this.voicePlaying.source.stop(); } catch { } this.voicePlaying = null; this.voiceDuck = 1; this.applyVolumes(); } }
   // Beat clock for visuals; null when the synth is not running.
   beatInfo() {
     if (!this.ctx || !this.enabled || !this.active || this.musicBuffer || this.ctx.state !== 'running') return null;

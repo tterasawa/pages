@@ -8,21 +8,21 @@ import { ComboMeter, rankFor, musicIntensity } from './hype.js';
 const $ = s => document.querySelector(s); const $$ = s => [...document.querySelectorAll(s)];
 const icon = (name, cls = '') => `<svg class="${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
 const SETTINGS_KEY = 'lastlight-pop-settings-v1', RECORDS_KEY = 'lastlight-pop-records-v1', PROFILE_KEY = 'lastlight-pop-profile-v1';
-const DEFAULT_SETTINGS = { sound: true, music: 0.42, sfx: 0.6, quality: 'auto', vibration: true, heat: 0, shake: 1, flash: true, numbers: true, largeText: false, hints: true, keyDash: 'Space', keyPulse: 'KeyQ' };
+const DEFAULT_SETTINGS = { sound: true, music: 0.42, sfx: 0.6, quality: 'auto', vibration: true, heat: 0, shake: 1, flash: true, numbers: true, largeText: false, hints: true, voice: .9, subtitles: true, keyDash: 'Space', keyPulse: 'KeyQ' };
 const EMPTY_RECORDS = { runs: 0, wins: 0, totalKills: 0, bestKills: 0, bestTime: 0, bestCombo: 0, modes: {} };
 export const POP_COLORS = Object.freeze({ boomer: 'var(--yellow)', laser: 'var(--sky)', mine: 'var(--coral)', rain: 'var(--purple)', crit: 'var(--mint)', tempo: 'var(--orange)', pulse: 'var(--lemon)', bomb: 'var(--ink-soft)', other: '#cfc6ea', bolt: 'var(--yellow)', orbit: 'var(--sky)', arc: 'var(--orange)', frost: '#9be7ff', drone: 'var(--pink)', nova: 'var(--coral)', power: 'var(--purple)', haste: 'var(--mint)', magnet: 'var(--teal)', vital: 'var(--pink)', regen: 'var(--mint)' });
 function read(key, fallback) { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } }
 function save(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); return true; } catch { return false; } }
 function number(v, fallback, min, max) { return typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback; }
 const rawSettings = read(SETTINGS_KEY, {}), settings = { ...DEFAULT_SETTINGS };
-if (rawSettings && typeof rawSettings === 'object') { settings.sound = rawSettings.sound !== false; settings.music = number(rawSettings.music, DEFAULT_SETTINGS.music, 0, 1); settings.sfx = number(rawSettings.sfx, DEFAULT_SETTINGS.sfx, 0, 1); settings.quality = ['auto', 'low', 'high'].includes(rawSettings.quality) ? rawSettings.quality : 'auto'; settings.vibration = rawSettings.vibration !== false; settings.heat = Math.floor(number(rawSettings.heat, 0, 0, 8)); settings.shake = number(rawSettings.shake, 1, 0, 1); for (const k of ['flash', 'numbers', 'hints']) settings[k] = rawSettings[k] !== false; settings.largeText = rawSettings.largeText === true; for (const k of ['keyDash', 'keyPulse']) if (typeof rawSettings[k] === 'string' && /^[A-Za-z0-9]{2,20}$/.test(rawSettings[k])) settings[k] = rawSettings[k]; }
+if (rawSettings && typeof rawSettings === 'object') { settings.sound = rawSettings.sound !== false; settings.music = number(rawSettings.music, DEFAULT_SETTINGS.music, 0, 1); settings.sfx = number(rawSettings.sfx, DEFAULT_SETTINGS.sfx, 0, 1); settings.quality = ['auto', 'low', 'high'].includes(rawSettings.quality) ? rawSettings.quality : 'auto'; settings.vibration = rawSettings.vibration !== false; settings.heat = Math.floor(number(rawSettings.heat, 0, 0, 8)); settings.shake = number(rawSettings.shake, 1, 0, 1); for (const k of ['flash', 'numbers', 'hints']) settings[k] = rawSettings[k] !== false; settings.largeText = rawSettings.largeText === true; settings.voice = number(rawSettings.voice, .9, 0, 1); settings.subtitles = rawSettings.subtitles !== false; for (const k of ['keyDash', 'keyPulse']) if (typeof rawSettings[k] === 'string' && /^[A-Za-z0-9]{2,20}$/.test(rawSettings[k])) settings[k] = rawSettings[k]; }
 const profile = sanitizeProfile(read(PROFILE_KEY, null)); settings.heat = Math.min(settings.heat, profile.heatUnlocked);
 function saveProfile() { if (!save(PROFILE_KEY, profile)) toast('この環境では進行状況を保存できません。'); }
 const rawRecords = read(RECORDS_KEY, {}), records = { ...EMPTY_RECORDS, modes: {} };
 if (rawRecords && typeof rawRecords === 'object') { for (const k of ['runs', 'wins', 'totalKills', 'bestKills', 'bestTime', 'bestCombo']) records[k] = Math.floor(number(rawRecords[k], 0, 0, 1e9)); for (const id of Object.keys(MODES)) { const r = rawRecords.modes?.[id]; if (r && typeof r === 'object') records.modes[id] = { time: number(r.time, 0, 0, 1e6), kills: Math.floor(number(r.kills, 0, 0, 1e9)), won: r.won === true }; } }
 
 const renderer = new Renderer($('#game-canvas')), audio = new AudioEngine(), combo = new ComboMeter();
-renderer.setQuality(settings.quality); audio.musicVolume = settings.music; audio.sfxVolume = settings.sfx; audio.enabled = settings.sound;
+renderer.setQuality(settings.quality); audio.musicVolume = settings.music; audio.sfxVolume = settings.sfx; audio.voiceVolume = settings.voice; audio.enabled = settings.sound;
 let mode = 'guard', game = null, ending = null, endingResultShown = false, demo = makeDemo(), prevState = 'home', previous = performance.now(), accumulator = 0, hudTimer = 0;
 let frameTime = 0, elapsedTime = 0, frameCount = 0, fps = 60, resultSaved = false, toastTimer = 0, announceTimer = 0, warnTimer = 0, dialogReturn = null, installPrompt = null, waitingSW = null, pendingReload = false;
 let heartbeatAt = 0, slowmo = 0, lastKills = 0, lastLevel = 1, lastArsenal = '', choosing = false, cooldownReady = { dash: true, pulse: true }, audioPrimed = false;
@@ -53,9 +53,25 @@ function enterRun(resumed) {
   $('#dash-button kbd').textContent = settings.keyDash.replace('Key', '').toUpperCase(); $('#pulse-button kbd').textContent = settings.keyPulse.replace('Key', '').toUpperCase();
   $('#mission-label').textContent = `${MODES[game.mode].name}・${STAGES[game.stage].name}`;
   $('#hud-chips').innerHTML = (runInfo.daily ? `<span class="daily">DAILY ${runInfo.day.slice(5).replace('-', '/')}</span>` : '') + (runInfo.heat ? `<span>ヒート${runInfo.heat}</span>` : '') + runInfo.mutators.map(id => `<span class="daily">${MUTATORS[id].name}</span>`).join(''); $('#time-target').textContent = '/ ' + formatTime(game.duration); $('#movement-hint').hidden = false; $('#announcement').hidden = true; $('#warning-banner').hidden = true; $('#combo').hidden = true;
-  transition(); updateHUD(); if (resumed) { announce('おかえり！続きからスタート'); return; } renderer.celebrate('start', game); announce('READY… GO!!');
+  transition(); updateHUD(); preloadRunVoices(); for (const k in voiceAt) delete voiceAt[k]; audio.stopVoice(); if (resumed) { announce('おかえり！続きからスタート'); return; } renderer.celebrate('start', game); announce('READY… GO!!');
+  void audio.preloadVoices([`voice.${game.character || 'keeper'}.start`]).then(() => setTimeout(() => { if (game?.time < 4) speak('start', { priority: 2 }); }, 350));
   coach('move', '<b>動いて</b>キラキラを集めよう！攻撃は自動。ピンチは<b>ダッシュ</b>で回避、囲まれたら<b>パルス</b>！'); if (game.stage === 'frost') coach('ice', '氷の湖は<b>足元が滑る</b>！早めに方向を変えよう。'); if (game.stage === 'candy') coach('syrup', 'ピンクの<b>シロップ</b>に入ると足が鈍る。敵も遅くなるよ。'); $('#stage').focus({ preventScroll: true });
 }
+// --- voices & subtitles ------------------------------------------------------------------
+const voiceAt = {}; let subtitleTimer = 0;
+function showSubtitle(line, boss) {
+  if (!settings.subtitles || !line) return; const el = $('#subtitle'); $('#subtitle-name').textContent = line.name; $('#subtitle-text').textContent = line.text;
+  $('#subtitle-face').src = line.speaker.startsWith('boss_') ? codexVisual({ group: 'boss', id: line.speaker }).match(/src="([^"]+)"/)?.[1] || '' : charImage(line.speaker, renderer.skin);
+  el.classList.toggle('boss', !!boss); el.hidden = true; void el.offsetWidth; el.hidden = false; clearTimeout(subtitleTimer); subtitleTimer = setTimeout(() => el.hidden = true, Math.max(1600, (line.duration || 2) * 1000 + 700));
+}
+// Speak a line for the current hero (or a boss). cooldown in seconds; chance < 1 keeps frequent events from nagging.
+function speak(event, { boss = false, priority = 1, cooldown = 0, chance = 1, queue = false } = {}) {
+  if (!game) return; const who = boss ? 'boss_' + game.stage : game.character || 'keeper', id = `voice.${who}.${event}`, now = performance.now() / 1000;
+  if (cooldown && now - (voiceAt[id] ?? -1e9) < cooldown) return; if (chance < 1 && Math.random() > chance) return;
+  const line = audio.playVoice(id, { priority, queue }); if (!line && !queue) return; voiceAt[id] = now;
+  if (line) showSubtitle(line, boss); else if (queue) setTimeout(() => { const l = audio.voiceIndex?.[id]; if (l && audio.voicePlaying?.id === id) showSubtitle(l, boss); }, 1800);
+}
+function preloadRunVoices() { const who = game.character || 'keeper'; void audio.preloadVoices(['start', 'levelup', 'evolve', 'lowhp', 'revive', 'victory', 'defeat'].map(e => `voice.${who}.${e}`).concat(['appear', 'rage', 'fall'].map(e => `voice.boss_${game.stage}.${e}`))); }
 // --- suspend / resume -------------------------------------------------------------------------
 const RUN_KEY = 'lastlight-pop-run-v1'; let lastSave = 0;
 function saveRun() { if (!game || ending || !['running', 'paused', 'upgrade', 'chest', 'relic'].includes(game.state)) return; try { localStorage.setItem(RUN_KEY, JSON.stringify({ v: 1, at: Date.now(), runInfo, combo: { count: combo.count, best: combo.best }, kills: lastKills, game: game.snapshot() })); lastSave = performance.now(); } catch { } }
@@ -68,12 +84,16 @@ function resumeRun() {
   combo.reset(); combo.best = d.combo?.best || 0; lastKills = game.kills; audio.setStage(STAGES[game.stage].transpose); prevState = ''; transition();
 }
 function home() {
+  audio.stopVoice(); $('#subtitle').hidden = true;
   if (game && ['running', 'paused', 'upgrade', 'chest', 'relic'].includes(game.state)) finalizeRun(false); hideCoach(); clearRun();
   game = null; ending = null; endingResultShown = false; audio.setScene('home'); clearInput(); prevState = 'home'; hideScreens(); $('#home-screen').hidden = false;
   document.body.classList.remove('playing'); $('#announcement').hidden = true; $('#warning-banner').hidden = true; $('#boss-panel').hidden = true; renderer.resize(); demo = makeDemo(); updateBest(); updateHome(); $('#start-button').focus({ preventScroll: true });
 }
+let shownChoices = '';
 function transition() {
-  if (!game || game.state === prevState) return; prevState = game.state; clearInput(); hideScreens(); $('#hud').hidden = false;
+  // Re-render when the offer itself changes (e.g. a chained level-up), not only when the state does.
+  const sig = game?.state === 'upgrade' ? game.choices.map(c => c.id).join() + '|' + game.level : '';
+  if (!game || game.state === prevState && sig === shownChoices) return; shownChoices = sig; prevState = game.state; clearInput(); hideScreens(); $('#hud').hidden = false;
   if (game.state === 'upgrade') { choosing = false; renderUpgrades(); coach('level', 'レベルアップ！<b>1つ選ぼう</b>。武器は4つ・支援も4つまで持てるよ。'); if (game.level >= 4) coach('reroll', '欲しいカードがない？<b>リロール</b>で引き直し、<b>除外</b>で二度と出なくできる。'); $('#upgrade-screen').hidden = false; $('#upgrade-cards button')?.focus({ preventScroll: true }); }
   else if (game.state === 'chest') { $('#chest-screen').hidden = false; playChest(); coach('chest', '宝箱は<b>1〜5個</b>の強化が当たる！5個なら大当たり！'); }
   else if (game.state === 'relic') { renderRelics(); $('#relic-screen').hidden = false; $('#relic-cards button')?.focus({ preventScroll: true }); coach('relic', '<b>レリック</b>はルールを変える特別な力。祭壇のレリックには<b>呪い</b>が付くので、受け取るか見極めよう。'); }
@@ -82,6 +102,7 @@ function transition() {
 }
 function beginEnding() {
   ending = new EndingSequence(game.state, { reducedMotion: renderer.reduced }); endingResultShown = false; combo.finish(); hideCoach();
+  speak(game.state === 'won' ? 'victory' : 'defeat', { priority: 4, queue: !!audio.voicePlaying && audio.voicePlaying.id.endsWith('.fall') });
   audio.setScene('ending'); renderResult(); $('#hud').hidden = true; $('#announcement').hidden = true; $('#warning-banner').hidden = true; clearTimeout(announceTimer);
   const won = ending.kind === 'won', screen = $('#ending-screen'); screen.dataset.outcome = ending.kind; screen.style.setProperty('--ending-text', ending.reducedMotion ? 1 : 0); screen.hidden = false;
   $('#ending-kicker').textContent = won ? 'MISSION CLEAR!!' : 'GAME OVER'; $('#ending-title').textContent = won ? '夜明けだ！' : 'やられた〜！';
@@ -99,6 +120,7 @@ function evolveHint(u) {
   return '';
 }
 function renderUpgrades(flip = false) {
+  shownChoices = game.choices.map(c => c.id).join() + '|' + game.level;
   const cards = $('#upgrade-cards'); cards.classList.toggle('banishing', banishMode); cards.classList.remove('rerolled'); if (flip) { void cards.offsetWidth; cards.classList.add('rerolled'); }
   cards.innerHTML = game.choices.map((u, i) => {
     const lv = game.levels[u.id], fusion = u.tag === 'FUSION', evolved = lv === 4 && u.tag === 'WEAPON' || fusion, desc = lv > 0 && u.effect ? u.effect[lv - 1] : u.description;
@@ -306,6 +328,12 @@ function processEvents(g, muted = false) {
     if (muted || terminal && !['won', 'dead'].includes(e.type)) continue;
     if (e.type === 'decoy') audio.effect('decoy');
     if (e.type !== 'kill' && e.type !== 'chest' && e.type !== 'decoy') audio.effect(e.type === 'relicOffer' && e.source === 'altar' ? 'altar' : e.type, e);
+    if (e.type === 'level') speak('levelup', { cooldown: 25, chance: .6 });
+    if (e.type === 'evolve' || e.type === 'fusion') speak('evolve', { priority: 2, cooldown: 6 });
+    if (e.type === 'revive') speak('revive', { priority: 3 });
+    if (e.type === 'boss') setTimeout(() => speak('appear', { boss: true, priority: 3 }), 400);
+    if (e.type === 'bossPhase' && e.phase >= 3) speak('rage', { boss: true, priority: 3, cooldown: 10 });
+    if (e.type === 'bossDown') speak('fall', { boss: true, priority: 3 });
     if (e.type === 'elite') { announce('エリート出現！宝箱を持ってるぞ！', 'combo-call'); coach('elite', '<b>王冠のエリート</b>は宝箱を落とす！優先して倒そう。'); }
     if (e.type === 'boss') coach('boss', '<b>夜の主</b>が来た！弱るほど攻撃が激しくなる。<b>赤い円</b>は攻撃の予告だから離れよう。');
     if (e.type === 'special') coach('special', '<b>光る泡</b>は特殊アイテム。爆弾・時間停止・スターなど、拾うと一発逆転！');
@@ -333,7 +361,7 @@ function syncBeat(now) {
   else { const beat = now / 1000 * MUSIC_BPM / 60; renderer.beat = { count: Math.floor(beat), phase: beat % 1, bar: Math.floor(beat / 4), energy: game ? .55 : .4 }; }
   if (game && game.state === 'running') audio.setIntensity(musicIntensity(game), !!game.boss?.alive);
   audio.setMuffle(!!game && ['paused', 'upgrade', 'chest', 'relic'].includes(game.state) || $('#app-dialog').open);
-  if (game && game.state === 'running' && game.player.hp < game.player.maxHP * .3 && now - heartbeatAt > 820) { heartbeatAt = now; audio.effect('heartbeat'); }
+  if (game && game.state === 'running' && game.player.hp < game.player.maxHP * .3 && now - heartbeatAt > 820) { heartbeatAt = now; audio.effect('heartbeat'); speak('lowhp', { priority: 2, cooldown: 30 }); }
 }
 function frame(now) {
   const presentationElapsed = Math.max(0, (now - previous) / 1000), elapsed = Math.min(presentationElapsed, .1), frameEnding = ending; previous = now;
@@ -423,10 +451,12 @@ function openDialog(type) {
     content.innerHTML = `<h2 id="dialog-title">灯火を守って、夜をこえろ！</h2><p>攻撃はぜんぶ自動。モンスターをかわしながらキラキラを集めてレベルアップ、武器を育てよう。制限時間を生きのびて、最後に現れる「夜の主」をたおせば作戦成功！</p><div class="control-row"><span>移動</span><span><kbd>W A S D</kbd> / <kbd>↑ ↓ ← →</kbd></span></div><div class="control-row"><span>スマートフォン</span><span>画面をドラッグ</span></div><div class="control-row"><span>ダッシュ（一瞬むてき）</span><span><kbd>SPACE</kbd> / 右下ボタン</span></div><div class="control-row"><span>パルス（周りを攻撃・キラキラ回収）</span><span><kbd>Q</kbd> / 右下ボタン</span></div><div class="control-row"><span>一時停止</span><span><kbd>P</kbd> / <kbd>ESC</kbd></span></div><div class="control-row"><span>強化をえらぶ</span><span><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> / タップ</span></div><h3>アイテムと敵の弾</h3><div class="legend"><span style="--c:var(--mint)"><i></i>キラキラ＝経験値</span><span style="--c:var(--yellow)"><i></i>星＝大きな経験値</span><span style="--c:var(--coral)"><i></i>ハート＝回復</span><span style="--c:var(--tomato)"><i></i>赤い玉＝敵の弾</span></div><h3>武器は4つ、支援も4つまで</h3><p>持てる武器・支援はそれぞれ4つまで。何を育てるかが勝負の分かれ目。実績を達成すると新しい武器やキャラクターが解放されます。光る泡は特殊アイテム（全部吸い寄せ・画面一掃の爆弾・時間停止・無敵のスター）。赤い円は攻撃の予告なのですぐに離れて！</p><h3>宝箱・工房・ヒート</h3><p>王冠をかぶったエリートや夜の主をたおすと宝箱が出現。開けると1〜5個の強化が当たります。出撃するとスターがたまり、工房で恒久強化を買えます。クリアするとヒート（難易度）が解放され、高ヒートほどスター倍率がアップ。毎日変わる「今日のチャレンジ」もあります。</p><h3>進化とカードの操作</h3><p>武器はLv.5で進化しますが、相棒の支援強化が必要です（カードに表示）。強化カードはリロール（R）・除外（X）・スキップ（S）できます。</p><h3>コンボでアガれ！</h3><p>途切れずにたおし続けるとコンボが伸びて、効果音もどんどん高くなります。武器はLv.5で進化。パルスはピンチの切り札！</p><h3>アプリとして遊ぶ</h3><p>対応ブラウザではインストールできます。iPhone / iPadはSafariの共有メニューから「ホーム画面に追加」。初回読み込み後はオフラインでも遊べます。</p>`;
   } else if (type === 'settings') {
     $('#dialog-kicker').textContent = 'SETTINGS';
-    content.innerHTML = `<h2 id="dialog-title">せってい</h2><div class="settings-row"><div><label for="setting-sound">サウンド</label><small>BGMと効果音</small></div><input id="setting-sound" type="checkbox" ${settings.sound ? 'checked' : ''}></div><div class="settings-row"><label for="setting-music">音楽</label><input id="setting-music" type="range" min="0" max="100" value="${Math.round(settings.music * 100)}"></div><div class="settings-row"><label for="setting-sfx">効果音</label><input id="setting-sfx" type="range" min="0" max="100" value="${Math.round(settings.sfx * 100)}"></div><div class="settings-row"><div><label for="setting-quality">描画品質</label><small>低品質は電池と処理負荷をおさえます</small></div><select id="setting-quality"><option value="auto">自動</option><option value="high">高品質</option><option value="low">低品質</option></select></div><div class="settings-row"><div><label for="setting-vibration">ダメージ時の振動</label><small>対応する端末のみ</small></div><input id="setting-vibration" type="checkbox" ${settings.vibration ? 'checked' : ''}></div><p class="settings-note">設定はこの端末に保存されます。画面を離れると自動で一時停止します。端末の「視差効果を減らす」を有効にすると、画面の揺れやフラッシュを抑えます。</p>`;
+    content.innerHTML = `<h2 id="dialog-title">せってい</h2><div class="settings-row"><div><label for="setting-sound">サウンド</label><small>BGMと効果音</small></div><input id="setting-sound" type="checkbox" ${settings.sound ? 'checked' : ''}></div><div class="settings-row"><label for="setting-music">音楽</label><input id="setting-music" type="range" min="0" max="100" value="${Math.round(settings.music * 100)}"></div><div class="settings-row"><label for="setting-sfx">効果音</label><input id="setting-sfx" type="range" min="0" max="100" value="${Math.round(settings.sfx * 100)}"></div><div class="settings-row"><label for="setting-voice">ボイス</label><input id="setting-voice" type="range" min="0" max="100" value="${Math.round(settings.voice * 100)}"></div><div class="settings-row"><div><label for="setting-subtitles">字幕</label><small>キャラクターのセリフを文字でも表示</small></div><input id="setting-subtitles" type="checkbox" ${settings.subtitles ? 'checked' : ''}></div><div class="settings-row"><div><label for="setting-quality">描画品質</label><small>低品質は電池と処理負荷をおさえます</small></div><select id="setting-quality"><option value="auto">自動</option><option value="high">高品質</option><option value="low">低品質</option></select></div><div class="settings-row"><div><label for="setting-vibration">ダメージ時の振動</label><small>対応する端末のみ</small></div><input id="setting-vibration" type="checkbox" ${settings.vibration ? 'checked' : ''}></div><p class="settings-note">設定はこの端末に保存されます。画面を離れると自動で一時停止します。端末の「視差効果を減らす」を有効にすると、画面の揺れやフラッシュを抑えます。</p>`;
     $('#setting-quality').value = settings.quality;
     $('#setting-sound').addEventListener('change', e => setSound(e.target.checked));
     $('#setting-music').addEventListener('input', e => { settings.music = e.target.value / 100; audio.musicVolume = settings.music; audio.applyVolumes(); save(SETTINGS_KEY, settings); });
+    $('#setting-voice').addEventListener('input', e => { settings.voice = e.target.value / 100; audio.voiceVolume = settings.voice; audio.applyVolumes(); save(SETTINGS_KEY, settings); });
+    $('#setting-subtitles').addEventListener('change', e => { settings.subtitles = e.target.checked; save(SETTINGS_KEY, settings); if (!settings.subtitles) $('#subtitle').hidden = true; });
     $('#setting-sfx').addEventListener('input', e => { settings.sfx = e.target.value / 100; audio.sfxVolume = settings.sfx; audio.applyVolumes(); save(SETTINGS_KEY, settings); });
     $('#setting-quality').addEventListener('change', e => { settings.quality = e.target.value; renderer.setQuality(settings.quality); save(SETTINGS_KEY, settings); });
     $('#setting-vibration').addEventListener('change', e => { settings.vibration = e.target.checked; save(SETTINGS_KEY, settings); });
@@ -482,7 +512,7 @@ if ('serviceWorker' in navigator) {
 }
 $('#update-button').addEventListener('click', () => { if (hasUnfinishedRun()) { game.pause(); transition(); toast('結果画面で更新してください。'); return; } if (pendingReload) location.reload(); else waitingSW?.postMessage({ type: 'SKIP_WAITING' }); });
 if (profile.stats.runs === 0) { mode = 'patrol'; $$('[data-mode]').forEach(x => { x.classList.toggle('selected', x.dataset.mode === 'patrol'); x.setAttribute('aria-pressed', String(x.dataset.mode === 'patrol')); }); $('#mode-title').textContent = MODES.patrol.name; $('#mode-description').textContent = MODES.patrol.description + '（はじめての方におすすめ）'; }
-document.body.classList.toggle('large-text', settings.largeText); applyRenderOptions();
+document.body.classList.toggle('large-text', settings.largeText); applyRenderOptions(); void audio.loadVoiceIndex();
 syncSound(); updateBest(); updateHome(); connection(); requestAnimationFrame(frame);
 // Live module bindings are available to development tools without global hooks.
 export { game, renderer, audio, settings, records, combo, profile, updateHome };
