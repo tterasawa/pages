@@ -1,6 +1,6 @@
 // Persistent progression: the workshop (permanent upgrades), achievements, star rewards,
 // heat unlocks and the daily challenge. Pure functions over a plain profile object.
-import { MODES, HEATS, MUTATORS, META_DEFAULT } from './core.js';
+import { MODES, HEATS, MUTATORS, META_DEFAULT, CHARACTERS } from './core.js';
 
 export const SHOP = Object.freeze([
   { id: 'hp', name: 'がんじょう', icon: 'heart', color: 'var(--coral)', max: 5, base: 72, step: 54, effect: r => `最大HP +${r * 10}` },
@@ -40,10 +40,27 @@ export const ACHIEVEMENTS = Object.freeze([
   { id: 'daily', name: '今日のチャレンジャー', desc: 'デイリーチャレンジをクリア', reward: 100, test: (r) => r.won && r.daily },
   { id: 'streak-3', name: '三日坊主じゃない', desc: 'デイリーを3日連続でプレイ', reward: 120, test: (r, p) => p.dailyStreak >= 3 },
   { id: 'veteran', name: 'ベテラン', desc: '通算10,000体撃破', reward: 150, test: (r, p) => p.stats.kills >= 10000 },
+  { id: 'endless-10', name: '終わらない夜', desc: 'エンドレスで10分生き残る', reward: 150, test: (r) => r.mode === 'endless' && r.time >= 600 },
+  { id: 'endless-20', name: '夜の住人', desc: 'エンドレスで20分生き残る', reward: 300, test: (r) => r.mode === 'endless' && r.time >= 1200 },
+  { id: 'specials-5', name: 'おたからハンター', desc: '1回の出撃で特殊アイテムを5個拾う', reward: 60, test: (r) => r.specials >= 5 },
+  { id: 'all-chars', name: 'みんなで夜明け', desc: '4人すべてのキャラクターでクリア', reward: 300, test: (r, p) => Object.keys(CHARACTERS).every(id => p.charClears[id]) },
   { id: 'workshop', name: '工房マスター', desc: '工房の強化をすべて最大にする', reward: 300, test: (r, p) => SHOP.every(i => (p.meta[i.id] || 0) >= i.max) }
 ]);
 
-export function emptyProfile() { return { stars: 0, earned: 0, meta: { ...META_DEFAULT }, achievements: {}, heatUnlocked: 0, stats: { runs: 0, wins: 0, kills: 0, chests: 0, evolves: 0 }, daily: {}, dailyStreak: 0, lastDaily: '' }; }
+// New weapons and characters unlock through achievements.
+export const UNLOCKS = Object.freeze([
+  { kind: 'weapon', id: 'boomer', achievement: 'first-clear', label: 'ブーメラン星' },
+  { kind: 'weapon', id: 'laser', achievement: 'evolve-1', label: 'プリズム光線' },
+  { kind: 'weapon', id: 'mine', achievement: 'kills-500', label: '花火地雷' },
+  { kind: 'weapon', id: 'rain', achievement: 'clear-guard', label: '星降りの夜' },
+  { kind: 'character', id: 'runner', achievement: 'clear-patrol', label: 'ソラ' },
+  { kind: 'character', id: 'knight', achievement: 'elite-5', label: 'ガンテツ' },
+  { kind: 'character', id: 'witch', achievement: 'combo-100', label: 'ミント' }
+]);
+export const isUnlocked = (profile, u) => !!profile.achievements[u.achievement];
+export function lockedWeapons(profile) { return UNLOCKS.filter(u => u.kind === 'weapon' && !isUnlocked(profile, u)).map(u => u.id); }
+export function characterUnlocked(profile, id) { const u = UNLOCKS.find(x => x.kind === 'character' && x.id === id); return !u || isUnlocked(profile, u); }
+export function emptyProfile() { return { stars: 0, earned: 0, meta: { ...META_DEFAULT }, achievements: {}, heatUnlocked: 0, stats: { runs: 0, wins: 0, kills: 0, chests: 0, evolves: 0 }, daily: {}, dailyStreak: 0, lastDaily: '', charClears: {}, endlessBest: 0, character: 'keeper' }; }
 const int = (v, min = 0, max = 1e9) => Number.isFinite(v) ? Math.max(min, Math.min(max, Math.floor(v))) : min;
 export function sanitizeProfile(raw) {
   const p = emptyProfile(); if (!raw || typeof raw !== 'object') return p;
@@ -51,6 +68,8 @@ export function sanitizeProfile(raw) {
   for (const item of SHOP) p.meta[item.id] = int(raw.meta?.[item.id], 0, item.max);
   for (const a of ACHIEVEMENTS) if (Number.isFinite(raw.achievements?.[a.id])) p.achievements[a.id] = raw.achievements[a.id];
   for (const k of Object.keys(p.stats)) p.stats[k] = int(raw.stats?.[k]);
+  for (const id of Object.keys(CHARACTERS)) if (raw.charClears?.[id] === true) p.charClears[id] = true;
+  p.endlessBest = Number.isFinite(raw.endlessBest) ? Math.max(0, raw.endlessBest) : 0; p.character = CHARACTERS[raw.character] ? raw.character : 'keeper';
   if (raw.daily && typeof raw.daily === 'object') for (const [d, v] of Object.entries(raw.daily).slice(-60)) if (/^\d{4}-\d{2}-\d{2}$/.test(d) && v && typeof v === 'object') p.daily[d] = { best: Number.isFinite(v.best) ? Math.max(0, v.best) : 0, won: v.won === true, kills: int(v.kills) };
   return p;
 }
@@ -64,7 +83,7 @@ export function heatMultiplier(heat) { return 1 + heat * .25; }
 export function starsForRun(r) {
   const minutes = r.time / 60, lines = [
     ['生存', Math.round(minutes * 8)], ['撃破', Math.round(r.kills / 25)], ['レベル', r.level * 2], ['エリート', r.elites * 6], ['夜の主', r.bossKills * 25], ['宝箱', r.chests * 4],
-    ['クリア', r.won ? { patrol: 40, guard: 80, eclipse: 120 }[r.mode] || 60 : 0], ['デイリー', r.daily && r.won ? 50 : 0]
+    ['クリア', r.won ? { patrol: 40, guard: 80, eclipse: 120 }[r.mode] || 60 : 0], ['デイリー', r.daily && r.won ? 50 : 0], ['耐久', r.mode === 'endless' ? Math.round(Math.max(0, minutes - 6) * 6) : 0], ['特殊', (r.specials || 0) * 3]
   ].filter(([, v]) => v > 0);
   const base = lines.reduce((s, [, v]) => s + v, 0), mult = heatMultiplier(r.heat || 0), total = Math.round(base * mult);
   return { lines, base, mult, total };
@@ -73,6 +92,8 @@ export function starsForRun(r) {
 export function recordRun(profile, r, today = localDate()) {
   const stars = starsForRun(r); profile.stars += stars.total; profile.earned += stars.total;
   profile.stats.runs++; if (r.won) profile.stats.wins++; profile.stats.kills += r.kills; profile.stats.chests += r.chests; profile.stats.evolves += r.evolves;
+  if (r.won && r.character) profile.charClears[r.character] = true; if (r.mode === 'endless') profile.endlessBest = Math.max(profile.endlessBest, r.time);
+  const before = new Set(Object.keys(profile.achievements));
   let heatUnlocked = null; if (r.won && !r.daily && r.heat >= profile.heatUnlocked && profile.heatUnlocked < HEATS.length - 1) { profile.heatUnlocked = r.heat + 1; heatUnlocked = profile.heatUnlocked; }
   if (r.daily) {
     const prev = profile.daily[today] || { best: 0, won: false, kills: 0 }; profile.daily[today] = { best: Math.max(prev.best, r.time), won: prev.won || r.won, kills: Math.max(prev.kills, r.kills) };
@@ -81,7 +102,8 @@ export function recordRun(profile, r, today = localDate()) {
   const unlocked = [];
   for (const a of ACHIEVEMENTS) if (!profile.achievements[a.id] && a.test(r, profile)) { profile.achievements[a.id] = Date.now(); profile.stars += a.reward; profile.earned += a.reward; unlocked.push(a); }
   // Buying can complete the workshop achievement later; checkProfileAchievements handles that path.
-  return { stars, unlocked, heatUnlocked };
+  const newlyUnlocked = UNLOCKS.filter(u => !before.has(u.achievement) && profile.achievements[u.achievement]);
+  return { stars, unlocked, heatUnlocked, newlyUnlocked };
 }
 export function checkProfileAchievements(profile) { const unlocked = []; for (const a of ACHIEVEMENTS) if (!profile.achievements[a.id] && ['workshop', 'veteran'].includes(a.id) && a.test({}, profile)) { profile.achievements[a.id] = Date.now(); profile.stars += a.reward; unlocked.push(a); } return unlocked; }
 

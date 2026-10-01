@@ -1,7 +1,7 @@
 /* Bump VERSION for every published release, including MP3/config replacements. */
 const BASE=new URL('./',self.location.href);
 const PREFIX='last-light-pop-'+encodeURIComponent(BASE.pathname)+'-';
-const VERSION=PREFIX+'2.1.0';
+const VERSION=PREFIX+'2.2.0';
 const AUDIO_FETCH_TIMEOUT=30_000;
 const ASSETS=['./','./index.html','./style.css','./src/main.js','./src/core.js','./src/render.js','./src/audio.js','./src/ending.js','./src/hype.js','./src/meta.js','./manifest.webmanifest','./assets/audio-config.json','./assets/icon.svg','./assets/icon-192.png','./assets/icon-512.png','./assets/icon-maskable.png'];
 self.addEventListener('install',event=>event.waitUntil((async()=>{

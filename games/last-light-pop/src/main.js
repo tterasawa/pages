@@ -1,5 +1,5 @@
-import { Game, MODES, UPGRADES, HEATS, MUTATORS, EVOLVE_PAIRS, formatTime } from './core.js';
-import { SHOP, shopCost, ACHIEVEMENTS, sanitizeProfile, buy, refundAll, recordRun, checkProfileAchievements, dailyConfig, describeDaily, heatMultiplier, localDate } from './meta.js';
+import { Game, MODES, UPGRADES, HEATS, MUTATORS, EVOLVE_PAIRS, SLOT_LIMIT, CHARACTERS, EVENTS, formatTime } from './core.js';
+import { SHOP, shopCost, ACHIEVEMENTS, sanitizeProfile, buy, refundAll, recordRun, checkProfileAchievements, UNLOCKS, lockedWeapons, characterUnlocked, dailyConfig, describeDaily, heatMultiplier, localDate } from './meta.js';
 import { Renderer } from './render.js';
 import { AudioEngine, MUSIC_BPM } from './audio.js';
 import { EndingSequence } from './ending.js';
@@ -10,7 +10,7 @@ const icon = (name, cls = '') => `<svg class="${cls}" aria-hidden="true"><use hr
 const SETTINGS_KEY = 'lastlight-pop-settings-v1', RECORDS_KEY = 'lastlight-pop-records-v1', PROFILE_KEY = 'lastlight-pop-profile-v1';
 const DEFAULT_SETTINGS = { sound: true, music: 0.42, sfx: 0.6, quality: 'auto', vibration: true, heat: 0 };
 const EMPTY_RECORDS = { runs: 0, wins: 0, totalKills: 0, bestKills: 0, bestTime: 0, bestCombo: 0, modes: {} };
-export const POP_COLORS = Object.freeze({ bolt: 'var(--yellow)', orbit: 'var(--sky)', arc: 'var(--orange)', frost: '#9be7ff', drone: 'var(--pink)', nova: 'var(--coral)', power: 'var(--purple)', haste: 'var(--mint)', magnet: 'var(--teal)', vital: 'var(--pink)', regen: 'var(--mint)' });
+export const POP_COLORS = Object.freeze({ boomer: 'var(--yellow)', laser: 'var(--sky)', mine: 'var(--coral)', rain: 'var(--purple)', crit: 'var(--mint)', tempo: 'var(--orange)', pulse: 'var(--lemon)', bomb: 'var(--ink-soft)', other: '#cfc6ea', bolt: 'var(--yellow)', orbit: 'var(--sky)', arc: 'var(--orange)', frost: '#9be7ff', drone: 'var(--pink)', nova: 'var(--coral)', power: 'var(--purple)', haste: 'var(--mint)', magnet: 'var(--teal)', vital: 'var(--pink)', regen: 'var(--mint)' });
 function read(key, fallback) { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } }
 function save(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); return true; } catch { return false; } }
 function number(v, fallback, min, max) { return typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback; }
@@ -42,7 +42,7 @@ function primeAudio() { if (audioPrimed || !settings.sound) return; audioPrimed 
 function start(opts = {}) {
   const daily = !!opts.daily;
   if (daily) { const cfg = dailyConfig(); runInfo = { daily: true, heat: cfg.heat, mutators: cfg.mutators, day: cfg.day }; game = new Game(cfg.mode, cfg.seed, { heat: cfg.heat, mutators: cfg.mutators }); }
-  else { runInfo = { daily: false, heat: settings.heat, mutators: [], day: '' }; game = new Game(mode, Date.now(), { heat: settings.heat, meta: profile.meta }); }
+  else { runInfo = { daily: false, heat: settings.heat, mutators: [], day: '' }; game = new Game(mode, Date.now(), { heat: settings.heat, meta: profile.meta, character: characterUnlocked(profile, profile.character) ? profile.character : 'keeper', locked: lockedWeapons(profile) }); }
   ending = null; endingResultShown = false; runResult = null; clearInput(); game.start(); combo.reset(); resultSaved = false; lastArsenal = ''; lastKills = 0; lastLevel = 1; slowmo = 0; choosing = false;
   prevState = ''; accumulator = 0; document.body.classList.add('playing'); renderer.camera.x = game.player.x; renderer.camera.y = game.player.y; renderer.resize();
   audioPrimed = true; audio.setScene('play'); void audio.unlock(); audio.setActive(true);
@@ -88,7 +88,7 @@ function renderUpgrades(flip = false) {
     return `<button class="upgrade-card ${evolved ? 'evolve' : ''}" data-upgrade="${u.id}" style="--c:${POP_COLORS[u.id] || 'var(--yellow)'}" aria-label="${u.name}を${banishMode ? '除外' : '選択'}"><div class="upgrade-top"><span>${evolved ? '★ EVOLUTION ★' : lv === 0 ? 'NEW ' + u.tag : u.tag}</span><kbd>${i + 1}</kbd></div><div class="upgrade-icon">${icon(u.icon)}</div><h3>${u.name}${evolved ? '・極' : ''}</h3><p>${desc}</p>${evolveHint(u)}<span class="upgrade-level">${lv === 0 ? 'GET!' : `LV. ${lv} → ${lv + 1}`}<span class="pips">${pips}</span></span></button>`;
   }).join('');
   $('#reroll-count').textContent = game.rerolls; $('#banish-count').textContent = game.banishes; $('#reroll-button').disabled = game.rerolls <= 0; $('#banish-button').disabled = game.banishes <= 0 && !banishMode;
-  $('#banish-button').setAttribute('aria-pressed', String(banishMode)); $('#upgrade-footnote').textContent = banishMode ? '除外するカードを選んでください（この出撃では二度と出ません）・ X でキャンセル' : '時間は停止中 ・ 数字キー 1 / 2 / 3 でも選べます';
+  $('#banish-button').setAttribute('aria-pressed', String(banishMode)); $('#upgrade-footnote').textContent = banishMode ? '除外するカードを選んでください（この出撃では二度と出ません）・ X でキャンセル' : `武器 ${game.owned('WEAPON')}/${SLOT_LIMIT.WEAPON} ・ 支援 ${game.owned('SUPPORT')}/${SLOT_LIMIT.SUPPORT} ・ 数字キー 1 / 2 / 3 でも選べます`;
 }
 function choose(id) {
   if (!game || game.state !== 'upgrade' || choosing || !game.choices.some(c => c.id === id)) return;
@@ -135,7 +135,7 @@ function finishChest() {
   $('#chest-claim').hidden = false; $('#chest-claim').focus({ preventScroll: true });
 }
 function claimChest() { if (!chestDone || game?.state !== 'chest') return; game.claimChest(); accumulator = 0; prevState = ''; transition(); updateHUD(); }
-function runSummary(won) { const st = game.stats; return { mode: game.mode, won, time: game.time, kills: game.kills, level: game.level, heat: runInfo.heat, combo: combo.best, evolves: st.evolves, jackpots: st.jackpots, elites: st.elites, bossKills: st.bossKills, bossHits: st.bossHits, chests: st.chests, daily: runInfo.daily }; }
+function runSummary(won) { const st = game.stats; return { mode: game.mode, won, time: game.time, kills: game.kills, level: game.level, heat: runInfo.heat, combo: combo.best, evolves: st.evolves, jackpots: st.jackpots, elites: st.elites, bossKills: st.bossKills, bossHits: st.bossHits, chests: st.chests, daily: runInfo.daily, specials: st.specials, character: game.character }; }
 function finalizeRun(won) { if (!game || resultSaved) return runResult; const best = storeResult(won); runResult = { best, ...recordRun(profile, runSummary(won), runInfo.day || localDate()) }; saveProfile(); updateStars(true); return runResult; }
 function storeResult(won) {
   if (!game || resultSaved) return false; resultSaved = true;
@@ -154,8 +154,13 @@ function renderResult() {
   $('#new-record').hidden = !best;
   $('#star-total').dataset.target = res.stars.total; $('#star-total').textContent = '0'; $('#star-mult').textContent = res.stars.mult > 1 ? `ヒート ×${res.stars.mult.toFixed(2)}` : '';
   $('#star-lines').innerHTML = res.stars.lines.map(([k, v]) => `<li>${k} <b>+${v}</b></li>`).join('');
-  $('#result-unlocks').innerHTML = (res.heatUnlocked ? `<div class="unlock heat">${icon('flame')}ヒート${res.heatUnlocked}「${HEATS[res.heatUnlocked].name}」が解放された！<small>★×${heatMultiplier(res.heatUnlocked).toFixed(2)}</small></div>` : '') + res.unlocked.map(a => `<div class="unlock">${icon('medal')}実績「${a.name}」達成！<small>★ +${a.reward}</small></div>`).join('');
-  if (res.unlocked.length) setTimeout(() => audio.effect('achieve'), 1400);
+  const names = { pulse: 'パルス', bomb: '爆弾', other: 'その他' }, totalDmg = Object.values(game.damageBy).reduce((a, b) => a + b, 0) || 1;
+  const rows = Object.entries(game.damageBy).filter(([k, v]) => v > 0 && k !== 'other').sort((a, b) => b[1] - a[1]).slice(0, 6);
+  $('#damage-board').innerHTML = rows.length ? `<h4><span>ダメージ内訳</span><span>DPS ${Math.round(totalDmg / Math.max(1, game.time)).toLocaleString()}</span></h4>` + rows.map(([id, v]) => { const u = UPGRADES.find(x => x.id === id); return `<div class="dmg-row" style="--c:${POP_COLORS[id] || 'var(--lemon)'}">${icon(u ? u.icon : id === 'pulse' ? 'nova' : id === 'bomb' ? 'mine' : 'light')}<span>${u ? u.name : names[id] || id}</span><div class="dmg-bar"><i data-w="${(v / rows[0][1] * 100).toFixed(1)}"></i></div><b>${Math.round(v / totalDmg * 100)}%<small> · ${(game.killsBy[id] || 0).toLocaleString()}体</small></b></div>`; }).join('') : '';
+  setTimeout(() => $$('.dmg-bar i').forEach(i => i.style.width = i.dataset.w + '%'), 600);
+  if (game.endless) { $('#result-title').textContent = `${formatTime(game.time)} 生き残った！`; $('#result-eyebrow').textContent = 'ENDLESS NIGHT'; $('#result-copy').textContent = `自己ベスト ${formatTime(profile.endlessBest)}`; }
+  $('#result-unlocks').innerHTML = res.newlyUnlocked.map(u => `<div class="unlock new">${icon(u.kind === 'weapon' ? UPGRADES.find(x => x.id === u.id).icon : 'user')}${u.kind === 'weapon' ? '新しい武器' : '新キャラクター'}「${u.label}」が解放された！<small>NEW!</small></div>`).join('') + (res.heatUnlocked ? `<div class="unlock heat">${icon('flame')}ヒート${res.heatUnlocked}「${HEATS[res.heatUnlocked].name}」が解放された！<small>★×${heatMultiplier(res.heatUnlocked).toFixed(2)}</small></div>` : '') + res.unlocked.map(a => `<div class="unlock">${icon('medal')}実績「${a.name}」達成！<small>★ +${a.reward}</small></div>`).join('');
+  if (res.unlocked.length) setTimeout(() => audio.effect('achieve'), 1400); if (res.newlyUnlocked.length) setTimeout(() => audio.effect('unlock'), 2000);
   $('#result-build').innerHTML = UPGRADES.filter(u => u.tag === 'WEAPON' && game.levels[u.id] > 0).map(u => `<span style="--c:${POP_COLORS[u.id]}" title="${u.name}">${icon(u.icon)} ${game.levels[u.id] === 5 ? '★MAX' : 'Lv' + game.levels[u.id]}</span>`).join('');
 }
 function countUp() {
@@ -174,8 +179,11 @@ function updateHome() {
   $('#daily-summary').textContent = `${d.mode}・${d.mutators.map(m => m.name).join('＋')}${cfg.heat ? `・ヒート${cfg.heat}` : ''}`;
   const badge = $('#daily-badge'); badge.textContent = rec?.won ? 'CLEAR' : rec ? formatTime(rec.best) : 'NEW'; badge.className = rec?.won ? 'done' : '';
   $('#achieve-count').textContent = `${Object.keys(profile.achievements).length}/${ACHIEVEMENTS.length}`;
+  updateCharacter();
   $('#shop-badge').hidden = !SHOP.some(i => profile.stars >= shopCost(i, profile.meta[i.id] || 0));
 }
+function charImage(id) { try { return renderer.sprites['player_' + id].image.toDataURL(); } catch { return ''; } }
+function updateCharacter() { const id = characterUnlocked(profile, profile.character) ? profile.character : 'keeper', c = CHARACTERS[id]; $('#char-img').src = charImage(id); $('#char-name').textContent = `${c.name}・${c.title}`; $('#char-perk').textContent = c.perk; }
 function setHeat(delta) { const next = Math.max(0, Math.min(profile.heatUnlocked, settings.heat + delta)); if (next === settings.heat) return; settings.heat = next; save(SETTINGS_KEY, settings); audio.effect(delta > 0 ? 'elite' : 'ui'); updateHome(); }
 function achievementToast(list) { list.forEach((a, i) => setTimeout(() => { const el = document.createElement('div'); el.className = 'ach-toast'; el.innerHTML = `${icon('medal')}<div>実績「${a.name}」達成！<small>★ +${a.reward}</small></div>`; document.body.append(el); audio.effect('achieve'); setTimeout(() => el.remove(), 3300); }, i * 900)); }
 function updateBest() { $('#home-best').textContent = records.bestTime ? formatTime(records.bestTime) : '--:--'; $('#home-combo').textContent = records.bestCombo.toLocaleString(); }
@@ -185,17 +193,19 @@ function updateHUD() {
   $('#hp-text').textContent = `${Math.ceil(p.hp)} / ${p.maxHP}`; $('#hp-bar').style.width = `${p.hp / p.maxHP * 100}%`; $('.health-track').classList.toggle('danger', p.hp < p.maxHP * .3);
   $('#level-text').textContent = `LV. ${String(game.level).padStart(2, '0')}`; if (game.level !== lastLevel) { lastLevel = game.level; const b = $('#level-text'); b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
   $('#xp-bar').style.width = `${Math.min(100, game.xp / game.xpNext * 100)}%`; $('#time-text').textContent = formatTime(game.time);
-  const overtime = game.time >= game.duration && !game.finalKilled; $('#time-target').textContent = overtime ? '夜の主をたおせ！' : '/ ' + formatTime(game.duration); $('#time-target').classList.toggle('alert', overtime);
+  const overtime = !game.endless && game.time >= game.duration && !game.finalKilled; $('#time-target').textContent = game.endless ? `∞ BEST ${formatTime(profile.endlessBest)}` : overtime ? '夜の主をたおせ！' : '/ ' + formatTime(game.duration);
+  $('#status-chips').innerHTML = (game.freeze > 0 ? `<span class="freeze">FREEZE ${Math.ceil(game.freeze)}</span>` : '') + (game.starPower > 0 ? `<span class="star">★ STAR ${Math.ceil(game.starPower)}</span>` : '') + (game.eventKind === 'meteor' && game.eventTimer > 0 ? `<span class="event">流星群 ${Math.ceil(game.eventTimer)}</span>` : ''); $('#time-target').classList.toggle('alert', overtime);
   $('#kills-text').textContent = game.kills.toLocaleString(); $('#movement-hint').hidden = game.time > 7;
   for (const [key, cd, max] of [['dash', p.dashCD, 3 * (1 - game.levels.haste * .08)], ['pulse', p.pulseCD, 18]]) {
     const btn = $(`#${key}-button`), label = $(`#${key}-cooldown`), ready = cd <= 0;
     label.textContent = ready ? '' : Math.ceil(cd); label.style.setProperty('--cd', Math.max(0, Math.min(1, cd / max))); btn.disabled = !ready || game.state !== 'running';
     if (ready && !cooldownReady[key]) { btn.classList.remove('ready'); void btn.offsetWidth; btn.classList.add('ready'); } cooldownReady[key] = ready;
   }
-  const signature = UPGRADES.filter(u => u.tag === 'WEAPON').map(u => game.levels[u.id]).join(',');
+  const signature = UPGRADES.map(u => game.levels[u.id]).join(',');
   if (signature !== lastArsenal) {
-    const before = lastArsenal.split(','); lastArsenal = signature; const equipped = UPGRADES.filter(u => u.tag === 'WEAPON' && game.levels[u.id] > 0), weapons = UPGRADES.filter(u => u.tag === 'WEAPON');
-    $('#arsenal-slots').innerHTML = equipped.map(u => { const i = weapons.indexOf(u), fresh = before.length > 1 && Number(before[i]) !== game.levels[u.id]; return `<div class="weapon-slot ${game.levels[u.id] === 5 ? 'evolved' : ''} ${fresh ? 'fresh' : ''}" style="--c:${POP_COLORS[u.id]}" title="${u.name} Lv.${game.levels[u.id]}">${icon(u.icon)}<small>${game.levels[u.id] === 5 ? 'MAX' : 'Lv' + game.levels[u.id]}</small></div>`; }).join('') + '<div class="weapon-slot empty"></div>'.repeat(6 - equipped.length);
+    const before = lastArsenal.split(','); lastArsenal = signature; const equipped = UPGRADES.filter(u => u.tag === 'WEAPON' && game.levels[u.id] > 0), weapons = UPGRADES;
+    $('#arsenal-slots').innerHTML = equipped.map(u => { const i = weapons.indexOf(u), fresh = before.length > 1 && Number(before[i]) !== game.levels[u.id]; return `<div class="weapon-slot ${game.levels[u.id] === 5 ? 'evolved' : ''} ${fresh ? 'fresh' : ''}" style="--c:${POP_COLORS[u.id]}" title="${u.name} Lv.${game.levels[u.id]}">${icon(u.icon)}<small>${game.levels[u.id] === 5 ? 'MAX' : 'Lv' + game.levels[u.id]}</small></div>`; }).join('') + '<div class="weapon-slot empty"></div>'.repeat(Math.max(0, SLOT_LIMIT.WEAPON - equipped.length));
+    const supports = UPGRADES.filter(u => u.tag === 'SUPPORT' && game.levels[u.id] > 0); $('#support-slots').innerHTML = supports.map(u => `<div class="weapon-slot" style="--c:${POP_COLORS[u.id]}" title="${u.name} Lv.${game.levels[u.id]}">${icon(u.icon)}<small>${game.levels[u.id]}</small></div>`).join('') + '<div class="weapon-slot empty"></div>'.repeat(Math.max(0, SLOT_LIMIT.SUPPORT - supports.length));
   }
   const boss = game.boss; $('#boss-panel').hidden = !boss?.alive;
   if (boss?.alive) { $('#boss-name').textContent = boss.final ? '夜の主 — 終夜' : '夜の主 — 先触れ'; $('#boss-hp').textContent = `${Math.ceil(boss.hp).toLocaleString()} / ${Math.ceil(boss.maxHP).toLocaleString()}`; $('#boss-bar').style.width = `${boss.hp / boss.maxHP * 100}%`; }
@@ -215,8 +225,12 @@ function processEvents(g, muted = false) {
   const terminal = g.events.some(e => e.type === 'won' || e.type === 'dead'); if (terminal && !muted) audio.setScene('ending');
   for (const e of g.events) {
     if (muted || terminal && !['won', 'dead'].includes(e.type)) continue;
-    if (e.type !== 'kill' && e.type !== 'chest') audio.effect(e.type);
+    if (e.type !== 'kill' && e.type !== 'chest') audio.effect(e.type, e);
     if (e.type === 'elite') announce('エリート出現！宝箱を持ってるぞ！', 'combo-call');
+    if (e.type === 'event') { warning({ siege: 'モンスターに包囲された！', stampede: '大暴走が迫ってくる！', meteor: '流星群が降ってくる！赤い円を避けろ！' }[e.kind]); $('#warning-banner strong').textContent = EVENTS[e.kind].length > 2 ? EVENTS[e.kind] + '!!' : EVENTS[e.kind] + '！！'; }
+    if (e.type === 'boss') $('#warning-banner strong').textContent = 'WARNING!!';
+    if (e.type === 'bossPhase') announce(e.phase >= 3 ? '夜の主が本気になった！赤い円に注意！' : '夜の主が怒った！手下を呼んだぞ！', 'danger');
+    if (e.type === 'special') announce({ magnet: 'ぜんぶ吸い寄せ！', bomb: 'ドカーン！画面の敵を一掃！', freeze: '時間よ止まれ！', star: 'スターパワー！無敵＆パワーアップ！' }[e.kind], 'evolve');
     if (e.type === 'revive') { announce('もういっかい！復活！！', 'evolve'); slowmo = renderer.reduced ? 0 : .8; }
     if (e.type === 'boss') { warning(e.final ? '夜の主が現れた — 最後の灯火を守れ！' : '夜の主が接近中！'); renderer.celebrate('boss', g); }
     if (e.type === 'bossDown') { announce('夜の主をたおした！', 'evolve'); slowmo = renderer.reduced ? 0 : .9; }
@@ -257,7 +271,7 @@ $('#stage').tabIndex = -1;
 $('#ending-skip').addEventListener('click', skipEnding);
 $('#start-button').addEventListener('click', () => start());
 $('#heat-down').addEventListener('click', () => setHeat(-1)); $('#heat-up').addEventListener('click', () => setHeat(1));
-$('#daily-button').addEventListener('click', () => openDialog('daily'));
+$('#daily-button').addEventListener('click', () => openDialog('daily')); $('#char-button').addEventListener('click', () => openDialog('characters'));
 $('#reroll-button').addEventListener('click', reroll); $('#banish-button').addEventListener('click', toggleBanish); $('#skip-button').addEventListener('click', skipUpgrade);
 $('#chest-claim').addEventListener('click', e => { e.stopPropagation(); claimChest(); }); $('#chest-screen').addEventListener('click', () => { if (!chestDone) finishChest(); }); $('#retry-button').addEventListener('click', () => start({ daily: runInfo.daily })); $('#result-home').addEventListener('click', home);
 $('#resume-button').addEventListener('click', () => { game?.resume(); accumulator = 0; transition(); });
@@ -301,7 +315,7 @@ function openDialog(type) {
   dialogReturn = document.activeElement; if (game?.state === 'running') { game.pause(); transition(); } clearInput(); const content = $('#dialog-content');
   if (type === 'help') {
     $('#dialog-kicker').textContent = 'HOW TO PLAY';
-    content.innerHTML = `<h2 id="dialog-title">灯火を守って、夜をこえろ！</h2><p>攻撃はぜんぶ自動。モンスターをかわしながらキラキラを集めてレベルアップ、武器を育てよう。制限時間を生きのびて、最後に現れる「夜の主」をたおせば作戦成功！</p><div class="control-row"><span>移動</span><span><kbd>W A S D</kbd> / <kbd>↑ ↓ ← →</kbd></span></div><div class="control-row"><span>スマートフォン</span><span>画面をドラッグ</span></div><div class="control-row"><span>ダッシュ（一瞬むてき）</span><span><kbd>SPACE</kbd> / 右下ボタン</span></div><div class="control-row"><span>パルス（周りを攻撃・キラキラ回収）</span><span><kbd>Q</kbd> / 右下ボタン</span></div><div class="control-row"><span>一時停止</span><span><kbd>P</kbd> / <kbd>ESC</kbd></span></div><div class="control-row"><span>強化をえらぶ</span><span><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> / タップ</span></div><h3>アイテムと敵の弾</h3><div class="legend"><span style="--c:var(--mint)"><i></i>キラキラ＝経験値</span><span style="--c:var(--yellow)"><i></i>星＝大きな経験値</span><span style="--c:var(--coral)"><i></i>ハート＝回復</span><span style="--c:var(--tomato)"><i></i>赤い玉＝敵の弾</span></div><h3>宝箱・工房・ヒート</h3><p>王冠をかぶったエリートや夜の主をたおすと宝箱が出現。開けると1〜5個の強化が当たります。出撃するとスターがたまり、工房で恒久強化を買えます。クリアするとヒート（難易度）が解放され、高ヒートほどスター倍率がアップ。毎日変わる「今日のチャレンジ」もあります。</p><h3>進化とカードの操作</h3><p>武器はLv.5で進化しますが、相棒の支援強化が必要です（カードに表示）。強化カードはリロール（R）・除外（X）・スキップ（S）できます。</p><h3>コンボでアガれ！</h3><p>途切れずにたおし続けるとコンボが伸びて、効果音もどんどん高くなります。武器はLv.5で進化。パルスはピンチの切り札！</p><h3>アプリとして遊ぶ</h3><p>対応ブラウザではインストールできます。iPhone / iPadはSafariの共有メニューから「ホーム画面に追加」。初回読み込み後はオフラインでも遊べます。</p>`;
+    content.innerHTML = `<h2 id="dialog-title">灯火を守って、夜をこえろ！</h2><p>攻撃はぜんぶ自動。モンスターをかわしながらキラキラを集めてレベルアップ、武器を育てよう。制限時間を生きのびて、最後に現れる「夜の主」をたおせば作戦成功！</p><div class="control-row"><span>移動</span><span><kbd>W A S D</kbd> / <kbd>↑ ↓ ← →</kbd></span></div><div class="control-row"><span>スマートフォン</span><span>画面をドラッグ</span></div><div class="control-row"><span>ダッシュ（一瞬むてき）</span><span><kbd>SPACE</kbd> / 右下ボタン</span></div><div class="control-row"><span>パルス（周りを攻撃・キラキラ回収）</span><span><kbd>Q</kbd> / 右下ボタン</span></div><div class="control-row"><span>一時停止</span><span><kbd>P</kbd> / <kbd>ESC</kbd></span></div><div class="control-row"><span>強化をえらぶ</span><span><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> / タップ</span></div><h3>アイテムと敵の弾</h3><div class="legend"><span style="--c:var(--mint)"><i></i>キラキラ＝経験値</span><span style="--c:var(--yellow)"><i></i>星＝大きな経験値</span><span style="--c:var(--coral)"><i></i>ハート＝回復</span><span style="--c:var(--tomato)"><i></i>赤い玉＝敵の弾</span></div><h3>武器は4つ、支援も4つまで</h3><p>持てる武器・支援はそれぞれ4つまで。何を育てるかが勝負の分かれ目。実績を達成すると新しい武器やキャラクターが解放されます。光る泡は特殊アイテム（全部吸い寄せ・画面一掃の爆弾・時間停止・無敵のスター）。赤い円は攻撃の予告なのですぐに離れて！</p><h3>宝箱・工房・ヒート</h3><p>王冠をかぶったエリートや夜の主をたおすと宝箱が出現。開けると1〜5個の強化が当たります。出撃するとスターがたまり、工房で恒久強化を買えます。クリアするとヒート（難易度）が解放され、高ヒートほどスター倍率がアップ。毎日変わる「今日のチャレンジ」もあります。</p><h3>進化とカードの操作</h3><p>武器はLv.5で進化しますが、相棒の支援強化が必要です（カードに表示）。強化カードはリロール（R）・除外（X）・スキップ（S）できます。</p><h3>コンボでアガれ！</h3><p>途切れずにたおし続けるとコンボが伸びて、効果音もどんどん高くなります。武器はLv.5で進化。パルスはピンチの切り札！</p><h3>アプリとして遊ぶ</h3><p>対応ブラウザではインストールできます。iPhone / iPadはSafariの共有メニューから「ホーム画面に追加」。初回読み込み後はオフラインでも遊べます。</p>`;
   } else if (type === 'settings') {
     $('#dialog-kicker').textContent = 'SETTINGS';
     content.innerHTML = `<h2 id="dialog-title">せってい</h2><div class="settings-row"><div><label for="setting-sound">サウンド</label><small>BGMと効果音</small></div><input id="setting-sound" type="checkbox" ${settings.sound ? 'checked' : ''}></div><div class="settings-row"><label for="setting-music">音楽</label><input id="setting-music" type="range" min="0" max="100" value="${Math.round(settings.music * 100)}"></div><div class="settings-row"><label for="setting-sfx">効果音</label><input id="setting-sfx" type="range" min="0" max="100" value="${Math.round(settings.sfx * 100)}"></div><div class="settings-row"><div><label for="setting-quality">描画品質</label><small>低品質は電池と処理負荷をおさえます</small></div><select id="setting-quality"><option value="auto">自動</option><option value="high">高品質</option><option value="low">低品質</option></select></div><div class="settings-row"><div><label for="setting-vibration">ダメージ時の振動</label><small>対応する端末のみ</small></div><input id="setting-vibration" type="checkbox" ${settings.vibration ? 'checked' : ''}></div><p class="settings-note">設定はこの端末に保存されます。画面を離れると自動で一時停止します。端末の「視差効果を減らす」を有効にすると、画面の揺れやフラッシュを抑えます。</p>`;
@@ -316,13 +330,17 @@ function openDialog(type) {
   } else if (type === 'achievements') {
     $('#dialog-kicker').textContent = 'ACHIEVEMENTS'; const done = Object.keys(profile.achievements).length;
     content.innerHTML = `<h2 id="dialog-title">実績 ${done} / ${ACHIEVEMENTS.length}</h2><div class="achieve-progress"><i style="width:${done / ACHIEVEMENTS.length * 100}%"></i></div><div class="achievement-list">${ACHIEVEMENTS.map(a => `<div class="achievement ${profile.achievements[a.id] ? 'done' : ''}">${icon('medal')}<div><strong>${a.name}</strong><span>${a.desc}</span></div><em>${profile.achievements[a.id] ? '達成！' : '★ ' + a.reward}</em></div>`).join('')}</div><p class="record-note">達成するとスターがもらえます。スターは工房で使えます。</p>`;
+  } else if (type === 'characters') {
+    $('#dialog-kicker').textContent = 'CHARACTERS';
+    content.innerHTML = `<h2 id="dialog-title">だれで出撃する？</h2><div class="char-grid">${Object.entries(CHARACTERS).map(([id, c]) => { const open = characterUnlocked(profile, id), u = UNLOCKS.find(x => x.id === id), a = u && ACHIEVEMENTS.find(x => x.id === u.achievement); const start = UPGRADES.find(x => x.id === c.start); return `<button class="char-card ${profile.character === id ? 'selected' : ''}" data-char="${id}" ${open ? '' : 'disabled'}><img src="${charImage(id)}" alt=""><strong>${c.name}</strong><small>${c.title}</small><p>${c.perk.split('・')[0]}<br>初期武器：${start.name}</p>${open ? (profile.charClears[id] ? '<span class="clear">★ CLEAR</span>' : '') : `<span class="lock">実績「${a.name}」で解放</span>`}</button>`; }).join('')}</div><p class="record-note">新しい武器も実績で解放されます：${UNLOCKS.filter(u => u.kind === 'weapon').map(u => `${u.label}${characterUnlocked(profile, 'keeper') && profile.achievements[u.achievement] ? '✓' : '（' + ACHIEVEMENTS.find(a => a.id === u.achievement).name + '）'}`).join('・')}</p>`;
+    content.querySelectorAll('[data-char]').forEach(b => b.addEventListener('click', () => { profile.character = b.dataset.char; saveProfile(); audio.effect('choose'); updateHome(); $('#app-dialog').close(); }));
   } else if (type === 'daily') {
     const cfg = dailyConfig(), d = describeDaily(cfg), rec = profile.daily[cfg.day]; $('#dialog-kicker').textContent = 'DAILY CHALLENGE';
     content.innerHTML = `<h2 id="dialog-title">今日のチャレンジ（${cfg.day.replace(/-/g, '/')}）</h2><p>今日だけの特別ルール。同じ日なら誰でも同じ夜になります。工房の強化は無効、腕だけが頼り！クリアでスター +50 のボーナス。</p><div class="daily-detail"><div><span>作戦</span><strong>${d.mode}</strong></div><div><span>ヒート</span><strong>${cfg.heat}・${d.heat.name}</strong></div>${d.mutators.map(m => `<div class="mutator"><strong>${m.name}</strong><small>${m.rule}</small></div>`).join('')}<div><span>今日のベスト</span><strong>${rec ? formatTime(rec.best) + (rec.won ? ' ★CLEAR' : '') : '--:--'}</strong></div><div><span>連続プレイ</span><strong>${profile.dailyStreak} 日</strong></div></div><button class="primary-button" id="daily-start">チャレンジ開始 <svg><use href="#i-arrow"/></svg></button>`;
     $('#daily-start').addEventListener('click', () => { $('#app-dialog').close(); start({ daily: true }); });
   } else {
     $('#dialog-kicker').textContent = 'RECORDS';
-    content.innerHTML = `<h2 id="dialog-title">これまでの記録</h2><div class="record-grid"><div class="record-tile"><small>最長生存</small><strong>${formatTime(records.bestTime)}</strong></div><div class="record-tile"><small>最多撃破</small><strong>${records.bestKills.toLocaleString()}</strong></div><div class="record-tile"><small>最大コンボ</small><strong>${records.bestCombo.toLocaleString()}</strong></div><div class="record-tile"><small>出撃 / 成功</small><strong>${records.runs} / ${records.wins}</strong></div></div><div class="record-list">${Object.entries(MODES).map(([id, m]) => `<div><span>${m.name} ${records.modes[id]?.won ? '★' : ''}</span><span>${records.modes[id] ? formatTime(records.modes[id].time) : '--:--'}</span></div>`).join('')}</div><p class="record-note">記録はこのブラウザに保存されます。端末間の同期はありません。</p>`;
+    content.innerHTML = `<h2 id="dialog-title">これまでの記録</h2><div class="record-grid"><div class="record-tile"><small>最長生存</small><strong>${formatTime(records.bestTime)}</strong></div><div class="record-tile"><small>最多撃破</small><strong>${records.bestKills.toLocaleString()}</strong></div><div class="record-tile"><small>最大コンボ</small><strong>${records.bestCombo.toLocaleString()}</strong></div><div class="record-tile"><small>エンドレス最長</small><strong>${formatTime(profile.endlessBest)}</strong></div><div class="record-tile"><small>獲得スター累計</small><strong>${profile.earned.toLocaleString()}</strong></div><div class="record-tile"><small>出撃 / 成功</small><strong>${records.runs} / ${records.wins}</strong></div></div><div class="record-list">${Object.entries(MODES).map(([id, m]) => `<div><span>${m.name} ${records.modes[id]?.won ? '★' : ''}</span><span>${records.modes[id] ? formatTime(records.modes[id].time) : '--:--'}</span></div>`).join('')}</div><p class="record-note">記録はこのブラウザに保存されます。端末間の同期はありません。</p>`;
   }
   $('#app-dialog').showModal();
 }
