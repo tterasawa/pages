@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LAST LIGHT POP</title>
+<meta name="description" content="夜明けまで、ぶっとばせ！押し寄せるモンスターを自動攻撃でなぎ倒す、ポップなトランス・サバイバー。ブラウザで無料・インストール不要。">
+<meta name="theme-color" content="#2b1a63">
+<meta property="og:title" content="LAST LIGHT POP — 夜明けまで、ぶっとばせ！">
+<meta property="og:description" content="ポップな光とトランスで駆け抜ける2Dサバイバー。ブラウザで今すぐ遊べます。">
+<meta property="og:type" content="website">
+<meta property="og:image" content="img/boss-candy.webp">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<style>
+:root {
+  --ink: #22114a; --ink-soft: #3a2370; --night: #2b1a63; --night-2: #3a2a7c; --cream: #fff6e3; --white: #fff;
+  --coral: #ff5f8a; --orange: #ff9f1c; --yellow: #ffd23f; --lemon: #fff07a; --mint: #3ee0a0;
+  --teal: #2ec4b6; --sky: #4cc9f0; --purple: #9b5de5; --magenta: #f15bb5; --pink: #ff8fc7;
+  --muted: #cbbdf5; --bg: var(--night); --card: var(--cream); --card-ink: var(--ink);
+  --font: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Hiragino Sans", "BIZ UDPGothic", "Noto Sans CJK JP", "Noto Sans JP", "Meiryo", system-ui, sans-serif;
+  --num: "Arial Rounded MT Bold", "Nunito", "Segoe UI", "Noto Sans CJK JP", var(--font);
+  --pop: 0 6px 0 var(--ink); --pop-sm: 0 3px 0 var(--ink); --border: 3px solid var(--ink);
+  color-scheme: dark;
+}
+/* The game itself is a night-time palette; the page keeps it in both schemes so screenshots sit on matching ground. */
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --bg: #33207a; } }
+:root[data-theme="light"] { --bg: #33207a; }
+:root[data-theme="dark"] { --bg: var(--night); }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+html, body { overflow-x: clip; }
+body { margin: 0; background: var(--bg); color: var(--cream); font-family: var(--font); line-height: 1.75; -webkit-font-smoothing: antialiased; overflow-x: hidden;
+  background-image: radial-gradient(circle at 12% 8%, rgba(255,95,138,.22), transparent 32%), radial-gradient(circle at 88% 18%, rgba(76,201,240,.18), transparent 30%),
+    linear-gradient(45deg, rgba(255,255,255,.035) 25%, transparent 25%, transparent 75%, rgba(255,255,255,.035) 75%), linear-gradient(45deg, rgba(255,255,255,.035) 25%, transparent 25%, transparent 75%, rgba(255,255,255,.035) 75%);
+  background-size: auto, auto, 64px 64px, 64px 64px; background-position: 0 0, 0 0, 0 0, 32px 32px; }
+img { max-width: 100%; height: auto; display: block; }
+a { color: inherit; }
+:focus-visible { outline: 4px solid var(--lemon); outline-offset: 3px; border-radius: 8px; }
+.wrap { width: min(1160px, 100% - 32px); margin-inline: auto; }
+
+/* Header */
+.top { position: sticky; top: 0; z-index: 20; background: var(--ink); border-bottom: 4px solid #170a35; }
+.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-family: var(--num); font-weight: 900; font-size: 19px; letter-spacing: .04em; }
+.brand i { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; background: var(--yellow); border: 3px solid var(--cream); transform: rotate(-8deg); font-style: normal; color: var(--coral); font-size: 20px; line-height: 1; }
+.brand b { color: var(--ink); background: var(--coral); padding: 0 8px 1px; border-radius: 9px; font-size: 14px; }
+.top nav { display: flex; gap: 6px; align-items: center; }
+.top nav a.link { text-decoration: none; font-weight: 800; font-size: 14px; padding: 6px 12px; border-radius: 99px; color: var(--muted); }
+.top nav a.link:hover { color: var(--cream); background: var(--ink-soft); }
+@media (max-width: 760px) { .top nav a.link { display: none; } }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 900; border: var(--border); border-radius: 18px; box-shadow: var(--pop); transition: transform .15s, box-shadow .15s; white-space: nowrap; }
+.btn:hover { transform: translateY(-2px); box-shadow: 0 8px 0 var(--ink); }
+.btn:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--ink); }
+.btn-play { background: var(--yellow); color: var(--ink); font-size: 22px; padding: 14px 28px; }
+.btn-play span.arrow { font-size: 24px; }
+.btn-sm { background: var(--yellow); color: var(--ink); font-size: 14px; padding: 6px 14px; border-radius: 12px; box-shadow: var(--pop-sm); border-width: 2px; }
+.btn-ghost { background: var(--cream); color: var(--ink); font-size: 16px; padding: 12px 20px; }
+
+/* Hero */
+.hero { padding: 56px 0 40px; }
+.hero .wrap { display: grid; grid-template-columns: 1fr 1.25fr; gap: 40px; align-items: center; }
+.pill { display: inline-block; font-family: var(--num); font-weight: 900; font-size: 12px; letter-spacing: .18em; color: var(--ink); background: var(--yellow); border: var(--border); border-radius: 99px; padding: 3px 14px; box-shadow: var(--pop-sm); }
+.logo { margin: 18px 0 6px; font-family: var(--num); font-weight: 900; font-size: clamp(64px, 9vw, 116px); line-height: .86; letter-spacing: -.02em; }
+.logo span { display: inline-block; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; text-shadow: 0 6px 0 var(--ink); }
+.logo .c1 { color: var(--coral); } .logo .c2 { color: var(--yellow); } .logo .c3 { color: var(--mint); } .logo .c4 { color: var(--sky); } .logo .c5 { color: var(--purple); } .logo .c6 { color: var(--orange); }
+.logo .sticker { font-size: .38em; color: var(--white); background: var(--coral); border: var(--border); border-radius: 18px; padding: 4px 14px 8px; transform: rotate(8deg) translateY(-.3em); -webkit-text-stroke: 0; text-shadow: none; box-shadow: var(--pop); vertical-align: top; }
+.hero h1 { font-size: clamp(26px, 3.4vw, 38px); line-height: 1.3; margin: 20px 0 10px; }
+.hero p.lead { color: var(--muted); font-size: 16px; margin: 0 0 22px; }
+.cta-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.cta-note { font-size: 13px; color: var(--muted); }
+.tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; padding: 0; list-style: none; }
+.tags li { font-size: 13px; font-weight: 800; color: var(--ink); border: 2px solid var(--ink); border-radius: 10px; padding: 2px 10px; box-shadow: var(--pop-sm); }
+.tags li:nth-child(4n+1) { background: var(--yellow); } .tags li:nth-child(4n+2) { background: var(--mint); } .tags li:nth-child(4n+3) { background: var(--sky); } .tags li:nth-child(4n+4) { background: var(--pink); }
+.hero-shots { position: relative; padding-bottom: 40px; }
+.frame { background: var(--ink); border: 4px solid var(--cream); border-radius: 20px; overflow: hidden; box-shadow: 0 10px 0 #170a35; cursor: zoom-in; padding: 0; display: block; width: 100%; }
+.frame img { width: 100%; }
+.hero-shots .main { transform: rotate(1.6deg); }
+.phone { position: absolute; width: 27%; right: 0; bottom: -6px; border: 5px solid var(--cream); border-radius: 26px; overflow: hidden; background: var(--ink); box-shadow: 0 10px 0 #170a35; transform: rotate(-6deg); cursor: zoom-in; padding: 0; }
+.burst { position: absolute; left: -18px; top: -22px; z-index: 2; background: var(--coral); color: var(--white); font-weight: 900; font-size: 15px; line-height: 1.25; text-align: center; border: var(--border); border-radius: 18px; padding: 8px 14px; transform: rotate(-9deg); box-shadow: var(--pop); }
+@media (max-width: 900px) { .hero .wrap { grid-template-columns: 1fr; } .hero-shots { margin-top: 10px; } }
+
+/* Fact strip */
+.facts { background: var(--cream); color: var(--ink); border-block: 4px solid var(--ink); }
+.facts ul { list-style: none; margin: 0; padding: 18px 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.facts li { text-align: center; }
+.facts strong { display: block; font-family: var(--num); font-size: 30px; line-height: 1.1; color: var(--coral); }
+.facts small { font-weight: 800; font-size: 13px; }
+@media (max-width: 640px) { .facts ul { grid-template-columns: repeat(2, 1fr); row-gap: 18px; } }
+
+/* Sections */
+section.block { padding: 84px 0 20px; }
+.kicker { font-family: var(--num); font-weight: 900; font-size: 13px; letter-spacing: .22em; color: var(--yellow); }
+h2 { font-size: clamp(28px, 4vw, 42px); line-height: 1.25; margin: 6px 0 14px; }
+h2 em { font-style: normal; color: var(--ink); background: var(--mint); border-radius: 10px; padding: 0 10px; box-shadow: var(--pop-sm); border: 3px solid var(--ink); display: inline-block; transform: rotate(-2deg); }
+.sub { color: var(--muted); max-width: 720px; margin: 0 0 34px; }
+h3 { font-size: 22px; line-height: 1.35; margin: 14px 0 6px; }
+
+/* Steps */
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; counter-reset: s; }
+.step { background: var(--card); color: var(--card-ink); border: var(--border); border-radius: 22px; box-shadow: var(--pop); padding: 14px 14px 18px; position: relative; }
+.step .frame { border-color: var(--ink); border-width: 3px; box-shadow: none; border-radius: 14px; }
+.step::before { counter-increment: s; content: counter(s); position: absolute; top: -18px; left: -12px; z-index: 2; width: 46px; height: 46px; display: grid; place-items: center; font-family: var(--num); font-size: 24px; font-weight: 900; background: var(--coral); color: var(--white); border: var(--border); border-radius: 50%; box-shadow: var(--pop-sm); }
+.step p { margin: 0; font-size: 14.5px; }
+kbd { font-family: var(--num); font-size: 12px; font-weight: 900; padding: 1px 6px; border-radius: 7px; background: var(--white); color: var(--ink); border: 2px solid var(--ink); box-shadow: 0 2px 0 var(--ink); }
+@media (max-width: 860px) { .steps { grid-template-columns: 1fr; gap: 34px; } }
+
+/* Feature rows */
+.feature { display: grid; grid-template-columns: 1.15fr 1fr; gap: 44px; align-items: center; margin-bottom: 70px; }
+.feature.flip > :first-child { order: 2; }
+.feature .shots { display: grid; gap: 16px; }
+.feature .shots.two { grid-template-columns: 1fr 1fr; }
+.feature .shots .frame:nth-child(2) { transform: rotate(-1.5deg); }
+.feature .shots .frame:nth-child(1) { transform: rotate(1deg); }
+.label { display: inline-block; font-size: 12px; font-weight: 900; letter-spacing: .1em; color: var(--ink); background: var(--yellow); border: 2px solid var(--ink); border-radius: 8px; padding: 0 8px; }
+.feature p { color: var(--muted); margin: 0 0 12px; }
+.feature ul.points { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 8px; }
+.feature ul.points li { padding-left: 30px; position: relative; }
+.feature ul.points li::before { content: "★"; position: absolute; left: 0; top: 0; color: var(--yellow); font-size: 18px; }
+.feature ul.points b { color: var(--cream); }
+@media (max-width: 860px) { .feature { grid-template-columns: 1fr; gap: 24px; } .feature.flip > :first-child { order: 0; } }
+
+/* Stage tabs */
+.stages { background: var(--card); color: var(--card-ink); border: var(--border); border-radius: 26px; box-shadow: var(--pop); padding: 18px; }
+.tabs { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.tabs button { font: inherit; font-weight: 900; font-size: 16px; color: var(--ink); background: var(--white); border: var(--border); border-radius: 14px; padding: 8px 16px; box-shadow: var(--pop-sm); cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--stage, var(--yellow)); transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+.stage-panel { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; align-items: center; }
+.stage-panel[hidden] { display: none; }
+.stage-panel .frame { border-color: var(--ink); border-width: 3px; box-shadow: none; }
+.stage-panel dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 14.5px; }
+.stage-panel dt { font-weight: 900; color: var(--ink-soft); }
+.stage-panel dd { margin: 0; }
+.stage-panel h3 { margin-top: 0; font-size: 26px; }
+.song { display: inline-flex; gap: 8px; align-items: center; margin-top: 14px; font-family: var(--num); font-weight: 900; font-size: 14px; background: var(--ink); color: var(--cream); border-radius: 12px; padding: 6px 12px; }
+.song i { font-style: normal; color: var(--yellow); }
+@media (max-width: 860px) { .stage-panel { grid-template-columns: 1fr; } }
+
+/* Card grid */
+.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.mini { background: var(--card); color: var(--card-ink); border: var(--border); border-radius: 20px; box-shadow: var(--pop); padding: 16px; }
+.mini strong { display: block; font-size: 17px; margin-bottom: 4px; }
+.mini p { margin: 0; font-size: 13.5px; color: var(--ink-soft); }
+.mini .big { font-family: var(--num); font-size: 34px; line-height: 1; color: var(--coral); font-weight: 900; }
+@media (max-width: 860px) { .grid4 { grid-template-columns: 1fr 1fr; } }
+
+.cards3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.cards3 figure { margin: 0; }
+.cards3 figcaption { margin-top: 14px; font-size: 14.5px; color: var(--muted); }
+.cards3 figcaption strong { display: block; color: var(--cream); font-size: 19px; }
+.cards3 figure:nth-child(1) .frame { transform: rotate(-1.5deg); } .cards3 figure:nth-child(3) .frame { transform: rotate(1.5deg); }
+.card-shot { aspect-ratio: auto; max-width: 520px; margin-inline: auto; }
+@media (max-width: 860px) { .cards3 { grid-template-columns: 1fr; gap: 36px; } }
+
+/* Modes table */
+.table-wrap { overflow-x: auto; background: var(--card); color: var(--card-ink); border: var(--border); border-radius: 22px; box-shadow: var(--pop); }
+table { width: 100%; border-collapse: collapse; min-width: 560px; font-size: 15px; }
+th, td { text-align: left; padding: 12px 16px; border-bottom: 2px dashed rgba(34,17,74,.18); }
+th { font-size: 13px; letter-spacing: .08em; background: var(--yellow); }
+tr:last-child td { border-bottom: 0; }
+td b { font-size: 16px; }
+
+/* Mobile showcase */
+.mobile-show { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 28px; align-items: center; }
+.mobile-show .phone { position: static; width: 100%; transform: rotate(-3deg); }
+.mobile-show .phone + .phone { transform: rotate(3deg) translateY(24px); }
+@media (max-width: 860px) { .mobile-show { grid-template-columns: 1fr 1fr; } .mobile-show > div:last-child { grid-column: 1 / -1; } }
+
+/* Final CTA */
+.final { margin: 90px 0 0; background: var(--yellow); color: var(--ink); border-top: 4px solid var(--ink); text-align: center; padding: 60px 0 64px; }
+.final h2 { margin-top: 0; }
+.final .btn-play { background: var(--coral); color: var(--white); font-size: 26px; padding: 16px 34px; }
+.final p { font-weight: 800; }
+footer { background: var(--ink); color: var(--muted); font-size: 13px; padding: 28px 0 40px; }
+footer p { margin: 4px 0; }
+
+/* Lightbox */
+dialog#zoom { border: 0; padding: 0; background: transparent; max-width: min(96vw, 1440px); max-height: 94vh; }
+dialog#zoom::backdrop { background: rgba(23,10,53,.88); }
+dialog#zoom img { max-height: 88vh; width: auto; margin: auto; border: 4px solid var(--cream); border-radius: 16px; }
+dialog#zoom button { position: absolute; top: 10px; right: 10px; font: inherit; font-weight: 900; background: var(--cream); color: var(--ink); border: var(--border); border-radius: 12px; padding: 4px 12px; cursor: pointer; }
+dialog#zoom p { text-align: center; color: var(--cream); font-weight: 800; margin: 10px 0 0; }
+
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity .6s, transform .6s cubic-bezier(.2, 1.4, .4, 1); }
+.reveal.on { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .reveal { opacity: 1; transform: none; transition: none; } .btn { transition: none; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#"><i aria-hidden="true">★</i>LAST LIGHT <b>POP</b></a>
+    <nav aria-label="ページ内">
+      <a class="link" href="#how">遊び方</a><a class="link" href="#build">ビルド</a><a class="link" href="#stages">ステージ</a><a class="link" href="#modes">モード</a>
+      <a class="btn btn-sm" href="../">遊ぶ ▶</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <span class="pill">★ TRANCE SURVIVOR ★</span>
+      <div class="logo" aria-label="LAST LIGHT POP!">
+        <span class="c1">L</span><span class="c2">A</span><span class="c3">S</span><span class="c4">T</span> <span class="sticker">POP!</span><br>
+        <span class="c5">L</span><span class="c6">I</span><span class="c2">G</span><span class="c3">H</span><span class="c1">T</span>
+      </div>
+      <h1>夜明けまで、ぶっとばせ！</h1>
+      <p class="lead">押し寄せるモンスターを、勝手に撃ってくれる武器でなぎ倒す。動いて、拾って、強くなる。<br>トランスに乗って、ちいさな灯火で夜をパーティーに変えよう。</p>
+      <div class="cta-row">
+        <a class="btn btn-play" href="../">ブラウザで今すぐ遊ぶ <span class="arrow">→</span></a>
+        <span class="cta-note">無料・登録なし<br>PC / スマホ / ゲームパッド</span>
+      </div>
+      <ul class="tags"><li>自動攻撃</li><li>ランダム強化</li><li>3分から遊べる</li><li>オフライン対応</li></ul>
+    </div>
+    <div class="hero-shots">
+      <div class="burst">170 COMBO!<br>FANTASTIC!</div>
+      <button class="frame main" data-zoom="img/boss-candy.webp" data-cap="キャンディの森でキャンディ大王と対決"><img src="img/boss-candy.webp" width="1440" height="900" alt="キャンディの森のバトル画面。主人公のまわりで武器がモンスターの群れを倒し、170コンボが表示されている"></button>
+      <button class="phone" data-zoom="img/mobile-play.webp" data-cap="スマホでもそのまま遊べる"><img src="img/mobile-play.webp" width="780" height="1688" alt="スマートフォンでのプレイ画面"></button>
+    </div>
+  </div>
+</section>
+
+<div class="facts">
+  <ul class="wrap">
+    <li><strong>3分〜</strong><small>1プレイ</small></li>
+    <li><strong>15種</strong><small>武器と合体技</small></li>
+    <li><strong>3面</strong><small>ステージとボス</small></li>
+    <li><strong>4人</strong><small>プレイアブルキャラ</small></li>
+  </ul>
+</div>
+
+<section class="block" id="how">
+  <div class="wrap">
+    <div class="kicker">HOW TO PLAY</div>
+    <h2>操作は<em>移動だけ</em></h2>
+    <p class="sub">攻撃は全部自動。あなたがやるのは、敵をかわして、光る結晶を拾って、レベルアップで強化を選ぶことだけ。夜明けまで灯火を守り抜けばクリアです。</p>
+    <div class="steps">
+      <div class="step reveal">
+        <button class="frame" data-zoom="img/battle-wilds.webp" data-cap="動くだけで、武器が勝手に敵を倒す"><img src="img/battle-wilds.webp" width="1440" height="900" loading="lazy" alt="夜の荒野でモンスターの群れと戦う画面"></button>
+        <h3>動いて、かわす</h3>
+        <p><kbd>WASD</kbd> / 矢印キー、スマホはドラッグで移動。攻撃は自動。ピンチは <kbd>SPACE</kbd> ダッシュと <kbd>Q</kbd> パルスで切り抜けよう。</p>
+      </div>
+      <div class="step reveal">
+        <button class="frame" data-zoom="img/upgrade.webp" data-cap="レベルアップで3枚から1枚を選ぶ"><img src="img/upgrade.webp" width="1440" height="900" loading="lazy" alt="レベルアップ時の強化カード3枚の選択画面"></button>
+        <h3>強化を選ぶ</h3>
+        <p>結晶を集めてレベルアップ。3枚のカードから1枚を選ぶ。いらなければリロール・除外・スキップも使える。</p>
+      </div>
+      <div class="step reveal">
+        <button class="frame" data-zoom="img/victory.webp" data-cap="夜明けを迎えればクリア"><img src="img/victory.webp" width="1440" height="900" loading="lazy" alt="「夜明けだ！」と表示されたクリア演出"></button>
+        <h3>夜明けまで生き残る</h3>
+        <p>時間とともに敵はどんどん増え、最後にボスが現れる。倒して夜が明ければクリア。リザルトでランクとスターが手に入る。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="build">
+  <div class="wrap">
+    <div class="kicker">BUILD YOUR LIGHT</div>
+    <h2>毎回ちがう、<em>自分だけの最強ビルド</em></h2>
+    <p class="sub">出てくる強化は毎回ランダム。どの武器を伸ばし、どれを組み合わせるか。同じ夜は二度とありません。</p>
+
+    <div class="feature reveal">
+      <div class="shots two">
+        <button class="frame" data-zoom="img/fusion-card.webp" data-cap="進化した武器2つで合体カードが出現"><img src="img/fusion-card.webp" width="1440" height="900" loading="lazy" alt="合体技「花火大会」のカードが出た強化画面"></button>
+        <button class="frame" data-zoom="img/fusion-fight.webp" data-cap="合体技でモンスターの群れが一掃される"><img src="img/fusion-fight.webp" width="1440" height="900" loading="lazy" alt="合体技を使って敵の群れを倒している画面"></button>
+      </div>
+      <div>
+        <span class="label">WEAPON × FUSION</span>
+        <h3>育てて、進化させて、合体させる</h3>
+        <p>武器は最大4つ、サポートも4つまで装備できます。</p>
+        <ul class="points">
+          <li><b>武器10種</b>：光弾・衛星刃・雷の糸・ブーメラン星・プリズム光線・花火地雷など</li>
+          <li><b>進化</b>：武器と対応するサポートを揃えると、上位版に進化</li>
+          <li><b>合体技5種</b>：進化した武器を2つ組み合わせると「花火大会」「ギャラクシーリング」などの大技に</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="feature flip reveal">
+      <div class="shots two">
+        <button class="frame" data-zoom="img/chest.webp" data-cap="エリートやボスを倒すと宝箱"><img src="img/chest.webp" width="1440" height="900" loading="lazy" alt="宝箱を開けて強化を手に入れる画面"></button>
+        <button class="frame" data-zoom="img/relic.webp" data-cap="呪いの祭壇でレリックを選ぶ"><img src="img/relic.webp" width="1440" height="900" loading="lazy" alt="呪いと引き換えにレリックを選ぶ画面"></button>
+      </div>
+      <div>
+        <span class="label">TREASURE × RELIC</span>
+        <h3>宝箱、レリック、そしてちょっとの呪い</h3>
+        <p>王冠をかぶったエリートやボスを倒すと宝箱。ルーレットが止まるまでドキドキです。</p>
+        <ul class="points">
+          <li><b>宝箱</b>：1〜5個の報酬がまとめて手に入る。大当たりもあり</li>
+          <li><b>レリック12種</b>：呪いの祭壇で、呪いと引き換えに強力な効果を受け取る</li>
+          <li><b>スペシャル</b>：光る泡を拾うと爆弾・時間停止・無敵スターなどで一発逆転</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="stages">
+  <div class="wrap">
+    <div class="kicker">3 STAGES × 3 BOSSES</div>
+    <h2>ステージごとに、<em>曲もボスもちがう</em></h2>
+    <p class="sub">ステージごとに足場のクセ、出てくる敵、ボスの攻撃、そしてBGMが変わります。クリアすると次のステージが解放されます。</p>
+    <div class="stages reveal">
+      <div class="tabs" role="tablist" aria-label="ステージ">
+        <button role="tab" id="t-wilds" aria-controls="p-wilds" aria-selected="true" style="--stage: var(--yellow)">夜の荒野</button>
+        <button role="tab" id="t-frost" aria-controls="p-frost" aria-selected="false" tabindex="-1" style="--stage: var(--sky)">氷の湖</button>
+        <button role="tab" id="t-candy" aria-controls="p-candy" aria-selected="false" tabindex="-1" style="--stage: var(--pink)">キャンディの森</button>
+      </div>
+      <div class="stage-panel" role="tabpanel" id="p-wilds" aria-labelledby="t-wilds">
+        <button class="frame" data-zoom="img/boss-wilds.webp" data-cap="夜の荒野 — ボス「夜の主」"><img src="img/boss-wilds.webp" width="1440" height="900" loading="lazy" alt="夜の荒野でボス「夜の主」と戦う画面"></button>
+        <div>
+          <h3>夜の荒野</h3>
+          <dl><dt>特徴</dt><dd>最初のステージ。突進イノシシとプルプルが出る</dd><dt>ボス</dt><dd>夜の主：怒ると闇を呼び、灯火のまわりしか見えなくなる</dd></dl>
+          <span class="song">♪ Lantern Rush <i>138 BPM</i></span>
+        </div>
+      </div>
+      <div class="stage-panel" role="tabpanel" id="p-frost" aria-labelledby="t-frost" hidden>
+        <button class="frame" data-zoom="img/boss-frost.webp" data-cap="氷の湖 — ボス「氷の女王」"><img src="img/boss-frost.webp" width="1440" height="900" loading="lazy" alt="氷の湖でボス「氷の女王」と戦う画面"></button>
+        <div>
+          <h3>氷の湖</h3>
+          <dl><dt>特徴</dt><dd>足元がつるつる滑る。カメ盾とスナイパーが出る</dd><dt>ボス</dt><dd>氷の女王：氷のトゲと、足が鈍る凍結床を広げてくる</dd></dl>
+          <span class="song">♪ Crystal Drift <i>132 BPM</i></span>
+        </div>
+      </div>
+      <div class="stage-panel" role="tabpanel" id="p-candy" aria-labelledby="t-candy" hidden>
+        <button class="frame" data-zoom="img/boss-candy.webp" data-cap="キャンディの森 — ボス「キャンディ大王」"><img src="img/boss-candy.webp" width="1440" height="900" loading="lazy" alt="キャンディの森でボス「キャンディ大王」と戦う画面"></button>
+        <div>
+          <h3>キャンディの森</h3>
+          <dl><dt>特徴</dt><dd>シロップで足が鈍る。敵を回復するナースが出る</dd><dt>ボス</dt><dd>キャンディ大王：分身を出してくる。本物はどれ？</dd></dl>
+          <span class="song">♪ Sugar Stampede <i>142 BPM</i></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="chars">
+  <div class="wrap">
+    <div class="feature reveal">
+      <button class="frame card-shot" data-zoom="img/characters.webp" data-cap="4人のキャラクターとスキン"><img src="img/characters-card.webp" width="600" height="720" loading="lazy" alt="キャラクター選択画面。ランタン・ソラ・ガンテツ・ミントの4人"></button>
+      <div>
+        <div class="kicker">CHARACTERS</div>
+        <h2>4人の<em>灯火の仲間</em></h2>
+        <p>キャラごとに初期武器と能力がちがいます。全員にボイスが付いていて、出撃・進化・ピンチ・勝利でしゃべります。</p>
+        <ul class="points">
+          <li><b>ランタン</b>（灯火の番人）：バランス型。光弾スタート</li>
+          <li><b>ソラ</b>（風の配達人）：移動が速い。雷の糸スタート</li>
+          <li><b>ガンテツ</b>（鉄壁の騎士）：HPが多い。衛星刃スタート</li>
+          <li><b>ミント</b>（星読みの魔女）：威力と経験値が高い。星降りスタート</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="grow">
+  <div class="wrap">
+    <div class="kicker">KEEP PLAYING</div>
+    <h2>負けても、<em>ちゃんと強くなる</em></h2>
+    <p class="sub">プレイするたびにスターがたまります。スターで灯火そのものを強化して、次の夜はもう少し先へ。</p>
+    <div class="cards3 reveal">
+      <figure><button class="frame card-shot" data-zoom="img/workshop.webp" data-cap="工房：スターで永続強化"><img src="img/workshop-card.webp" width="600" height="840" loading="lazy" alt="工房の強化メニュー。がんじょう・パワー・すばやさなど"></button>
+        <figcaption><strong>工房</strong>体力・威力・移動速度など10項目を、スターで永続強化。最後のランクまで効き目が伸びる。</figcaption></figure>
+      <figure><button class="frame card-shot" data-zoom="img/codex.webp" data-cap="図鑑：出会った敵や使った強化を記録"><img src="img/codex-card.webp" width="600" height="840" loading="lazy" alt="モンスター図鑑の画面"></button>
+        <figcaption><strong>図鑑 49項目</strong>敵・ボス・武器・レリックを記録。50%と100%でスキンが手に入る。</figcaption></figure>
+      <figure><button class="frame card-shot" data-zoom="img/result.webp" data-cap="リザルト：ランクとダメージ内訳"><img src="img/result-card.webp" width="700" height="840" loading="lazy" alt="リザルト画面。ランクS、武器ごとのダメージ内訳、獲得スター"></button>
+        <figcaption><strong>リザルトと実績</strong>ランクS〜Cと武器ごとのダメージ内訳。実績を達成すると武器・キャラ・ステージが解放。</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="modes">
+  <div class="wrap">
+    <div class="kicker">MODES</div>
+    <h2>3分の腕だめしから、<em>終わらない夜</em>まで</h2>
+    <p class="sub">はじめは「夜間巡回」がおすすめ。慣れてきたら、ヒート（追加の縛り）を上げて自分を追い込もう。</p>
+    <div class="table-wrap reveal">
+      <table>
+        <thead><tr><th>モード</th><th>時間</th><th>こんな人に</th></tr></thead>
+        <tbody>
+          <tr><td><b>夜間巡回</b></td><td>3分</td><td>はじめての方。短い夜で操作に慣れる</td></tr>
+          <tr><td><b>灯火防衛</b></td><td>6分</td><td>武器を育ててボスを迎え撃つ、いちばんの基本モード</td></tr>
+          <tr><td><b>極夜作戦</b></td><td>6分</td><td>敵がさらに速く強い、上級者向け</td></tr>
+          <tr><td><b>エンドレス</b></td><td>∞</td><td>どこまで耐えられるか、記録に挑む</td></tr>
+          <tr><td><b>ヒート 1〜8</b></td><td>—</td><td>敵の強化などの縛りを1段ずつ追加。報酬のスターも増える</td></tr>
+          <tr><td><b>今日のチャレンジ</b></td><td>—</td><td>毎日変わるステージとルール。全員同じ条件で挑む</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="anywhere">
+  <div class="wrap">
+    <div class="mobile-show reveal">
+      <button class="phone" data-zoom="img/mobile-home.webp" data-cap="スマホのホーム画面"><img src="img/mobile-home.webp" width="780" height="1688" loading="lazy" alt="スマートフォンでのホーム画面"></button>
+      <button class="phone" data-zoom="img/mobile-play.webp" data-cap="スマホのプレイ画面"><img src="img/mobile-play.webp" width="780" height="1688" loading="lazy" alt="スマートフォンでのプレイ画面"></button>
+      <div>
+        <div class="kicker">ANYWHERE</div>
+        <h2>どこでも、<em>だれでも</em></h2>
+        <ul class="points" style="list-style:none;padding:0;display:grid;gap:8px">
+          <li>⭐ ブラウザで開くだけ。ホーム画面に追加すればアプリのように起動</li>
+          <li>⭐ 一度開けば電波がなくても遊べる</li>
+          <li>⭐ 途中でやめても、続きから再開できる</li>
+          <li>⭐ キーボード・タッチ・ゲームパッド対応。キー配置も変更可</li>
+          <li>⭐ 画面の揺れ・フラッシュ・文字サイズ・字幕を調整できる</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<section class="final">
+  <div class="wrap">
+    <h2>今夜、灯火をともそう。</h2>
+    <p>ダウンロード不要。すぐに始められます。</p>
+    <a class="btn btn-play" href="../">LAST LIGHT POP を遊ぶ →</a>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>LAST LIGHT POP — グラフィック・音楽・効果音はすべてプログラムで生成しています（外部素材は使っていません）。</p>
+    <p>キャラクターボイスは Irodori-TTS による合成音声です（実在の人物の声は使っていません）。</p>
+  </div>
+</footer>
+
+<dialog id="zoom" aria-label="スクリーンショットの拡大表示">
+  <button type="button" id="zoom-close" aria-label="閉じる">✕ 閉じる</button>
+  <img id="zoom-img" alt="">
+  <p id="zoom-cap"></p>
+</dialog>
+
+<script>
+// Stage tabs (arrow keys move between tabs).
+const tabs = [...document.querySelectorAll('[role="tab"]')];
+function select(tab) { for (const t of tabs) { const on = t === tab; t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1; document.getElementById(t.getAttribute('aria-controls')).hidden = !on; } }
+tabs.forEach((t, i) => { t.addEventListener('click', () => select(t)); t.addEventListener('keydown', e => { const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0; if (!d) return; const n = tabs[(i + d + tabs.length) % tabs.length]; select(n); n.focus(); }); });
+
+// Click a screenshot to see it large.
+const zoom = document.getElementById('zoom'), zImg = document.getElementById('zoom-img'), zCap = document.getElementById('zoom-cap');
+document.addEventListener('click', e => { const b = e.target.closest('[data-zoom]'); if (!b) return; zImg.src = b.dataset.zoom; zImg.alt = b.querySelector('img')?.alt || ''; zCap.textContent = b.dataset.cap || ''; zoom.showModal(); });
+document.getElementById('zoom-close').addEventListener('click', () => zoom.close());
+zoom.addEventListener('click', e => { if (e.target === zoom) zoom.close(); });
+
+// Pop sections in as they scroll into view.
+const items = document.querySelectorAll('.reveal');
+if ('IntersectionObserver' in window) { const io = new IntersectionObserver(es => es.forEach(x => { if (x.isIntersecting) { x.target.classList.add('on'); io.unobserve(x.target); } }), { threshold: .12 }); items.forEach(el => io.observe(el)); }
+else items.forEach(el => el.classList.add('on'));
+</script>
+</body>
+</html>
