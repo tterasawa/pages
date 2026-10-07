@@ -135,6 +135,7 @@ kbd { display: inline-block; font-family: var(--num); font-size: 11px; font-weig
 .round-button { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; border: var(--border); background: var(--cream); color: var(--ink); box-shadow: var(--pop-sm); transition: transform .12s; }
 .round-button svg { width: 22px; height: 22px; stroke-width: 3.2; }
 .round-button:hover { transform: translateY(-2px) rotate(-6deg); background: var(--yellow); }
+#boss-face { width: 40px; height: 40px; object-fit: contain; margin: -14px 2px -6px -6px; filter: drop-shadow(0 2px 0 var(--ink)); }
 .boss-panel { position: absolute; left: 50%; top: 104px; transform: translateX(-50%); width: min(520px, calc(100% - 28px)); animation: drop-in .5s cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes drop-in { from { transform: translate(-50%, -40px) scale(.7); opacity: 0; } }
 .boss-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-weight: 900; font-size: 15px; color: var(--white); text-shadow: 0 2px 0 var(--ink); }

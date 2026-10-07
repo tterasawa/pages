@@ -1,5 +1,6 @@
 // Pop-style renderer. Every sprite, prop and effect is drawn procedurally here at load time.
 import { orbitRadius, frostRadius } from './core.js';
+import { createBossArt, BOSS_INFO, BOSS_EYES, BOSS_TOP } from './bosses.js';
 
 const TAU = Math.PI * 2;
 export const PALETTE = Object.freeze({
@@ -115,20 +116,6 @@ function makeSprites() {
     path(c, [[-6, 15], [-3, 21], [0, 15], [3, 21], [6, 15]]); ink(c, P.purple, 2.4);
     shine(c, -8, -9, 3.6, 2);
   }, 72);
-  const bossOf = (body, shade, crown) => sprite(c => {
-    shadow(c, 42, 40);
-    path(c, [[-30, 0], [-46, 22], [-30, 40], [30, 40], [46, 22], [30, 0]]); ink(c, '#7b2cbf', 3.5);
-    for (const s of [-1, 1]) { path(c, [[s * 20, -26], [s * 34, -48], [s * 32, -20]]); ink(c, P.cream, 3.5); }
-    circle(c, 0, 4, 36, body, 4);
-    c.save(); c.beginPath(); c.arc(0, 4, 36, 0, TAU); c.clip(); oval(c, 0, 34, 44, 18, shade); c.restore(); circle(c, 0, 4, 36, null, 4);
-    path(c, [[-24, -26], [-26, -48], [-13, -36], [0, -54], [13, -36], [26, -48], [24, -26]]); ink(c, crown, 3.5);
-    circle(c, 0, -38, 4, P.coral, 2.4); circle(c, -17, -33, 2.8, P.sky, 2); circle(c, 17, -33, 2.8, P.mint, 2);
-    eye(c, -13, -4, 8.5, [.2, .45], 1.2); eye(c, 13, -4, 8.5, [-.2, .45], -1.2);
-    c.beginPath(); c.moveTo(-18, 14); c.quadraticCurveTo(0, 30, 18, 14); c.closePath(); ink(c, P.ink, 3);
-    path(c, [[-14, 15], [-10, 21], [-6, 17], [-2, 23], [2, 17], [6, 23], [10, 17], [14, 15]]); ink(c, P.white, 0);
-    shine(c, -18, -14, 7, 3.4);
-  }, 140);
-  S.enemy4 = S.enemy4_wilds = bossOf(P.magenta, '#c93f92', P.yellow); S.enemy4_frost = bossOf(P.sky, '#2a9fd0', P.white); S.enemy4_candy = bossOf(P.orange, '#e07b00', P.pink);
   S.enemy5 = sprite(c => { shadow(c, 18, 20); oval(c, 0, 2, 20, 14, P.orange, 3); oval(c, 0, 9, 16, 6, '#e07b00'); oval(c, 0, 2, 20, 14, null, 3); path(c, [[14, -4], [24, -10], [20, 2]]); ink(c, P.cream, 2.4); path(c, [[-6, -12], [-2, -20], [3, -12]]); ink(c, '#e07b00', 2.4); eye(c, 9, -3, 3.4, [.6, .2], 1); oval(c, 18, 4, 4, 3, '#ffbe4d', 2); for (const x of [-12, -4, 4, 12]) { c.fillStyle = P.ink; c.fillRect(x - 2, 13, 4, 7); } shine(c, -8, -6, 5, 2.2); }, 72);
   S.enemy6 = sprite(c => { shadow(c, 18, 18); c.beginPath(); c.moveTo(-19, 14); c.quadraticCurveTo(-22, -18, 0, -18); c.quadraticCurveTo(22, -18, 19, 14); c.closePath(); ink(c, P.mint, 3); oval(c, 0, 10, 16, 5, '#22b884'); eye(c, -6, -2, 4, [0, .4]); eye(c, 6, -2, 4, [0, .4]); c.beginPath(); c.arc(0, 6, 3, 0, Math.PI); c.lineWidth = 2; c.strokeStyle = P.ink; c.stroke(); shine(c, -9, -10, 4, 2.4); }, 64);
   S.enemy7 = sprite(c => { shadow(c, 9, 10); c.beginPath(); c.moveTo(-10, 8); c.quadraticCurveTo(-12, -10, 0, -10); c.quadraticCurveTo(12, -10, 10, 8); c.closePath(); ink(c, '#7af5c4', 2.4); eye(c, -3, -1, 2.2, [0, .4]); eye(c, 3, -1, 2.2, [0, .4]); }, 36);
@@ -208,10 +195,15 @@ function radial(size, stops) { const cv = canvas(size), c = cv.getContext('2d'),
 export class Renderer {
   constructor(el) {
     this.canvas = el; this.ctx = el.getContext('2d', { alpha: false }); this.sprites = makeSprites();
+    this.bossArt = createBossArt({ P, TAU, path, ink, star, roundRect });
+    // Boss parts are built in idle time after the first paint (a boss is minutes away), not at startup.
+    const warm = () => this.bossArt.warm(); if (window.requestIdleCallback) requestIdleCallback(warm, { timeout: 4000 }); else setTimeout(warm, 1500);
+    // Still portraits of the boss rigs (codex, subtitles, boss panel, white hit tint fallback).
+    for (const k of Object.keys(BOSS_INFO)) { let still = null; Object.defineProperty(this.sprites, 'enemy4_' + k, { configurable: true, enumerable: true, get: () => still ||= sprite(c => this.bossArt.draw(c, k, { motion: false, t: 0, look: [0, .35] }), 380) }); }
+    Object.defineProperty(this.sprites, 'enemy4', { configurable: true, enumerable: true, get: () => this.sprites.enemy4_wilds }); this.bossFx = new Map(); this.bossDeaths = []; this.bossRoarAt = -9; this.cutin = null;
     this.white = {}; this.ghost = {};
-    this.sprites.enemy11 = this.sprites.enemy4_candy;
-    for (let i = 0; i < 12; i++) this.white['enemy' + i] = tinted(this.sprites['enemy' + i], P.white);
-    for (const st of ['wilds', 'frost', 'candy']) this.white['enemy4_' + st] = tinted(this.sprites['enemy4_' + st], P.white);
+    Object.defineProperty(this.sprites, 'enemy11', { configurable: true, enumerable: true, get: () => this.sprites.enemy4_candy });
+    for (let i = 0; i < 12; i++) if (i !== 4 && i !== 11) this.white['enemy' + i] = tinted(this.sprites['enemy' + i], P.white); // bosses flash through their rig
     this.ghost.player = tinted(this.sprites.player, P.sky);
     this.width = 1; this.height = 1; this.scale = 1; this.camera = { x: 0, y: 0 }; this.quality = 'auto'; this.autoLow = false;
     this.reduced = matchMedia('(prefers-reduced-motion: reduce)').matches; this.frame = 0; this.clock = 0; this.drawnEnemies = 0;
@@ -309,15 +301,15 @@ export class Renderer {
           if (effects) { this.spawn('blast', e.x, e.y, { life: .34, size: e.a, color: P.orange }); this.spawn('ring', e.x, e.y, { life: .4, size: e.a * 1.15, color: P.yellow, grow: 1 }); if (heavy) this.burst(e.x, e.y, 14, [P.orange, P.yellow, P.white], 380, { size: 7 }); if (this.comicCooldown <= 0) { this.comic(e.x, e.y - e.a * .6, 'BOOM!', P.orange, 1); this.comicCooldown = .3; } }
           break;
         case 'bossDown':
-          this.kick = 1.2; this.zoomKick = .12; this.flash('#fff7d6', .45);
-          if (effects) { this.confetti(e.x, e.y, heavy ? 120 : 30, 640); for (let i = 0; i < 4; i++) this.spawn('ring', e.x, e.y, { life: .5 + i * .15, size: 140 + i * 90, color: CONFETTI[i], grow: 1 }); this.comic(e.x, e.y - 70, 'K.O.!', P.yellow, 2); }
+          this.kick = Math.max(this.kick, .7); this.flash('#ffffff', .12);
+          if (effects) this.bossDeaths.push({ x: e.x, y: e.y, t: 0, kind: this.stage || 'wilds', popped: false, next: 0 }); else this.bossPop({ x: e.x, y: e.y, kind: this.stage }, false);
           break;
         case 'firework': if (effects) { if (heavy) this.burst(e.x, e.y, this.crowd ? 8 : 22, CONFETTI, 420, { type: this.crowd ? 'dot' : 'star', size: 8, life: .6 }); this.spawn('ring', e.x, e.y, { life: .4, size: e.a, color: P.pink, grow: 1 }); } this.kick = Math.max(this.kick, .25); break;
         case 'star': if (effects) { this.spawn('blast', e.x, e.y, { life: .26, size: e.a, color: P.yellow }); if (heavy) this.burst(e.x, e.y, 6, [P.lemon, P.white], 260, { type: 'star', size: 6, life: .4 }); } break;
         case 'slam': this.kick = Math.max(this.kick, .45); if (effects) { this.spawn('ring', e.x, e.y, { life: .35, size: e.a * 1.2, color: P.tomato, grow: 1 }); this.spawn('puff', e.x, e.y, { life: .3, size: e.a, color: '#ff5a5f' }); } break;
         case 'special': { const words = ['MAGNET!', 'BOMB!!', 'FREEZE!', 'STAR POWER!'], cols = [P.coral, P.orange, P.sky, P.yellow]; this.flash(e.a === 1 ? '#ffffff' : e.a === 2 ? '#c9f3ff' : '#fff7d6', e.a === 1 ? .5 : .25); this.kick = Math.max(this.kick, e.a === 1 ? 1.1 : .4); this.zoomKick = .07;
           if (effects) { this.spawn('ring', e.x, e.y, { life: .6, size: e.a === 1 ? 700 : 260, color: cols[e.a], grow: 1 }); this.confetti(e.x, e.y, heavy ? 60 : 18, 520); this.comic(e.x, e.y - 100, words[e.a], cols[e.a], 1.4); } break; }
-        case 'bossPhase': this.flash('#ff5a5f', .3); this.kick = Math.max(this.kick, .9); if (effects) { this.spawn('ring', e.x, e.y, { life: .5, size: 220, color: P.magenta, grow: 1 }); this.comic(e.x, e.y - 90, e.a >= 3 ? 'RAGE!!' : 'ANGRY!', P.tomato, 1.5); } break;
+        case 'bossPhase': this.flash('#ff5a5f', .3); this.kick = Math.max(this.kick, .9); this.bossRoarAt = this.clock; if (effects) { for (let k = 0; k < 18; k++) { const a = k / 18 * TAU; this.spawn('line', e.x + Math.cos(a) * 90, e.y - 40 + Math.sin(a) * 90, { vx: Math.cos(a) * 900, vy: Math.sin(a) * 900, life: .35, size: 16, color: k % 2 ? P.white : (BOSS_INFO[this.stage] || BOSS_INFO.wilds).color, drag: 2 }); } this.spawn('ring', e.x, e.y, { life: .5, size: 220, color: P.magenta, grow: 1 }); this.comic(e.x, e.y - 90, e.a >= 3 ? 'RAGE!!' : 'ANGRY!', P.tomato, 1.5); } break;
         case 'heal': if (effects) { this.spawn('ring', e.x, e.y, { life: .45, size: e.a, color: P.pink, grow: 1 }); for (let k = 0; k < 6; k++) this.spawn('twinkle', e.x + (Math.random() - .5) * e.a, e.y + (Math.random() - .5) * e.a, { life: .5, size: 9, color: P.mint, vy: -40 }); } break;
         case 'shieldBreak': if (effects) { this.burst(e.x, e.y, 10, [P.white, P.sky], 300, { type: 'spark', size: 10, life: .3 }); this.comic(e.x, e.y - 30, 'BREAK!', P.sky, .7); } break;
         case 'relic': this.flash('#e5d4ff', .3); this.zoomKick = .08; if (effects) { for (let k = 0; k < 3; k++) this.spawn('ring', e.x, e.y, { life: .5 + k * .15, size: 120 + k * 80, color: [P.purple, P.pink, P.lemon][k], grow: 1 }); this.confetti(e.x, e.y, heavy ? 60 : 18, 480); this.comic(e.x, e.y - 100, 'RELIC!', P.purple, 1.3); } break;
@@ -429,7 +421,7 @@ export class Renderer {
     for (const g of game.gems) { if (g.kind === 'altar' && g.x >= x0 && g.x <= x1 && g.y >= y0 && g.y <= y1) { c.fillStyle = '#9b5de533'; c.beginPath(); c.ellipse(g.x, g.y + 18, 46, 16, 0, 0, TAU); c.fill(); this.sprite('altar', g.x, g.y + (motion ? Math.sin(this.clock * 3) * 2 : 0), 78); if (motion && this.frame % 8 === 0) this.spawn('twinkle', g.x + (Math.random() - .5) * 60, g.y - Math.random() * 50, { life: .6, size: 10, color: P.pink, vr: 4 }); continue; } if (g.kind !== 'special' || g.x < x0 || g.x > x1 || g.y < y0 || g.y > y1) continue; const bob = motion ? Math.sin(this.clock * 5 + g.phase) * 4 : 0; c.strokeStyle = CONFETTI[(this.frame >> 3) & 7]; c.lineWidth = 3; c.beginPath(); c.arc(g.x, g.y + bob, 20 + Math.sin(this.clock * 8) * 2, 0, TAU); c.stroke(); this.sprite('sp' + g.value, g.x, g.y + bob, 38); }
     this.nearestChest = null; let chestDist = Infinity;
     for (const g of game.gems) {
-      if (g.kind !== 'chest') continue; const d = Math.hypot(g.x - p.x, g.y - p.y); if (d < chestDist) { chestDist = d; this.nearestChest = g; }
+      if (g.kind !== 'chest' || g.wait > 0) continue; const d = Math.hypot(g.x - p.x, g.y - p.y); if (d < chestDist) { chestDist = d; this.nearestChest = g; }
       if (g.x < x0 || g.x > x1 || g.y < y0 || g.y > y1) continue;
       const big = g.value >= 2, bob = motion ? Math.sin(this.clock * 4 + g.phase) * 3 : 0, glow = .5 + Math.sin(this.clock * 6) * .2;
       c.fillStyle = `rgba(255,210,63,${glow * .35})`; c.fillRect(g.x - 9, g.y - 150, 18, 150); c.fillStyle = `rgba(255,255,255,${glow * .3})`; c.fillRect(g.x - 3, g.y - 150, 6, 150);
@@ -457,7 +449,8 @@ export class Renderer {
     const crowd = game.enemies.length > 400, fast = this.low || game.enemies.length > 220, ox = (w / 2 + sx) * this.dpr, oy = (h / 2 + sy) * this.dpr, k = s * this.dpr;
     if (fast) { c.setTransform(1, 0, 0, 1, 0, 0); c.imageSmoothingEnabled = false; }
     for (const e of game.enemies) {
-      if (!e.alive || e.x < x0 || e.x > x1 || e.y < y0 || e.y > y1) continue;
+      const big = e.type === 4 || e.type === 11 ? 150 : 0;
+      if (!e.alive || e.x < x0 - big || e.x > x1 + big || e.y < y0 - big || e.y > y1 + big) continue;
       if (e.type !== 4 && crowd) { const gx = Math.floor(((e.x - this.camera.x) * s + w / 2) / 18) + 1, gy = Math.floor(((e.y - this.camera.y) * s + h / 2) / 18) + 1, i = gx + gy * this.densityW; if (gx >= 0 && gx < this.densityW && i >= 0 && i < this.density.length) { if (this.density[i] >= 3) continue; this.density[i]++; } }
       this.drawnEnemies++;
       const size = ENEMY_SIZES[e.type], speed = e.type === 1 ? 14 : 7, wob = motion ? Math.sin(game.time * speed + e.phase) : 0;
@@ -468,7 +461,7 @@ export class Renderer {
       if (fast) { c.setTransform(k, 0, 0, k, ox - this.camera.x * k, oy - this.camera.y * k); c.imageSmoothingEnabled = true; }
       if (e.elite) { c.strokeStyle = P.yellow; c.lineWidth = 4; c.setLineDash([10, 8]); c.lineDashOffset = -this.clock * 40; c.beginPath(); c.ellipse(e.x, e.y + e.r * .6, e.r * 1.25, e.r * .5, 0, 0, TAU); c.stroke(); c.setLineDash([]); }
       if (tele) { const len = e.type === 5 ? 420 : 640, a = 1 - e.aiT / (e.type === 5 ? .75 : .8); c.strokeStyle = e.type === 5 ? `rgba(255,159,28,${.4 + a * .5})` : `rgba(255,90,95,${.3 + a * .6})`; c.lineWidth = e.type === 5 ? 26 * (1 - a * .5) : 3 + a * 3; c.setLineDash(e.type === 5 ? [16, 10] : [6, 6]); c.beginPath(); c.moveTo(e.x, e.y); c.lineTo(e.x + e.cx * len, e.y + e.cy * len); c.stroke(); c.setLineDash([]); }
-      this.sprite(e.type === 4 || e.type === 11 ? 'enemy4_' + (this.stage || 'wilds') : 'enemy' + e.type, e.x, e.y - lift, e.elite ? size * 1.45 : size, e.type === 1 ? wob * .12 : 0, 1, flip ? -sqx : sqx, sqy, set);
+      if (big) this.drawBoss(e, p, motion); else this.sprite('enemy' + e.type, e.x, e.y - lift, e.elite ? size * 1.45 : size, e.type === 1 ? wob * .12 : 0, 1, flip ? -sqx : sqx, sqy, set);
       if (e.type === 8 && e.shield > 0) this.sprite('shield', e.x, e.y - lift, 64, Math.atan2(p.y - e.y, p.x - e.x), .5 + e.shield * .17);
       if (e.elite) { this.sprite('crown', e.x, e.y - e.r * 1.35 - lift + (motion ? Math.sin(this.clock * 5) * 2 : 0), 34); if (e.hp < e.maxHP) { const bw = 56, by = e.y - e.r * 1.7; roundRect(c, e.x - bw / 2 - 2, by - 2, bw + 4, 9, 4); c.fillStyle = P.ink; c.fill(); roundRect(c, e.x - bw / 2, by, Math.max(4, bw * e.hp / e.maxHP), 5, 2.5); c.fillStyle = P.yellow; c.fill(); } }
       if (e.slow > 0) { c.fillStyle = '#9be7ff55'; c.beginPath(); c.ellipse(e.x, e.y + e.r * .7, e.r + 4, 6, 0, 0, TAU); c.fill(); }
@@ -501,14 +494,16 @@ export class Renderer {
     const facing = p.dx < -.1 ? -1 : 1;
     if (game.starPower > 0 && motion) { c.strokeStyle = CONFETTI[this.frame >> 2 & 7]; c.lineWidth = 6; c.beginPath(); c.arc(p.x, p.y - 4, 34 + Math.sin(this.clock * 20) * 3, 0, TAU); c.stroke(); if (this.frame % 3 === 0) this.spawn('star', p.x + (Math.random() - .5) * 40, p.y + (Math.random() - .5) * 40, { life: .5, size: 7, color: CONFETTI[this.frame & 7], vy: -40 }); }
     this.sprite(this.hero(game.character, this.skin), p.x, p.y - Math.abs(step) * (moving ? 2.5 : .6), 84, 0, p.invincible > .3 && p.invincible < 100 && this.frame % 6 < 2 ? .55 : 1, facing * (1 + step * .03) * bounce, (1 - step * .03) * bounce);
+    this.drawBossDeaths(dt, motion);
     this.drawFx(x0, y0, x1, y1);
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     if (!home && !['won', 'dead'].includes(game.state) && game.boss?.alive) this.bossIndicator(game.boss, s);
     if (!home && this.nearestChest && game.state === 'running') this.bossIndicator(this.nearestChest, s, P.yellow);
-    if (game.darkness > .02) { const px = w / 2 + (p.x - this.camera.x) * s + sx, py = h / 2 + (p.y - this.camera.y) * s + sy, R = 260 * s, g2 = c.createRadialGradient(px, py, R * .35, px, py, R); g2.addColorStop(0, 'rgba(14,4,36,0)'); g2.addColorStop(1, `rgba(14,4,36,${.86 * game.darkness})`); c.fillStyle = g2; c.fillRect(0, 0, w, h); if (game.boss?.alive) { const bx = w / 2 + (game.boss.x - this.camera.x) * s + sx, by = h / 2 + (game.boss.y - this.camera.y) * s + sy; c.fillStyle = `rgba(255,90,95,${game.darkness * (.6 + Math.sin(this.clock * 6) * .3)})`; for (const ox of [-14, 14]) { c.beginPath(); c.ellipse(bx + ox * s, by - 6 * s, 6 * s, 4 * s, 0, 0, TAU); c.fill(); } } }
+    if (game.darkness > .02) { const px = w / 2 + (p.x - this.camera.x) * s + sx, py = h / 2 + (p.y - this.camera.y) * s + sy, R = 260 * s, g2 = c.createRadialGradient(px, py, R * .35, px, py, R); g2.addColorStop(0, 'rgba(14,4,36,0)'); g2.addColorStop(1, `rgba(14,4,36,${.86 * game.darkness})`); c.fillStyle = g2; c.fillRect(0, 0, w, h); if (game.boss?.alive) { const bx = w / 2 + (game.boss.x - this.camera.x) * s + sx, by = h / 2 + (game.boss.y - this.camera.y) * s + sy; c.fillStyle = `rgba(255,90,95,${game.darkness * (.6 + Math.sin(this.clock * 6) * .3)})`; for (const [ex, ey] of BOSS_EYES.wilds) { c.beginPath(); c.ellipse(bx + ex * s, by + (ey - 12) * s, 8 * s, 6 * s, 0, 0, TAU); c.fill(); } } }
     if (game.freeze > 0) { c.fillStyle = `rgba(155,231,255,${Math.min(.28, game.freeze * .08)})`; c.fillRect(0, 0, w, h); c.strokeStyle = '#e8fbffcc'; c.lineWidth = 14; c.strokeRect(0, 0, w, h); }
     if (this.hurtTime > 0 && motion && this.opts.flash) { const a = this.hurtTime / .35; c.strokeStyle = `rgba(255,70,110,${a * .55})`; c.lineWidth = 28; c.strokeRect(0, 0, w, h); }
     if (p.hp < p.maxHP * .3 && !home && game.state === 'running' && motion) { const a = (.18 + Math.sin(this.clock * 7) * .1); c.strokeStyle = `rgba(255,70,110,${a})`; c.lineWidth = 18; c.strokeRect(0, 0, w, h); }
+    if (this.cutin && !home) this.drawCutin(w, h); else if (home) this.cutin = null;
     if (this.flashTime > 0 && this.flashColor) { c.globalAlpha = this.flashTime / this.flashMax * .55; c.fillStyle = this.flashColor; c.fillRect(0, 0, w, h); c.globalAlpha = 1; }
   }
   onBeat(game) {
@@ -578,8 +573,95 @@ export class Renderer {
       }
     }
   }
+  // --- stage bosses ----------------------------------------------------------------------------
+  drawBoss(e, p, motion) {
+    const c = this.ctx, kind = (BOSS_INFO[this.stage] ? this.stage : 'wilds'), scale = e.final ? 1.12 : 1, dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy) || 1;
+    // Hit flash, throttled: a boss is hit almost every frame, so it flashes briefly at most ~4× a second.
+    let f = this.bossFx.get(e.id); if (!f) { f = { flashAt: -9 }; this.bossFx.set(e.id, f); if (this.bossFx.size > 12) this.bossFx.delete(this.bossFx.keys().next().value); }
+    if (e.hit > .03 && this.clock - f.flashAt > .4) f.flashAt = this.clock;
+    const white = this.opts.flash && this.clock - f.flashAt < .07, phase = e.phase2 || 1, roar = motion ? Math.max(0, 1 - (this.clock - this.bossRoarAt) / .9) : 0;
+    const charge = motion && e.type === 4 ? Math.max(phase >= 2 ? 1 - e.ringCD / .7 : 0, phase >= 3 ? 1 - e.slamCD / .6 : 0, kind === 'frost' && phase >= 2 ? 1 - e.spikeCD / .6 : 0, 0) : 0;
+    const flip = kind !== 'wilds' && dx < 0, pop = 1 + Math.min(.12, e.hit * .6);
+    c.save(); c.translate(e.x, e.y); c.scale(scale * pop * (flip ? -1 : 1), scale / Math.sqrt(pop));
+    const pose = { t: this.clock + (e.id % 7) * .37, motion, look: [(flip ? -dx : dx) / d, dy / d], charge: Math.min(1, charge), roar, phase };
+    this.bossArt.draw(c, kind, pose);
+    if (white) { c.globalAlpha = .55; this.bossArt.draw(c, kind, { ...pose, white: true }); c.globalAlpha = 1; } // soft hit flash, at most ~2× a second
+    c.restore();
+    if (motion && !this.low && !this.crowd && this.frame % 5 === 0) {
+      const rx = e.x + (Math.random() - .5) * 220, ry = e.y - 40 + (Math.random() - .5) * 160;
+      if (kind === 'wilds') this.spawn('twinkle', rx, ry, { life: .7, size: 9, color: Math.random() < .5 ? P.lemon : P.pink, vy: 30, vr: 4 });
+      else if (kind === 'frost') this.spawn('dot', rx, ry - 60, { life: 1.1, size: 4, color: P.white, vy: 70, vx: -20, drag: 0 });
+      else this.spawn('confetti', rx, ry - 40, { life: 1, size: 6, color: CONFETTI[this.frame & 7], vy: -60, g: 260, drag: 1, vr: 8 });
+    }
+    if (roar > .6 && kind === 'candy' && motion && this.frame % 3 === 0) this.spawn('puff', e.x + (Math.random() - .5) * 60, e.y - 110 * scale, { life: .5, size: 22, color: '#ffffffaa', vy: -120 });
+  }
+  // K.O.: the boss shudders and flickers for a beat, little blasts pop around it, then it bursts.
+  drawBossDeaths(dt, motion) {
+    const c = this.ctx;
+    for (let i = this.bossDeaths.length - 1; i >= 0; i--) {
+      const b = this.bossDeaths[i]; b.t += dt; const a = Math.min(1, b.t / .95);
+      if (!b.popped && b.t >= .95) { b.popped = true; this.bossPop(b, true); }
+      if (!b.popped) {
+        if (b.t >= b.next) { b.next = b.t + .11; const ox = (Math.random() - .5) * 180, oy = -40 + (Math.random() - .5) * 160; this.spawn('blast', b.x + ox, b.y + oy, { life: .25, size: 40 + a * 40, color: [P.yellow, P.coral, P.white][Math.floor(Math.random() * 3)] }); this.kick = Math.max(this.kick, .25 + a * .3); }
+        const sh = motion ? a * 10 : 0; c.save(); c.translate(b.x + (Math.random() - .5) * sh, b.y + (Math.random() - .5) * sh); c.rotate(motion ? Math.sin(b.t * 40) * .06 * a : 0); c.scale(1 + a * .12, 1 - a * .05);
+        this.bossArt.draw(c, b.kind, { t: this.clock, motion, white: this.opts.flash && Math.floor(b.t / .09) % 2 === 0, roar: 1, phase: 3 }); c.restore();
+      }
+      if (b.t > 1.1) this.bossDeaths.splice(i, 1);
+    }
+  }
+  bossPop(b, effects) {
+    const col = (BOSS_INFO[b.kind] || BOSS_INFO.wilds).color;
+    this.kick = 1.3; this.zoomKick = .14; this.flash('#fff7d6', .45);
+    if (!effects || this.reduced) return;
+    this.confetti(b.x, b.y - 30, this.low ? 30 : 140, 700);
+    this.spawn('blast', b.x, b.y - 30, { life: .45, size: 230, color: col });
+    for (let i = 0; i < 4; i++) this.spawn('ring', b.x, b.y - 30, { life: .5 + i * .15, size: 160 + i * 100, color: [col, P.yellow, P.white, P.pink][i], grow: 1 });
+    this.burst(b.x, b.y - 30, this.low ? 10 : 30, [P.yellow, P.white, col], 760, { type: 'star', size: 12, life: .8 });
+    this.comic(b.x, b.y - 150, 'K.O.!!', P.yellow, 2.4);
+  }
+  // Anime-style boss cut-in across the middle of the screen (replaces the HTML warning banner).
+  bossCutin(kind, name, text, final) { if (this.reduced) return false; this.cutin = { t: 0, kind: BOSS_INFO[kind] ? kind : 'wilds', name, text, final, start: performance.now() }; return true; }
+  drawCutin(w, h) {
+    // Wall-clock timed so a slow frame rate cannot stretch it.
+    const q = this.cutin, c = this.ctx; q.t = (performance.now() - q.start) / 1000; const t = q.t, T = 2.7; if (t > T) { this.cutin = null; return; }
+    const info = BOSS_INFO[q.kind], easeOut = x => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3), back = x => { x = Math.min(1, Math.max(0, x)); const k = 1.7; return 1 + (k + 1) * Math.pow(x - 1, 3) + k * Math.pow(x - 1, 2); };
+    const inn = easeOut(t / .3), out = easeOut((t - (T - .35)) / .35), H = Math.min(300, Math.max(170, h * .3)), cy = h * .47, skew = H * .18, slide = -out * (w + 400);
+    c.save();
+    c.fillStyle = `rgba(23,10,53,${.35 * inn * (1 - out)})`; c.fillRect(0, 0, w, h);
+    // Accent stripes and the band itself (scaled open from the middle).
+    const open = back(t / .32), half = H / 2 * open;
+    c.translate(slide, 0);
+    const band = (y0, y1, fill) => { c.beginPath(); c.moveTo(-60, y0 + skew); c.lineTo(w + 60, y0 - skew); c.lineTo(w + 60, y1 - skew); c.lineTo(-60, y1 + skew); c.closePath(); c.fillStyle = fill; c.fill(); c.lineWidth = 5; c.strokeStyle = P.ink; c.stroke(); };
+    const tape = Math.max(0, easeOut((t - .08) / .3)) * 22;
+    band(cy - half - tape - 8, cy - half - 4, P.yellow); band(cy + half + 4, cy + half + tape + 8, P.yellow);
+    band(cy - half, cy + half, info.band);
+    // Inside the band: halftone dots and speed lines streaming left.
+    c.save(); c.beginPath(); c.moveTo(-60, cy - half + skew); c.lineTo(w + 60, cy - half - skew); c.lineTo(w + 60, cy + half - skew); c.lineTo(-60, cy + half + skew); c.closePath(); c.clip();
+    c.fillStyle = '#ffffff14'; for (let gy = cy - H / 2; gy < cy + H / 2; gy += 18) for (let gx = w * .45; gx < w + 40; gx += 18) { const r = 2 + (gx - w * .45) / (w * .55) * 5; c.beginPath(); c.arc(gx + ((gy / 18) % 2) * 9, gy, r, 0, TAU); c.fill(); }
+    c.strokeStyle = '#ffffff40'; c.lineCap = 'round'; for (let i = 0; i < 16; i++) { const y = cy - H / 2 + ((i * 53) % H), len = 80 + (i * 37) % 160, x = w - ((t * (900 + i * 40) + i * 210) % (w + 400)); c.lineWidth = 2 + i % 3 * 2; c.beginPath(); c.moveTo(x, y); c.lineTo(x + len, y - len * skew * 2 / w); c.stroke(); }
+    // Scrolling WARNING ticker on the tape.
+    c.restore(); c.save(); c.font = `900 ${Math.max(11, tape * .62)}px ${FONT}`; c.fillStyle = P.ink; c.textBaseline = 'middle'; c.textAlign = 'left';
+    if (tape > 8) for (const [y, dir] of [[cy - half - tape / 2 - 6, -1], [cy + half + tape / 2 + 6, 1]]) { const msg = q.final ? 'FINAL BOSS  ▲  ' : 'WARNING  ▲  ', mw = c.measureText(msg).width, off = (t * 160 * dir) % mw; c.save(); c.translate(w / 2, y); c.rotate(-Math.atan2(skew * 2, w + 120)); for (let x = -w / 2 - mw * 2 + off; x < w / 2 + mw; x += mw) c.fillText(msg, x, 0); c.restore(); }
+    c.restore();
+    // Boss portrait sliding in from the right, roaring as it lands.
+    const narrow = w < 640, px = (narrow ? w * .8 : w * .73) + (1 - back((t - .1) / .45)) * (w * .5) + out * (w + 400) * 2, k = H / 230 * (narrow ? .78 : 1.3);
+    c.save(); c.translate(px, cy + H * .16 + Math.sin(t * 3) * 4); c.scale(k, k);
+    this.bossArt.draw(c, q.kind, { t: this.clock, motion: true, roar: Math.max(0, 1 - Math.abs(t - .75) / .45), look: [-1, .25], phase: 1 }); c.restore();
+    // Name block sliding in from the left with a skew.
+    const tx = (narrow ? 18 : w * .08) - (1 - easeOut((t - .14) / .35)) * w * .6, nameSize = Math.min(narrow ? w * .13 : w * .075, H * .32);
+    c.save(); c.translate(tx, cy); c.transform(1, 0, -.12, 1, 0, 0); c.textBaseline = 'alphabetic'; c.textAlign = 'left';
+    const tag = q.final ? 'FINAL BOSS' : 'BOSS'; c.font = `900 ${nameSize * .32}px ${FONT}`; const tw = c.measureText(tag).width + 26;
+    roundRect(c, 0, -nameSize * 1.05, tw, nameSize * .46, 10); ink(c, P.coral, 4); c.fillStyle = P.white; c.fillText(tag, 13, -nameSize * .71);
+    c.font = `900 ${nameSize}px ${FONT}`; c.lineJoin = 'round';
+    c.lineWidth = nameSize * .2; c.strokeStyle = P.ink; c.strokeText(q.name, 0, nameSize * .32 + 5); c.fillStyle = P.ink; c.fillText(q.name, 0, nameSize * .32 + 6);
+    c.fillStyle = info.accent === P.white ? P.white : P.yellow; c.strokeText(q.name, 0, nameSize * .32); c.fillText(q.name, 0, nameSize * .32);
+    c.font = `800 ${nameSize * .3}px ${FONT}`; c.fillStyle = P.cream; c.lineWidth = 5; c.strokeText(info.title, 4, nameSize * .82); c.fillText(info.title, 4, nameSize * .82);
+    if (q.text) { c.font = `800 ${Math.max(12, nameSize * .22)}px ${FONT}`; c.fillStyle = P.lemon; c.strokeText(q.text, 4, nameSize * 1.18); c.fillText(q.text, 4, nameSize * 1.18); }
+    c.restore();
+    c.restore();
+  }
   bossBar(e) {
-    if (e.hp >= e.maxHP) return; const c = this.ctx, w = 96, y = e.y - 78;
+    if (e.hp >= e.maxHP) return; const c = this.ctx, w = 110, y = e.y - BOSS_TOP * (e.final ? 1.12 : 1) - 8;
     roundRect(c, e.x - w / 2 - 3, y - 3, w + 6, 12, 6); c.fillStyle = P.ink; c.fill();
     roundRect(c, e.x - w / 2, y, Math.max(6, w * e.hp / e.maxHP), 6, 3); c.fillStyle = P.magenta; c.fill();
   }

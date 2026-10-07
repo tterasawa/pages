@@ -217,7 +217,7 @@ dialog#zoom p { text-align: center; color: var(--cream); font-weight: 800; margi
     </div>
     <div class="hero-shots">
       <div class="burst">170 COMBO!<br>FANTASTIC!</div>
-      <button class="frame main" data-zoom="img/boss-candy.webp" data-cap="キャンディの森でキャンディ大王と対決"><img src="img/boss-candy.webp" width="1440" height="900" alt="キャンディの森のバトル画面。主人公のまわりで武器がモンスターの群れを倒し、170コンボが表示されている"></button>
+      <button class="frame main" data-zoom="img/cutin-candy.webp" data-cap="キャンディの森でキャンディ大王と対決"><img src="img/cutin-candy.webp" width="1440" height="900" alt="キャンディの森でキャンディ大王と戦うバトル画面"></button>
       <button class="phone" data-zoom="img/mobile-play.webp" data-cap="スマホでもそのまま遊べる"><img src="img/mobile-play.webp" width="780" height="1688" alt="スマートフォンでのプレイ画面"></button>
     </div>
   </div>
@@ -303,7 +303,7 @@ dialog#zoom p { text-align: center; color: var(--cream); font-weight: 800; margi
   <div class="wrap">
     <div class="kicker">3 STAGES × 3 BOSSES</div>
     <h2>ステージごとに、<em>曲もボスもちがう</em></h2>
-    <p class="sub">ステージごとに足場のクセ、出てくる敵、ボスの攻撃、そしてBGMが変わります。クリアすると次のステージが解放されます。</p>
+    <p class="sub">ステージごとに足場のクセ、出てくる敵、ボスの姿と攻撃、そしてBGMが変わります。ボスはカットインとともに登場します。クリアすると次のステージが解放されます。</p>
     <div class="stages reveal">
       <div class="tabs" role="tablist" aria-label="ステージ">
         <button role="tab" id="t-wilds" aria-controls="p-wilds" aria-selected="true" style="--stage: var(--yellow)">夜の荒野</button>
@@ -311,26 +311,26 @@ dialog#zoom p { text-align: center; color: var(--cream); font-weight: 800; margi
         <button role="tab" id="t-candy" aria-controls="p-candy" aria-selected="false" tabindex="-1" style="--stage: var(--pink)">キャンディの森</button>
       </div>
       <div class="stage-panel" role="tabpanel" id="p-wilds" aria-labelledby="t-wilds">
-        <button class="frame" data-zoom="img/boss-wilds.webp" data-cap="夜の荒野 — ボス「夜の主」"><img src="img/boss-wilds.webp" width="1440" height="900" loading="lazy" alt="夜の荒野でボス「夜の主」と戦う画面"></button>
+        <button class="frame" data-zoom="img/cutin-wilds.webp" data-cap="夜の荒野 — ボス「夜の主」"><img src="img/cutin-wilds.webp" width="1440" height="900" loading="lazy" alt="ボス「夜の主」の登場カットイン"></button>
         <div>
           <h3>夜の荒野</h3>
-          <dl><dt>特徴</dt><dd>最初のステージ。突進イノシシとプルプルが出る</dd><dt>ボス</dt><dd>夜の主：怒ると闇を呼び、灯火のまわりしか見えなくなる</dd></dl>
+          <dl><dt>特徴</dt><dd>最初のステージ。突進イノシシとプルプルが出る</dd><dt>ボス</dt><dd>夜の主（星空のマントと三日月の角）：怒ると闇を呼び、灯火のまわりしか見えなくなる</dd></dl>
           <span class="song">♪ Lantern Rush <i>138 BPM</i></span>
         </div>
       </div>
       <div class="stage-panel" role="tabpanel" id="p-frost" aria-labelledby="t-frost" hidden>
-        <button class="frame" data-zoom="img/boss-frost.webp" data-cap="氷の湖 — ボス「氷の女王」"><img src="img/boss-frost.webp" width="1440" height="900" loading="lazy" alt="氷の湖でボス「氷の女王」と戦う画面"></button>
+        <button class="frame" data-zoom="img/cutin-frost.webp" data-cap="氷の湖 — ボス「氷の女王」"><img src="img/cutin-frost.webp" width="1440" height="900" loading="lazy" alt="ボス「氷の女王」の登場カットイン"></button>
         <div>
           <h3>氷の湖</h3>
-          <dl><dt>特徴</dt><dd>足元がつるつる滑る。カメ盾とスナイパーが出る</dd><dt>ボス</dt><dd>氷の女王：氷のトゲと、足が鈍る凍結床を広げてくる</dd></dl>
+          <dl><dt>特徴</dt><dd>足元がつるつる滑る。カメ盾とスナイパーが出る</dd><dt>ボス</dt><dd>氷の女王（結晶のティアラと雪の結晶の杖）：氷のトゲと、足が鈍る凍結床を広げてくる</dd></dl>
           <span class="song">♪ Crystal Drift <i>132 BPM</i></span>
         </div>
       </div>
       <div class="stage-panel" role="tabpanel" id="p-candy" aria-labelledby="t-candy" hidden>
-        <button class="frame" data-zoom="img/boss-candy.webp" data-cap="キャンディの森 — ボス「キャンディ大王」"><img src="img/boss-candy.webp" width="1440" height="900" loading="lazy" alt="キャンディの森でボス「キャンディ大王」と戦う画面"></button>
+        <button class="frame" data-zoom="img/boss-candy.webp" data-cap="キャンディの森 — ボス「キャンディ大王」"><img src="img/boss-candy.webp" width="1440" height="900" loading="lazy" alt="ボス「キャンディ大王」の登場カットイン"></button>
         <div>
           <h3>キャンディの森</h3>
-          <dl><dt>特徴</dt><dd>シロップで足が鈍る。敵を回復するナースが出る</dd><dt>ボス</dt><dd>キャンディ大王：分身を出してくる。本物はどれ？</dd></dl>
+          <dl><dt>特徴</dt><dd>シロップで足が鈍る。敵を回復するナースが出る</dd><dt>ボス</dt><dd>キャンディ大王（跳ねるグミの体と巨大キャンディ）：分身を出してくる。本物はどれ？</dd></dl>
           <span class="song">♪ Sugar Stampede <i>142 BPM</i></span>
         </div>
       </div>

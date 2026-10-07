@@ -7,7 +7,7 @@ import { ComboMeter, rankFor, musicIntensity } from './hype.js';
 
 const $ = s => document.querySelector(s); const $$ = s => [...document.querySelectorAll(s)];
 const icon = (name, cls = '') => `<svg class="${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
-const APP_VERSION = 'V 2.6.1';
+const APP_VERSION = 'V 2.7.0';
 const SETTINGS_KEY = 'lastlight-pop-settings-v1', RECORDS_KEY = 'lastlight-pop-records-v1', PROFILE_KEY = 'lastlight-pop-profile-v1';
 const DEFAULT_SETTINGS = { sound: true, music: 0.42, sfx: 0.6, quality: 'auto', vibration: true, heat: 0, shake: 1, flash: true, numbers: true, largeText: false, hints: true, voice: .9, subtitles: true, keyDash: 'Space', keyPulse: 'KeyQ' };
 const EMPTY_RECORDS = { runs: 0, wins: 0, totalKills: 0, bestKills: 0, bestTime: 0, bestCombo: 0, modes: {} };
@@ -297,7 +297,7 @@ function updateHUD() {
   $('#hp-text').textContent = `${Math.ceil(p.hp)} / ${p.maxHP}`; $('#hp-bar').style.width = `${p.hp / p.maxHP * 100}%`; $('.health-track').classList.toggle('danger', p.hp < p.maxHP * .3);
   $('#level-text').textContent = `LV. ${String(game.level).padStart(2, '0')}`; if (game.level !== lastLevel) { lastLevel = game.level; const b = $('#level-text'); b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
   $('#xp-bar').style.width = `${Math.min(100, game.xp / game.xpNext * 100)}%`; $('#time-text').textContent = formatTime(game.time);
-  const overtime = !game.endless && game.time >= game.duration && !game.finalKilled; $('#time-target').textContent = game.endless ? `∞ BEST ${formatTime(profile.endlessBest)}` : overtime ? '夜の主をたおせ！' : '/ ' + formatTime(game.duration);
+  const overtime = !game.endless && game.time >= game.duration && !game.finalKilled; $('#time-target').textContent = game.endless ? `∞ BEST ${formatTime(profile.endlessBest)}` : overtime ? `${STAGES[game.stage].boss}をたおせ！` : '/ ' + formatTime(game.duration);
   $('#status-chips').innerHTML = (game.freeze > 0 ? `<span class="freeze">FREEZE ${Math.ceil(game.freeze)}</span>` : '') + (game.starPower > 0 ? `<span class="star">★ STAR ${Math.ceil(game.starPower)}</span>` : '') + (game.eventKind === 'meteor' && game.eventTimer > 0 ? `<span class="event">流星群 ${Math.ceil(game.eventTimer)}</span>` : ''); $('#time-target').classList.toggle('alert', overtime);
   $('#kills-text').textContent = game.kills.toLocaleString(); $('#movement-hint').hidden = settings.hints || game.time > 7;
   for (const [key, cd, max] of [['dash', p.dashCD, 3 * (1 - game.levels.haste * .08)], ['pulse', p.pulseCD, 18]]) {
@@ -313,7 +313,7 @@ function updateHUD() {
     const supports = UPGRADES.filter(u => u.tag === 'SUPPORT' && game.levels[u.id] > 0); $('#support-slots').innerHTML = supports.map(u => `<div class="weapon-slot" style="--c:${POP_COLORS[u.id]}" title="${u.name} Lv.${game.levels[u.id]}">${icon(u.icon)}<small>${game.levels[u.id]}</small></div>`).join('') + '<div class="weapon-slot empty"></div>'.repeat(Math.max(0, SLOT_LIMIT.SUPPORT - supports.length));
   }
   const boss = game.boss; $('#boss-panel').hidden = !boss?.alive;
-  if (boss?.alive) { $('#boss-name').textContent = `${STAGES[game.stage].boss} — ${boss.final ? '終夜' : '先触れ'}`; $('#boss-hp').textContent = `${Math.ceil(boss.hp).toLocaleString()} / ${Math.ceil(boss.maxHP).toLocaleString()}`; $('#boss-bar').style.width = `${boss.hp / boss.maxHP * 100}%`; }
+  if (boss?.alive) { const face = $('#boss-face'); if (face.dataset.stage !== game.stage) { face.dataset.stage = game.stage; try { face.src = renderer.sprites['enemy4_' + game.stage].image.toDataURL(); } catch { face.removeAttribute('src'); } } $('#boss-name').textContent = `${STAGES[game.stage].boss} — ${boss.final ? '終夜' : '先触れ'}`; $('#boss-hp').textContent = `${Math.ceil(boss.hp).toLocaleString()} / ${Math.ceil(boss.maxHP).toLocaleString()}`; $('#boss-bar').style.width = `${boss.hp / boss.maxHP * 100}%`; }
 }
 function updateCombo(dt) {
   if (!game) return; const gained = game.kills - lastKills; lastKills = game.kills;
@@ -335,11 +335,11 @@ function processEvents(g, muted = false) {
     if (e.type === 'level') speak('levelup', { cooldown: 25, chance: .6 });
     if (e.type === 'evolve' || e.type === 'fusion') speak('evolve', { priority: 2, cooldown: 6 });
     if (e.type === 'revive') speak('revive', { priority: 3 });
-    if (e.type === 'boss') setTimeout(() => speak('appear', { boss: true, priority: 3 }), 400);
+    if (e.type === 'boss') setTimeout(() => speak('appear', { boss: true, priority: 3 }), 650);
     if (e.type === 'bossPhase' && e.phase >= 3) speak('rage', { boss: true, priority: 3, cooldown: 10 });
     if (e.type === 'bossDown') speak('fall', { boss: true, priority: 3 });
     if (e.type === 'elite') { announce('エリート出現！宝箱を持ってるぞ！', 'combo-call'); coach('elite', '<b>王冠のエリート</b>は宝箱を落とす！優先して倒そう。'); }
-    if (e.type === 'boss') coach('boss', '<b>夜の主</b>が来た！弱るほど攻撃が激しくなる。<b>赤い円</b>は攻撃の予告だから離れよう。');
+    if (e.type === 'boss') coach('boss', `<b>${STAGES[game.stage].boss}</b>が来た！弱るほど攻撃が激しくなる。<b>赤い円</b>は攻撃の予告だから離れよう。`);
     if (e.type === 'special') coach('special', '<b>光る泡</b>は特殊アイテム。爆弾・時間停止・スターなど、拾うと一発逆転！');
     if (e.type === 'event') coach('event', '時間イベント発生！流星群の<b>赤い円</b>には近づかないで。');
     if (e.type === 'charge') coach('charge', '<b>オレンジの線</b>はイノシシの突進ルート。横に避けよう！');
@@ -350,8 +350,8 @@ function processEvents(g, muted = false) {
       if (e.phase >= 3 && st === 'wilds') coach('dark', '闇の中でも<b>灯火</b>の周りは見える。赤く光る<b>目</b>がボスの位置だ！'); if (st === 'candy') coach('decoys', '分身を倒すと<b>キャンディ弾</b>が飛び散る。本物にはHPバーが出るよ。'); if (st === 'frost' && e.phase >= 2) coach('spikes', '赤い円の<b>列</b>は氷柱の予告。列の横へ逃げよう！'); }
     if (e.type === 'special') announce({ magnet: 'ぜんぶ吸い寄せ！', bomb: 'ドカーン！画面の敵を一掃！', freeze: '時間よ止まれ！', star: 'スターパワー！無敵＆パワーアップ！' }[e.kind], 'evolve');
     if (e.type === 'revive') { announce('もういっかい！復活！！', 'evolve'); slowmo = renderer.reduced ? 0 : .8; }
-    if (e.type === 'boss') { warning(e.final ? '夜の主が現れた — 最後の灯火を守れ！' : '夜の主が接近中！'); renderer.celebrate('boss', g); }
-    if (e.type === 'bossDown') { announce('夜の主をたおした！', 'evolve'); slowmo = renderer.reduced ? 0 : .9; }
+    if (e.type === 'boss') { const name = STAGES[game.stage].boss, text = e.final ? `${name}が現れた — 最後の灯火を守れ！` : `${name}が接近中！`; if (!renderer.bossCutin(game.stage, name, text, e.final)) warning(text); renderer.celebrate('boss', g); }
+    if (e.type === 'bossDown') { announce(`${STAGES[game.stage].boss}をたおした！`, 'evolve'); slowmo = renderer.reduced ? 0 : .9; }
     if (e.type === 'fusion') { const u = UPGRADES.find(x => x.id === e.id); announce(`合体！「${u ? u.name : ''}」`, 'evolve'); slowmo = renderer.reduced ? 0 : .7; coach('fusion', '<b>合体武器</b>は2つの進化武器の力をかけ合わせた究極の武器！'); }
     if (e.type === 'evolve') { announce('武器が進化した！！', 'evolve'); renderer.celebrate('evolve', g); slowmo = renderer.reduced ? 0 : .45; }
     if (e.type === 'hurt' && settings.vibration && navigator.vibrate) navigator.vibrate(22);
