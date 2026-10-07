@@ -9,10 +9,13 @@
 export const BOSS_INFO = Object.freeze({
   wilds: { title: '夜を統べる王', color: '#9b5de5', band: '#2b1466', accent: '#ffd23f' },
   frost: { title: '凍てつく湖の女王', color: '#4cc9f0', band: '#1d4f8f', accent: '#ffffff' },
-  candy: { title: 'あまあま帝国の大王', color: '#ff8fc7', band: '#a3306f', accent: '#ffd23f' }
+  candy: { title: 'あまあま帝国の大王', color: '#ff8fc7', band: '#a3306f', accent: '#ffd23f' },
+  bat: { title: '月をかくす翼', color: '#9b5de5', band: '#3a1a6e', accent: '#fff07a' },
+  snowman: { title: '吹雪の進軍司令', color: '#4cc9f0', band: '#16467d', accent: '#ffffff' },
+  donut: { title: 'あまいうずの魔神', color: '#f15bb5', band: '#8a2c6c', accent: '#ffd23f' }
 });
 // Eye positions (rig space, before hover) — used by the darkness overlay so the eyes shine through.
-export const BOSS_EYES = Object.freeze({ wilds: [[-16, -58], [16, -58]], frost: [[-9, -78], [9, -78]], candy: [[-22, -30], [22, -30]] });
+export const BOSS_EYES = Object.freeze({ wilds: [[-16, -58], [16, -58]], frost: [[-9, -78], [9, -78]], candy: [[-22, -30], [22, -30]], bat: [[-16, -48], [16, -48]], snowman: [[-11, -94], [11, -94]], donut: [[-26, -60], [26, -60]] });
 export const BOSS_TOP = 150; // rig height above the hitbox centre (for the HP bar)
 const RES = 2.8; // bitmap pixels per rig unit at the top level (sharp in the cut-in, where the rig is drawn large)
 
@@ -217,7 +220,136 @@ export function createBossArt(h) {
     orbit(c, 5, 128, 22, 30, t * 1.1 * m, false, (x, y, s, a, i) => put(c, C.sweet(i), x, y, a * 3, s));
   }
 
-  const RIGS = { wilds, frost, candy };
+  // --- 月夜の大コウモリ: huge flapping wings, crescent-moon belly, folds its wings before a dive -----
+  const B = {
+    wing: () => part('b_wing', 260, c => {
+      // Shoulder at the origin, membrane spreading to the right with a scalloped trailing edge.
+      c.beginPath(); c.moveTo(0, -6); c.quadraticCurveTo(60, -70, 118, -54); c.lineTo(112, -20); c.quadraticCurveTo(98, -4, 88, 14); c.quadraticCurveTo(74, 0, 62, 20); c.quadraticCurveTo(48, 6, 34, 24); c.quadraticCurveTo(20, 10, 4, 18); c.closePath(); ink(c, '#3a2370', 4);
+      c.save(); c.clip(); oval(c, 70, 30, 80, 34, '#2b1466'); c.restore();
+      line(c, [[4, 0], [114, -50]], 3, '#9b5de5'); line(c, [[6, 4], [88, 10]], 3, '#9b5de5'); line(c, [[6, 6], [62, 18]], 3, '#9b5de5'); line(c, [[6, 8], [34, 22]], 3, '#9b5de5');
+      c.beginPath(); c.moveTo(0, -6); c.quadraticCurveTo(60, -70, 118, -54); c.lineTo(112, -20); c.quadraticCurveTo(98, -4, 88, 14); c.quadraticCurveTo(74, 0, 62, 20); c.quadraticCurveTo(48, 6, 34, 24); c.quadraticCurveTo(20, 10, 4, 18); c.closePath(); ink(c, null, 4);
+      path(c, [[114, -56], [126, -66], [120, -50]]); ink(c, P.lemon, 2.4);
+    }),
+    body: () => part('b_body', 180, c => {
+      for (const s of [-1, 1]) { path(c, [[s * 14, -40], [s * 40, -86], [s * 38, -34]]); ink(c, '#5a2d9c', 3.5); path(c, [[s * 20, -42], [s * 36, -74], [s * 34, -40]]); ink(c, P.pink, 0); }
+      oval(c, 0, -10, 46, 44, '#5a2d9c', 4); c.save(); c.beginPath(); c.ellipse(0, -10, 46, 44, 0, 0, TAU); c.clip(); oval(c, 0, 26, 56, 22, '#3a1a6e'); c.restore(); oval(c, 0, -10, 46, 44, null, 4);
+      oval(c, 0, 10, 24, 20, '#c9b6f2', 3); c.beginPath(); c.arc(-2, 10, 11, .6, TAU - .6); c.arc(4, 8, 9, TAU - .9, .9, true); c.closePath(); ink(c, P.lemon, 2.4);
+      for (const s of [-1, 1]) { path(c, [[s * 14, 30], [s * 10, 42], [s * 18, 38], [s * 22, 44], [s * 24, 30]]); ink(c, P.lemon, 2.4); }
+      shine(c, -20, -34, 9, 4);
+    }),
+    mini: () => part('b_mini', 40, c => { path(c, [[0, -2], [-14, -8], [-10, 2], [-4, 0], [0, 6], [4, 0], [10, 2], [14, -8]]); ink(c, '#3a2370', 2.2); circle(c, -2, -1, 1.2, P.lemon, 0); circle(c, 2, -1, 1.2, P.lemon, 0); })
+  };
+  function bat(c, q) {
+    const { t, look, charge, roar, phase } = q, m = q.motion ? 1 : 0, rage = phase >= 3, dive = !!q.dive;
+    const flap = Math.sin(t * (dive ? 0 : rage ? 9 : 6.5)) * m, hover = -24 + Math.sin(t * 3) * 8 * m;
+    c.scale(1.12, 1.12); // the bat is all wings: a touch bigger so it reads as a boss
+    if (!white) oval(c, 0, 66, 66 + hover * .3, 16, '#12063477');
+    const mini = B.mini();
+    orbit(c, 4, 130, 30, -30, -t * 1.6 * m, true, (x, y, s, a) => put(c, mini, x, y + Math.sin(t * 12 + a * 3) * 3, 0, s));
+    c.translate(0, hover);
+    const wing = B.wing(), fold = dive ? .45 : 1 - charge * .35, lift = charge * .3 + roar * .2;
+    for (const s of [-1, 1]) put(c, wing, s * 26, -18, 0, s * fold * (1 + roar * .08), 1 - flap * .38 + lift);
+    put(c, B.body(), 0, 0, dive ? (look[0] >= 0 ? .25 : -.25) : 0, 1 + roar * .05);
+    const hx = look[0] * 3 * m;
+    eye(c, -16 + hx, -24, 11, look, { angry: 1.4 + roar * .4, pupil: rage ? P.tomato : '#5a1238' }); eye(c, 16 + hx, -24, 11, look, { angry: -1.4 - roar * .4, pupil: rage ? P.tomato : '#5a1238' });
+    if (!white) {
+      const open = Math.max(roar, charge * .6);
+      oval(c, hx, -4 + open * 3, 12, 4 + open * 8, P.ink, 3); if (open > .2) oval(c, hx, 0 + open * 5, 6, 2 + open * 3, P.coral);
+      for (const s of [-1, 1]) { path(c, [[hx + s * 8, -6], [hx + s * 5, 4], [hx + s * 2, -6]]); ink(c, P.white, 2); }
+    }
+    orbit(c, 4, 130, 30, -30, -t * 1.6 * m, false, (x, y, s, a) => put(c, mini, x, y + Math.sin(t * 12 + a * 3) * 3, 0, s));
+  }
+
+  // --- 雪だるま将軍: three stacked snowballs in a general's bicorne, icicle sabre and a snowball to throw
+  const S = {
+    ball: r => part('s_ball' + r, r * 2 + 12, c => { circle(c, 0, 0, r, P.white, 4); c.save(); c.beginPath(); c.arc(0, 0, r, 0, TAU); c.clip(); oval(c, r * .15, r * .75, r * 1.2, r * .5, '#cfe8ff'); c.restore(); circle(c, 0, 0, r, null, 4); shine(c, -r * .45, -r * .45, r * .22, r * .12); }),
+    coat: () => part('s_coat', 120, c => {
+      for (const s of [-1, 1]) { roundRect(c, s * 34 - 13, -36, 26, 12, 6); ink(c, P.yellow, 3); for (let k = 0; k < 4; k++) line(c, [[s * 34 - 10 + k * 7, -24], [s * 34 - 10 + k * 7, -16]], 3, P.yellow); }
+      c.save(); c.rotate(-.55); c.fillStyle = P.tomato; c.fillRect(-48, -7, 96, 14); c.strokeStyle = P.ink; c.lineWidth = 3; c.strokeRect(-48, -7, 96, 14); c.restore();
+      for (const y of [-14, 4, 22]) circle(c, 2, y, 4, P.ink, 0);
+      star(c, -16, 2, 8, 3.6); ink(c, P.yellow, 2.4);
+    }),
+    hat: () => part('s_hat', 120, c => { c.beginPath(); c.moveTo(-50, 6); c.quadraticCurveTo(0, -46, 50, 6); c.quadraticCurveTo(0, -8, -50, 6); c.closePath(); ink(c, '#1d3b7a', 3.5); line(c, [[-44, 2], [0, -8], [44, 2]], 3, P.yellow); circle(c, 0, -18, 7, P.tomato, 2.6); circle(c, 0, -18, 3, P.white, 0); }),
+    arm: () => part('s_arm', 90, c => { line(c, [[0, 0], [34, -4]], 6, '#7a4a2a'); line(c, [[24, -3], [32, -14]], 4, '#7a4a2a'); line(c, [[28, -4], [40, 2]], 4, '#7a4a2a'); }),
+    sabre: () => part('s_sabre', 120, c => { path(c, [[0, -4], [70, -12], [78, -8], [70, -4], [0, 4]]); ink(c, '#c9f3ff', 3); line(c, [[6, -2], [66, -9]], 2, P.white); roundRect(c, -10, -9, 12, 18, 4); ink(c, P.yellow, 2.6); }),
+    flake: () => part('s_flake', 30, c => { for (let k = 0; k < 3; k++) { c.save(); c.rotate(k * Math.PI / 3); line(c, [[-9, 0], [9, 0]], 3.4); line(c, [[-9, 0], [9, 0]], 1.6, P.white); c.restore(); } })
+  };
+  function snowman(c, q) {
+    const { t, look, charge, roar, phase } = q, m = q.motion ? 1 : 0, rage = phase >= 3;
+    const step = Math.sin(t * 4) * m, stomp = Math.max(roar, q.stomp || 0);
+    if (!white) oval(c, 0, 68, 72, 16, '#0d2a5488');
+    const flake = S.flake();
+    orbit(c, 5, 120, 26, 10, t * .8 * m, true, (x, y, s, a) => put(c, flake, x, y, a, s));
+    c.translate(0, -stomp * 10); c.save(); c.translate(0, 70); c.scale(1 + stomp * .08, 1 - stomp * .08); c.translate(0, -70);
+    put(c, S.ball(52), step * 2, 26); 
+    const throwing = charge, ax = 44, ay = -40;
+    put(c, S.arm(), -ax + 4, ay + 6 + step * 2, Math.PI + (.4 - roar * .6), 1, -1);
+    put(c, S.sabre(), -ax - 26, ay - 6 + step * 2, Math.PI + .5 - roar * .9 - stomp * .3);
+    put(c, S.ball(38), -step * 2, -34 + Math.abs(step) * 2);
+    put(c, S.coat(), -step * 2, -34 + Math.abs(step) * 2);
+    // Throwing arm winds back with a snowball while a volley is coming.
+    const wind = -.5 - throwing * 1.6;
+    put(c, S.arm(), ax - 4, ay + 6, wind);
+    if (!white || true) { const hx = ax - 4 + Math.cos(wind) * 36, hy = ay + 6 + Math.sin(wind) * 36; if (!white) circle(c, hx, hy, 10 + throwing * 4, P.white, 3); }
+    const hb = -88 + Math.abs(step) * 3 - roar * 4;
+    put(c, S.ball(30), step * 1.5, hb);
+    c.save(); c.translate(step * 1.5 + look[0] * 3 * m, hb);
+    eye(c, -11, -6, 6.5, look, { angry: 1.5 + roar * .5, pupil: rage ? P.tomato : P.ink });
+    eye(c, 11, -6, 6.5, look, { angry: -1.5 - roar * .5, pupil: rage ? P.tomato : P.ink });
+    if (!white) {
+      const dir = look[0] >= 0 ? 1 : -1; path(c, [[0, 0], [dir * 30, 4], [0, 8]]); ink(c, P.orange, 2.6);
+      if (roar > .2) oval(c, 0, 18, 9, 4 + roar * 4, P.ink, 0); else for (let k = -2; k <= 2; k++) circle(c, k * 5, 17 - Math.abs(k) * 1.4, 2.2, P.ink, 0);
+    }
+    c.restore();
+    put(c, S.hat(), step * 1.5, hb - 26 - roar * 6, Math.sin(t * 2.2) * .06 * m);
+    c.restore();
+    orbit(c, 5, 120, 26, 10, t * .8 * m, false, (x, y, s, a) => put(c, flake, x, y, a, s));
+  }
+
+  // --- ドーナツ魔神: a frosted donut genie with a soft-serve tail and a spinning sprinkle halo -------
+  const SPR = [P.mint, P.yellow, P.sky, P.white, P.coral, P.purple];
+  const D = {
+    ring: rage => part('d_ring' + rage, 170, c => {
+      const R = 64, r = 20, ring = () => { c.beginPath(); c.arc(0, 0, R, 0, TAU); c.arc(0, 0, r, 0, TAU, true); };
+      ring(); ink(c, '#f2c48d', 4);
+      c.save(); ring(); c.clip(); oval(c, 0, 52, 80, 26, '#d99a5b');
+      // Frosting: the top of the ring, ending in a wavy drip line.
+      const drip = x => 10 + Math.sin(x * .13) * 6 + Math.max(0, Math.sin(x * .07 + 1)) * 12;
+      c.beginPath(); c.moveTo(-R - 6, -R - 6); c.lineTo(R + 6, -R - 6); for (let x = R + 6; x >= -R - 6; x -= 4) c.lineTo(x, drip(x)); c.closePath(); c.fillStyle = rage ? '#ff5f8a' : P.pink; c.fill();
+      c.beginPath(); for (let x = R + 6; x >= -R - 6; x -= 4) x === R + 6 ? c.moveTo(x, drip(x)) : c.lineTo(x, drip(x)); c.lineWidth = 3; c.strokeStyle = P.ink; c.stroke();
+      for (let i = 0; i < 24; i++) { const a = Math.PI * 1.05 + (i * 0.37) % (Math.PI * .9), d = 32 + (i * 11) % 26, x = Math.cos(a) * d, y = Math.sin(a) * d; if (y > drip(x) - 6) continue; c.save(); c.translate(x, y); c.rotate(i * 1.7); c.fillStyle = SPR[i % SPR.length]; c.fillRect(-4.5, -1.6, 9, 3.2); c.restore(); }
+      c.restore();
+      ring(); ink(c, null, 4); circle(c, 0, 0, r, null, 3);
+      shine(c, -32, -40, 11, 4, -.8);
+    }),
+    tail: () => part('d_tail', 140, c => {
+      c.beginPath(); c.moveTo(-34, -10); c.quadraticCurveTo(-30, 30, -4, 54); c.quadraticCurveTo(10, 66, 22, 56); c.quadraticCurveTo(30, 46, 18, 42); c.quadraticCurveTo(28, 20, 34, -10); c.closePath(); ink(c, P.white, 4);
+      for (const [y, w] of [[2, 30], [20, 24], [36, 16]]) line(c, [[-w, y], [w * .8, y + 6]], 3, '#ffc4dd');
+    }),
+    arm: () => part('d_arm', 80, c => { line(c, [[0, 0], [26, 6]], 13); line(c, [[0, 0], [26, 6]], 7, '#f2c48d'); circle(c, 32, 8, 10, P.white, 3); }),
+    cherry: () => part('d_cherry', 50, c => { line(c, [[0, -6], [8, -20]], 3, '#2d7a3a'); circle(c, 0, 0, 9, P.tomato, 3); shine(c, -3, -3, 3, 1.6); })
+  };
+  function donut(c, q) {
+    const { t, look, charge, roar, phase } = q, m = q.motion ? 1 : 0, rage = phase >= 3, spin = charge > .5;
+    const hover = Math.sin(t * 2.2) * 8 * m - 30;
+    if (!white) { oval(c, 0, 66, 60 - hover * .2, 15, '#3a0f3188'); }
+    c.translate(0, hover);
+    put(c, D.tail(), Math.sin(t * 3) * 4 * m, 58, Math.sin(t * 2.5) * .08 * m);
+    for (const s of [-1, 1]) put(c, D.arm(), s * 56, -2, s * (spin ? -.6 - Math.sin(t * 14) * .2 : .3 + Math.sin(t * 3 + s) * .2 * m) - (s > 0 ? 0 : Math.PI) * 0, s, 1);
+    // Sprinkle halo: spins fast while it is firing the spiral.
+    if (!white) { const n = 12, sp = t * (spin ? 7 : 1.2) * m * (rage && Math.floor(t / 4) % 2 ? -1 : 1); for (let i = 0; i < n; i++) { const a = sp + i * TAU / n, x = Math.cos(a) * 88, y = Math.sin(a) * 30 - 6; c.save(); c.translate(x, y); c.rotate(a * 2); c.fillStyle = SPR[i % SPR.length]; c.fillRect(-6, -2.2, 12, 4.4); c.lineWidth = 1.6; c.strokeStyle = P.ink; c.strokeRect(-6, -2.2, 12, 4.4); c.restore(); } }
+    put(c, D.ring(rage), 0, 0, 0, 1 + roar * .06 + (spin ? Math.sin(t * 20) * .015 : 0));
+    const hx = look[0] * 4 * m;
+    eye(c, -26 + hx, -30, 10, look, { angry: rage ? 1.3 : roar ? .9 : 0 }); eye(c, 26 + hx, -30, 10, look, { angry: rage ? -1.3 : roar ? -.9 : 0 });
+    if (!white) {
+      const open = Math.max(roar, spin ? .5 : 0);
+      c.beginPath(); c.moveTo(-22 + hx, 34); c.quadraticCurveTo(hx, 48 + open * 14, 22 + hx, 34); c.closePath(); ink(c, P.ink, 3); oval(c, hx, 40 + open * 6, 7, 3 + open * 3, P.coral);
+      oval(c, -40 + hx, -8, 7, 4, '#ff8fc7'); oval(c, 40 + hx, -8, 7, 4, '#ff8fc7');
+    }
+    put(c, D.cherry(), 4, -66 + Math.sin(t * 3.4) * 3 * m - roar * 8, Math.sin(t * 2.6) * .15 * m);
+  }
+
+  const RIGS = { wilds, frost, candy, bat, snowman, donut };
   return {
     draw(c, kind, pose) {
       const q = { t: 0, motion: true, white: false, look: [0, .3], charge: 0, roar: 0, phase: 1, ...pose };

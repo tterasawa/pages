@@ -643,3 +643,56 @@ body.large-text .subtitle span { font-size: 19px; }
 @keyframes sub-in { from { transform: translate(-50%, 12px) scale(.9); opacity: 0; } }
 @media (max-width: 640px) { .subtitle { bottom: 284px; } .subtitle span { font-size: 14px; } .subtitle img { width: 36px; height: 36px; } }
 @media (max-height: 560px) and (orientation: landscape) { .subtitle { bottom: 64px; } }
+
+/* --- v2.8 campaign ------------------------------------------------------------------------- */
+.campaign-button { width: 100%; display: flex; align-items: center; gap: 10px; margin: 2px 0 10px; padding: 10px 12px; border-radius: 18px; border: 4px solid var(--ink); background: linear-gradient(100deg, var(--yellow), var(--orange)); color: var(--ink); box-shadow: var(--pop); text-align: left; transition: transform .12s; }
+.campaign-button:hover { transform: translateY(-2px) rotate(-.4deg); }
+.campaign-button > svg { width: 30px; height: 30px; stroke-width: 2.8; flex: none; }
+.campaign-button span { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.campaign-button strong { font-size: 17px; font-weight: 900; } .campaign-button strong b { color: var(--white); text-shadow: 0 2px 0 var(--ink); margin-left: 4px; }
+.campaign-button small { font-size: 12px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.campaign-button em { display: flex; align-items: center; gap: 3px; font-style: normal; font-family: var(--num); font-weight: 900; font-size: 13px; background: var(--white); border: 3px solid var(--ink); border-radius: 12px; padding: 3px 8px; }
+.campaign-button em svg { width: 16px; height: 16px; fill: var(--yellow); stroke-width: 2; }
+.star-track { display: flex; align-items: center; gap: 3px; margin-top: 3px; font-family: var(--num); font-size: 10.5px; font-weight: 900; padding: 1px 8px; border-radius: 8px; border: 2px solid var(--ink); background: var(--lemon); color: var(--ink); white-space: nowrap; }
+.star-track svg { width: 12px; height: 12px; fill: var(--yellow); stroke-width: 2.4; }
+.star-track.failed { background: #ddd6f0; color: #7a6ca8; text-decoration: line-through; } .star-track.failed svg { fill: #b9add9; }
+/* result */
+.camp-result { margin: 0 0 12px; padding: 10px 12px; border-radius: 18px; border: var(--border); background: var(--white); box-shadow: var(--pop-sm); text-align: left; }
+.camp-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; } .camp-head span { font-family: var(--num); font-weight: 900; font-size: 12px; background: var(--ink); color: var(--cream); padding: 2px 8px; border-radius: 8px; }
+.camp-head strong { flex: 1; font-size: 16px; font-weight: 900; } .camp-head em { display: flex; align-items: center; gap: 3px; font-style: normal; font-family: var(--num); font-weight: 900; font-size: 13px; } .camp-head em svg { width: 15px; height: 15px; fill: var(--yellow); stroke-width: 2; }
+.camp-stars { display: grid; gap: 6px; }
+.cstar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 12px; border: 3px solid var(--ink); background: #ece7f8; color: #7a6ca8; font-size: 13px; font-weight: 800; }
+.cstar svg { width: 28px; height: 28px; flex: none; fill: #cfc6ea; stroke-width: 2.2; color: var(--ink); }
+.cstar span { flex: 1; line-height: 1.3; } .cstar b { font-family: var(--num); font-size: 13px; }
+.cstar.on { background: var(--lemon); color: var(--ink); } .cstar.on svg { fill: var(--orange); }
+.cstar.new { animation: deal .5s cubic-bezier(.3, 1.6, .5, 1) both; animation-delay: var(--d); } .cstar.new svg { animation: star-pop .7s cubic-bezier(.3, 1.8, .5, 1) both; animation-delay: var(--d); } .cstar.new b { color: var(--coral); }
+@keyframes star-pop { 0% { transform: scale(0) rotate(-120deg); } 70% { transform: scale(1.35) rotate(12deg); } 100% { transform: scale(1) rotate(0); } }
+/* dialog */
+#dialog-title small { font-family: var(--num); font-size: 15px; display: inline-flex; align-items: center; gap: 3px; vertical-align: 3px; } #dialog-title small svg { width: 16px; height: 16px; fill: var(--yellow); stroke-width: 2; }
+.camp-milestones { position: relative; height: 12px; margin: 22px 14px 18px; border-radius: 999px; border: 3px solid var(--ink); background: #ece7f8; }
+.camp-milestones > i { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: linear-gradient(90deg, var(--yellow), var(--orange)); }
+.camp-milestones span { position: absolute; top: 50%; transform: translate(-50%, -50%); display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--ink); background: var(--white); }
+.camp-milestones span svg { width: 15px; height: 15px; fill: #cfc6ea; stroke-width: 2; } .camp-milestones span b { position: absolute; top: 28px; font-family: var(--num); font-size: 10px; font-weight: 900; }
+.camp-milestones span.done { background: var(--yellow); } .camp-milestones span.done svg { fill: var(--white); }
+.camp-acts small { font-family: var(--num); font-weight: 900; color: #6b5a9a; }
+.camp-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 12px; }
+.camp-tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px 6px; border-radius: 14px; border: 3px solid var(--ink); background: var(--white); box-shadow: var(--pop-sm); transition: transform .12s; }
+.camp-tile:hover { transform: translateY(-2px); }
+.camp-tile > b { font-family: var(--num); font-size: 20px; font-weight: 900; line-height: 1; }
+.camp-tile.selected { background: var(--sky); transform: translateY(-2px) scale(1.04); }
+.camp-tile.locked { background: #e3ddf2; color: #9a8fc0; box-shadow: none; } .camp-tile.locked > svg { width: 16px; height: 16px; }
+.camp-tile.finale { background: var(--pink); } .camp-tile.finale.selected { background: var(--sky); }
+.camp-tile em { position: absolute; top: -9px; right: -4px; font-style: normal; font-size: 10px; font-weight: 900; background: var(--coral); color: var(--white); border: 2px solid var(--ink); border-radius: 8px; padding: 0 5px; transform: rotate(8deg); }
+.cstars { display: flex; gap: 1px; } .cstars i { display: grid; } .cstars svg { width: 15px; height: 15px; fill: #d6cfeb; stroke-width: 2.2; } .cstars i.on svg { fill: var(--yellow); }
+.camp-detail { display: grid; grid-template-columns: 150px 1fr; gap: 12px; align-items: start; padding: 12px; border-radius: 18px; border: 3px solid var(--ink); background: var(--white); }
+.camp-bosses { display: grid; gap: 6px; } .camp-bosses figure { margin: 0; display: flex; flex-direction: column; align-items: center; padding: 6px; border-radius: 14px; background: #2b1a63; border: 3px solid var(--ink); }
+.camp-bosses img { width: 100%; max-height: 104px; object-fit: contain; } .camp-bosses figcaption { font-size: 11px; font-weight: 900; color: var(--cream); }
+.camp-info h3 { margin: 8px 0 4px; font-size: 21px; font-weight: 900; } .camp-info .eyebrow { font-size: 10px; padding: 3px 10px; letter-spacing: .08em; }
+.camp-meta { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; } .camp-meta span { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 900; padding: 2px 8px; border-radius: 9px; border: 2px solid var(--ink); background: var(--lemon); } .camp-meta svg { width: 13px; height: 13px; }
+.camp-goals { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 5px; }
+.camp-goals li { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 10px; border: 2px solid var(--ink); background: #f3effb; font-size: 12.5px; font-weight: 800; }
+.camp-goals li svg { width: 18px; height: 18px; flex: none; fill: #cfc6ea; stroke-width: 2; } .camp-goals li span { flex: 1; line-height: 1.3; } .camp-goals li b { font-family: var(--num); font-size: 11px; white-space: nowrap; color: #6b5a9a; }
+.camp-goals li.on { background: var(--lemon); } .camp-goals li.on svg { fill: var(--orange); } .camp-goals li.on b { color: var(--ink); }
+#camp-start { width: 100%; } #camp-start:disabled { filter: grayscale(.6); opacity: .7; }
+@media (max-width: 560px) { .camp-detail { grid-template-columns: 1fr; } .camp-bosses { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); } .camp-grid { gap: 6px; } .camp-tile > b { font-size: 17px; } .cstars svg { width: 12px; height: 12px; } }
+@media (prefers-reduced-motion: reduce) { .cstar.new, .cstar.new svg { animation: none; } }

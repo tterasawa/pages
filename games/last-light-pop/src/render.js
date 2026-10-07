@@ -147,6 +147,9 @@ function makeSprites() {
     oval(c, 0, 0, 10, 6, P.ink); oval(c, 0, 0, 8, 4, col); oval(c, 2, -1, 3.5, 1.6, P.white);
   }, 64);
   for (const [name, col] of [['foeA', P.tomato], ['foeB', P.orange]]) S[name] = sprite(c => { circle(c, 0, 0, 10, P.ink, 0); circle(c, 0, 0, 7.5, col, 0); circle(c, -2.2, -2.2, 2.6, P.white, 0); }, 24);
+  // Boss bullets with their own look: snowballs (雪だるま将軍) and candy drops (ドーナツ魔神).
+  S.snowball = sprite(c => { circle(c, 0, 0, 10, P.white, 2.4); oval(c, 1.5, 4, 7, 3.4, '#cfe8ff'); circle(c, 0, 0, 10, null, 2.4); circle(c, -3, -3, 2.4, P.white, 0); }, 26);
+  [P.pink, P.mint, P.yellow, P.sky].forEach((col, i) => { S['drop' + i] = sprite(c => { circle(c, 0, 0, 9.5, P.ink, 0); circle(c, 0, 0, 7, col, 0); circle(c, -2, -2.4, 2.2, P.white, 0); }, 24); });
   for (const [name, body, trim] of [['chest', P.coral, P.yellow], ['chestBig', P.purple, P.yellow]]) S[name] = sprite(c => {
     shadow(c, 16, 20, 5);
     roundRect(c, -18, -2, 36, 18, 4); ink(c, body, 3);
@@ -302,14 +305,14 @@ export class Renderer {
           break;
         case 'bossDown':
           this.kick = Math.max(this.kick, .7); this.flash('#ffffff', .12);
-          if (effects) this.bossDeaths.push({ x: e.x, y: e.y, t: 0, kind: this.stage || 'wilds', popped: false, next: 0 }); else this.bossPop({ x: e.x, y: e.y, kind: this.stage }, false);
+          const kind = BOSS_INFO[e.b] ? e.b : this.stage || 'wilds'; if (effects) this.bossDeaths.push({ x: e.x, y: e.y, t: 0, kind, popped: false, next: 0 }); else this.bossPop({ x: e.x, y: e.y, kind }, false);
           break;
         case 'firework': if (effects) { if (heavy) this.burst(e.x, e.y, this.crowd ? 8 : 22, CONFETTI, 420, { type: this.crowd ? 'dot' : 'star', size: 8, life: .6 }); this.spawn('ring', e.x, e.y, { life: .4, size: e.a, color: P.pink, grow: 1 }); } this.kick = Math.max(this.kick, .25); break;
         case 'star': if (effects) { this.spawn('blast', e.x, e.y, { life: .26, size: e.a, color: P.yellow }); if (heavy) this.burst(e.x, e.y, 6, [P.lemon, P.white], 260, { type: 'star', size: 6, life: .4 }); } break;
         case 'slam': this.kick = Math.max(this.kick, .45); if (effects) { this.spawn('ring', e.x, e.y, { life: .35, size: e.a * 1.2, color: P.tomato, grow: 1 }); this.spawn('puff', e.x, e.y, { life: .3, size: e.a, color: '#ff5a5f' }); } break;
         case 'special': { const words = ['MAGNET!', 'BOMB!!', 'FREEZE!', 'STAR POWER!'], cols = [P.coral, P.orange, P.sky, P.yellow]; this.flash(e.a === 1 ? '#ffffff' : e.a === 2 ? '#c9f3ff' : '#fff7d6', e.a === 1 ? .5 : .25); this.kick = Math.max(this.kick, e.a === 1 ? 1.1 : .4); this.zoomKick = .07;
           if (effects) { this.spawn('ring', e.x, e.y, { life: .6, size: e.a === 1 ? 700 : 260, color: cols[e.a], grow: 1 }); this.confetti(e.x, e.y, heavy ? 60 : 18, 520); this.comic(e.x, e.y - 100, words[e.a], cols[e.a], 1.4); } break; }
-        case 'bossPhase': this.flash('#ff5a5f', .3); this.kick = Math.max(this.kick, .9); this.bossRoarAt = this.clock; if (effects) { for (let k = 0; k < 18; k++) { const a = k / 18 * TAU; this.spawn('line', e.x + Math.cos(a) * 90, e.y - 40 + Math.sin(a) * 90, { vx: Math.cos(a) * 900, vy: Math.sin(a) * 900, life: .35, size: 16, color: k % 2 ? P.white : (BOSS_INFO[this.stage] || BOSS_INFO.wilds).color, drag: 2 }); } this.spawn('ring', e.x, e.y, { life: .5, size: 220, color: P.magenta, grow: 1 }); this.comic(e.x, e.y - 90, e.a >= 3 ? 'RAGE!!' : 'ANGRY!', P.tomato, 1.5); } break;
+        case 'bossPhase': this.flash('#ff5a5f', .3); this.kick = Math.max(this.kick, .9); this.bossRoarAt = this.clock; if (effects) { for (let k = 0; k < 18; k++) { const a = k / 18 * TAU; this.spawn('line', e.x + Math.cos(a) * 90, e.y - 40 + Math.sin(a) * 90, { vx: Math.cos(a) * 900, vy: Math.sin(a) * 900, life: .35, size: 16, color: k % 2 ? P.white : (BOSS_INFO[e.b] || BOSS_INFO[this.stage] || BOSS_INFO.wilds).color, drag: 2 }); } this.spawn('ring', e.x, e.y, { life: .5, size: 220, color: P.magenta, grow: 1 }); this.comic(e.x, e.y - 90, e.a >= 3 ? 'RAGE!!' : 'ANGRY!', P.tomato, 1.5); } break;
         case 'heal': if (effects) { this.spawn('ring', e.x, e.y, { life: .45, size: e.a, color: P.pink, grow: 1 }); for (let k = 0; k < 6; k++) this.spawn('twinkle', e.x + (Math.random() - .5) * e.a, e.y + (Math.random() - .5) * e.a, { life: .5, size: 9, color: P.mint, vy: -40 }); } break;
         case 'shieldBreak': if (effects) { this.burst(e.x, e.y, 10, [P.white, P.sky], 300, { type: 'spark', size: 10, life: .3 }); this.comic(e.x, e.y - 30, 'BREAK!', P.sky, .7); } break;
         case 'relic': this.flash('#e5d4ff', .3); this.zoomKick = .08; if (effects) { for (let k = 0; k < 3; k++) this.spawn('ring', e.x, e.y, { life: .5 + k * .15, size: 120 + k * 80, color: [P.purple, P.pink, P.lemon][k], grow: 1 }); this.confetti(e.x, e.y, heavy ? 60 : 18, 480); this.comic(e.x, e.y - 100, 'RELIC!', P.purple, 1.3); } break;
@@ -456,12 +459,12 @@ export class Renderer {
       const size = ENEMY_SIZES[e.type], speed = e.type === 1 ? 14 : 7, wob = motion ? Math.sin(game.time * speed + e.phase) : 0;
       const hitPop = e.hit > 0 ? 1 + e.hit * 2.2 : 1, sqx = (1 + wob * .06) * hitPop, sqy = (1 - wob * .06) / Math.sqrt(hitPop) * (e.hit > 0 ? 1.05 : 1);
       const flip = e.x > p.x && e.type !== 3 && e.type !== 4, set = e.hit > .03 ? this.white : this.sprites, lift = Math.abs(wob) * (e.type === 1 ? 4 : 2);
-      const tele = (e.type === 5 || e.type === 10) && e.ai === 1;
+      const tele = (e.type === 5 || e.type === 10 || e.type === 4 && e.kind === 'bat') && e.ai === 1;
       if (fast && e.type !== 4 && e.type !== 11 && !e.elite && !tele && !(e.type === 8 && e.shield > 0)) { this.blit('enemy' + e.type, set, flip, ox + (e.x - this.camera.x) * k, oy + (e.y - lift - this.camera.y) * k, size); continue; }
       if (fast) { c.setTransform(k, 0, 0, k, ox - this.camera.x * k, oy - this.camera.y * k); c.imageSmoothingEnabled = true; }
       if (e.elite) { c.strokeStyle = P.yellow; c.lineWidth = 4; c.setLineDash([10, 8]); c.lineDashOffset = -this.clock * 40; c.beginPath(); c.ellipse(e.x, e.y + e.r * .6, e.r * 1.25, e.r * .5, 0, 0, TAU); c.stroke(); c.setLineDash([]); }
-      if (tele) { const len = e.type === 5 ? 420 : 640, a = 1 - e.aiT / (e.type === 5 ? .75 : .8); c.strokeStyle = e.type === 5 ? `rgba(255,159,28,${.4 + a * .5})` : `rgba(255,90,95,${.3 + a * .6})`; c.lineWidth = e.type === 5 ? 26 * (1 - a * .5) : 3 + a * 3; c.setLineDash(e.type === 5 ? [16, 10] : [6, 6]); c.beginPath(); c.moveTo(e.x, e.y); c.lineTo(e.x + e.cx * len, e.y + e.cy * len); c.stroke(); c.setLineDash([]); }
-      if (big) this.drawBoss(e, p, motion); else this.sprite('enemy' + e.type, e.x, e.y - lift, e.elite ? size * 1.45 : size, e.type === 1 ? wob * .12 : 0, 1, flip ? -sqx : sqx, sqy, set);
+      if (tele) { const bat = e.type === 4, len = bat ? 420 : e.type === 5 ? 420 : 640, a = 1 - e.aiT / (e.type === 10 ? .8 : .75); c.strokeStyle = bat ? `rgba(155,93,229,${.45 + a * .5})` : e.type === 5 ? `rgba(255,159,28,${.4 + a * .5})` : `rgba(255,90,95,${.3 + a * .6})`; c.lineWidth = bat ? 90 * (1 - a * .4) : e.type === 5 ? 26 * (1 - a * .5) : 3 + a * 3; c.setLineDash(e.type === 10 ? [6, 6] : [16, 10]); c.beginPath(); c.moveTo(e.x, e.y); c.lineTo(e.x + e.cx * len, e.y + e.cy * len); c.stroke(); c.setLineDash([]); }
+      if (big) this.drawBoss(e, p, motion, game); else this.sprite('enemy' + e.type, e.x, e.y - lift, e.elite ? size * 1.45 : size, e.type === 1 ? wob * .12 : 0, 1, flip ? -sqx : sqx, sqy, set);
       if (e.type === 8 && e.shield > 0) this.sprite('shield', e.x, e.y - lift, 64, Math.atan2(p.y - e.y, p.x - e.x), .5 + e.shield * .17);
       if (e.elite) { this.sprite('crown', e.x, e.y - e.r * 1.35 - lift + (motion ? Math.sin(this.clock * 5) * 2 : 0), 34); if (e.hp < e.maxHP) { const bw = 56, by = e.y - e.r * 1.7; roundRect(c, e.x - bw / 2 - 2, by - 2, bw + 4, 9, 4); c.fillStyle = P.ink; c.fill(); roundRect(c, e.x - bw / 2, by, Math.max(4, bw * e.hp / e.maxHP), 5, 2.5); c.fillStyle = P.yellow; c.fill(); } }
       if (e.slow > 0) { c.fillStyle = '#9be7ff55'; c.beginPath(); c.ellipse(e.x, e.y + e.r * .7, e.r + 4, 6, 0, 0, TAU); c.fill(); }
@@ -471,7 +474,7 @@ export class Renderer {
     if (fast) { c.setTransform(k, 0, 0, k, ox - this.camera.x * k, oy - this.camera.y * k); c.imageSmoothingEnabled = true; }
     for (const b of game.bullets) {
       if (b.x < x0 || b.x > x1 || b.y < y0 || b.y > y1) continue;
-      if (b.hostile) { const sz = (b.r + 3) * 2.4; this.sprite(this.frame % 8 < 4 ? 'foeA' : 'foeB', b.x, b.y, sz); continue; }
+      if (b.hostile) { const sz = (b.r + 3) * 2.4; this.sprite(b.look === 'snow' ? 'snowball' : b.look?.startsWith('sprinkle') ? 'drop' + b.look.slice(8) : this.frame % 8 < 4 ? 'foeA' : 'foeB', b.x, b.y, sz); continue; }
       if (b.boomer) { this.sprite('boomerS', b.x, b.y, b.r * 3.6, this.clock * 18); continue; }
       const sp = Math.hypot(b.vx, b.vy) || 1, cs = b.vx / sp, sn = b.vy / sp, img = this.sprites[b.color === 'purple' ? 'shotP' : 'shotY'];
       c.setTransform(cs * k, sn * k, -sn * k, cs * k, ox + (b.x - this.camera.x) * k, oy + (b.y - this.camera.y) * k);
@@ -574,23 +577,30 @@ export class Renderer {
     }
   }
   // --- stage bosses ----------------------------------------------------------------------------
-  drawBoss(e, p, motion) {
-    const c = this.ctx, kind = (BOSS_INFO[this.stage] ? this.stage : 'wilds'), scale = e.final ? 1.12 : 1, dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy) || 1;
+  drawBoss(e, p, motion, game) {
+    const c = this.ctx, kind = BOSS_INFO[e.kind] ? e.kind : BOSS_INFO[this.stage] ? this.stage : 'wilds', scale = e.final ? 1.12 : 1, dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy) || 1;
     // Hit flash, throttled: a boss is hit almost every frame, so it flashes briefly at most ~4× a second.
     let f = this.bossFx.get(e.id); if (!f) { f = { flashAt: -9 }; this.bossFx.set(e.id, f); if (this.bossFx.size > 12) this.bossFx.delete(this.bossFx.keys().next().value); }
     if (e.hit > .03 && this.clock - f.flashAt > .4) f.flashAt = this.clock;
     const white = this.opts.flash && this.clock - f.flashAt < .07, phase = e.phase2 || 1, roar = motion ? Math.max(0, 1 - (this.clock - this.bossRoarAt) / .9) : 0;
-    const charge = motion && e.type === 4 ? Math.max(phase >= 2 ? 1 - e.ringCD / .7 : 0, phase >= 3 ? 1 - e.slamCD / .6 : 0, kind === 'frost' && phase >= 2 ? 1 - e.spikeCD / .6 : 0, 0) : 0;
-    const flip = kind !== 'wilds' && dx < 0, pop = 1 + Math.min(.12, e.hit * .6);
+    let charge = 0, dive = false, stomp = 0;
+    if (motion && e.type === 4) {
+      if (kind === 'bat') { charge = e.dive === 1 ? 1 - e.aiT / .75 : 0; dive = e.dive === 2; }
+      else if (kind === 'snowman') { charge = Math.max(0, 1 - e.ballCD / .6); const st = game.time - (e.stompAt ?? -9); stomp = st > .85 && st < 1.3 ? Math.sin((st - .85) / .45 * Math.PI) : 0; }
+      else if (kind === 'donut') charge = e.spinning ? 1 : 0;
+      else charge = Math.max(phase >= 2 ? 1 - e.ringCD / .7 : 0, phase >= 3 ? 1 - e.slamCD / .6 : 0, kind === 'frost' && phase >= 2 ? 1 - e.spikeCD / .6 : 0, 0);
+    }
+    const flip = (kind === 'frost' || kind === 'candy' || kind === 'snowman') && dx < 0, pop = 1 + Math.min(.12, e.hit * .6);
     c.save(); c.translate(e.x, e.y); c.scale(scale * pop * (flip ? -1 : 1), scale / Math.sqrt(pop));
-    const pose = { t: this.clock + (e.id % 7) * .37, motion, look: [(flip ? -dx : dx) / d, dy / d], charge: Math.min(1, charge), roar, phase };
+    const pose = { t: this.clock + (e.id % 7) * .37, motion, look: [(flip ? -dx : dx) / d, dy / d], charge: Math.min(1, Math.max(0, charge)), roar, phase, dive, stomp };
     this.bossArt.draw(c, kind, pose);
     if (white) { c.globalAlpha = .55; this.bossArt.draw(c, kind, { ...pose, white: true }); c.globalAlpha = 1; } // soft hit flash, at most ~2× a second
     c.restore();
     if (motion && !this.low && !this.crowd && this.frame % 5 === 0) {
       const rx = e.x + (Math.random() - .5) * 220, ry = e.y - 40 + (Math.random() - .5) * 160;
-      if (kind === 'wilds') this.spawn('twinkle', rx, ry, { life: .7, size: 9, color: Math.random() < .5 ? P.lemon : P.pink, vy: 30, vr: 4 });
-      else if (kind === 'frost') this.spawn('dot', rx, ry - 60, { life: 1.1, size: 4, color: P.white, vy: 70, vx: -20, drag: 0 });
+      const home = { bat: 'wilds', snowman: 'frost', donut: 'candy' }[kind] || kind;
+      if (home === 'wilds') this.spawn('twinkle', rx, ry, { life: .7, size: 9, color: Math.random() < .5 ? P.lemon : P.pink, vy: 30, vr: 4 });
+      else if (home === 'frost') this.spawn('dot', rx, ry - 60, { life: 1.1, size: 4, color: P.white, vy: 70, vx: -20, drag: 0 });
       else this.spawn('confetti', rx, ry - 40, { life: 1, size: 6, color: CONFETTI[this.frame & 7], vy: -60, g: 260, drag: 1, vr: 8 });
     }
     if (roar > .6 && kind === 'candy' && motion && this.frame % 3 === 0) this.spawn('puff', e.x + (Math.random() - .5) * 60, e.y - 110 * scale, { life: .5, size: 22, color: '#ffffffaa', vy: -120 });

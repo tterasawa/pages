@@ -1,4 +1,5 @@
-import { Game, MODES, UPGRADES, HEATS, MUTATORS, EVOLVE_PAIRS, SLOT_LIMIT, CHARACTERS, EVENTS, STAGES, RELICS, CURSES, formatTime } from './core.js';
+import { Game, MODES, UPGRADES, HEATS, MUTATORS, EVOLVE_PAIRS, SLOT_LIMIT, CHARACTERS, EVENTS, STAGES, RELICS, CURSES, BOSSES, formatTime } from './core.js';
+import { CHAPTERS, chapter, chapterOptions, chapterUnlocked, nextChapter, totalStars, CAMPAIGN_STARS, MILESTONES, recordChapter, starLabels, starReward, star3Status, bossNames } from './campaign.js';
 import { SHOP, shopCost, ACHIEVEMENTS, sanitizeProfile, buy, refundAll, recordRun, checkProfileAchievements, CODEX, codexProgress, SKINS, skinUnlocked, UNLOCKS, lockedWeapons, characterUnlocked, stageUnlocked, dailyConfig, describeDaily, heatMultiplier, localDate } from './meta.js';
 import { Renderer } from './render.js';
 import { AudioEngine, MUSIC_BPM } from './audio.js';
@@ -7,7 +8,7 @@ import { ComboMeter, rankFor, musicIntensity } from './hype.js';
 
 const $ = s => document.querySelector(s); const $$ = s => [...document.querySelectorAll(s)];
 const icon = (name, cls = '') => `<svg class="${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
-const APP_VERSION = 'V 2.7.0';
+const APP_VERSION = 'V 2.8.0';
 const SETTINGS_KEY = 'lastlight-pop-settings-v1', RECORDS_KEY = 'lastlight-pop-records-v1', PROFILE_KEY = 'lastlight-pop-profile-v1';
 const DEFAULT_SETTINGS = { sound: true, music: 0.42, sfx: 0.6, quality: 'auto', vibration: true, heat: 0, shake: 1, flash: true, numbers: true, largeText: false, hints: true, voice: .9, subtitles: true, keyDash: 'Space', keyPulse: 'KeyQ' };
 const EMPTY_RECORDS = { runs: 0, wins: 0, totalKills: 0, bestKills: 0, bestTime: 0, bestCombo: 0, modes: {} };
@@ -41,9 +42,11 @@ function warning(text) { const el = $('#warning-banner'); $('#warning-text').tex
 function hideScreens() { $$('#home-screen,#hud,#upgrade-screen,#chest-screen,#relic-screen,#pause-screen,#ending-screen,#result-screen').forEach(x => x.hidden = true); }
 function primeAudio() { if (audioPrimed || !settings.sound) return; audioPrimed = true; audio.setScene(game ? 'play' : 'home'); void audio.unlock(); }
 
+let lastStart = {};
 function start(opts = {}) {
-  const daily = !!opts.daily;
-  if (daily) { const cfg = dailyConfig(); runInfo = { daily: true, heat: cfg.heat, mutators: cfg.mutators, day: cfg.day }; game = new Game(cfg.mode, cfg.seed, { heat: cfg.heat, mutators: cfg.mutators }); }
+  const daily = !!opts.daily; lastStart = opts;
+  if (opts.chapter) { const ch = chapter(opts.chapter); runInfo = { daily: false, campaign: ch.id, heat: ch.heat, mutators: ch.mutators, day: '' }; game = new Game('campaign', Date.now(), { ...chapterOptions(ch), meta: profile.meta, character: characterUnlocked(profile, profile.character) ? profile.character : 'keeper', locked: lockedWeapons(profile) }); }
+  else if (daily) { const cfg = dailyConfig(); runInfo = { daily: true, heat: cfg.heat, mutators: cfg.mutators, day: cfg.day }; game = new Game(cfg.mode, cfg.seed, { heat: cfg.heat, mutators: cfg.mutators }); }
   else { runInfo = { daily: false, heat: settings.heat, mutators: [], day: '' }; game = new Game(mode, Date.now(), { stage: stageUnlocked(profile, profile.stage) ? profile.stage : 'wilds', heat: settings.heat, meta: profile.meta, character: characterUnlocked(profile, profile.character) ? profile.character : 'keeper', locked: lockedWeapons(profile) }); }
   game.start(); clearRun(); enterRun(false);
 }
@@ -53,7 +56,8 @@ function enterRun(resumed) {
   prevState = ''; accumulator = 0; document.body.classList.add('playing'); renderer.camera.x = game.player.x; renderer.camera.y = game.player.y; renderer.resize();
   audioPrimed = true; audio.setScene('play'); void audio.unlock(); audio.setActive(true);
   $('#dash-button kbd').textContent = settings.keyDash.replace('Key', '').toUpperCase(); $('#pulse-button kbd').textContent = settings.keyPulse.replace('Key', '').toUpperCase();
-  $('#mission-label').textContent = `${MODES[game.mode].name}・${STAGES[game.stage].name}`;
+  const camp = runInfo.campaign ? chapter(runInfo.campaign) : null; lastTrack = '';
+  $('#mission-label').textContent = camp ? `第${camp.id}章・${camp.name}` : `${MODES[game.mode].name}・${STAGES[game.stage].name}`; $('#star-track').hidden = !camp;
   $('#hud-chips').innerHTML = (runInfo.daily ? `<span class="daily">DAILY ${runInfo.day.slice(5).replace('-', '/')}</span>` : '') + (runInfo.heat ? `<span>ヒート${runInfo.heat}</span>` : '') + runInfo.mutators.map(id => `<span class="daily">${MUTATORS[id].name}</span>`).join(''); $('#time-target').textContent = '/ ' + formatTime(game.duration); $('#movement-hint').hidden = false; $('#announcement').hidden = true; $('#warning-banner').hidden = true; $('#combo').hidden = true;
   transition(); updateHUD(); preloadRunVoices(); for (const k in voiceAt) delete voiceAt[k]; audio.stopVoice(); if (resumed) { announce('おかえり！続きからスタート'); return; } renderer.celebrate('start', game); announce('READY… GO!!');
   void audio.preloadVoices([`voice.${game.character || 'keeper'}.start`]).then(() => setTimeout(() => { if (game?.time < 4) speak('start', { priority: 2 }); }, 350));
@@ -67,13 +71,13 @@ function showSubtitle(line, boss) {
   el.classList.toggle('boss', !!boss); el.hidden = true; void el.offsetWidth; el.hidden = false; clearTimeout(subtitleTimer); subtitleTimer = setTimeout(() => el.hidden = true, Math.max(1600, (line.duration || 2) * 1000 + 700));
 }
 // Speak a line for the current hero (or a boss). cooldown in seconds; chance < 1 keeps frequent events from nagging.
-function speak(event, { boss = false, priority = 1, cooldown = 0, chance = 1, queue = false } = {}) {
-  if (!game) return; const who = boss ? 'boss_' + game.stage : game.character || 'keeper', id = `voice.${who}.${event}`, now = performance.now() / 1000;
+function speak(event, { boss = false, kind = null, priority = 1, cooldown = 0, chance = 1, queue = false } = {}) {
+  if (!game) return; const who = boss ? 'boss_' + (kind || game.boss?.kind || game.stage) : game.character || 'keeper', id = `voice.${who}.${event}`, now = performance.now() / 1000;
   if (cooldown && now - (voiceAt[id] ?? -1e9) < cooldown) return; if (chance < 1 && Math.random() > chance) return;
   const line = audio.playVoice(id, { priority, queue }); if (!line && !queue) return; voiceAt[id] = now;
   if (line) showSubtitle(line, boss); else if (queue) setTimeout(() => { const l = audio.voiceIndex?.[id]; if (l && audio.voicePlaying?.id === id) showSubtitle(l, boss); }, 1800);
 }
-function preloadRunVoices() { const who = game.character || 'keeper'; void audio.preloadVoices(['start', 'levelup', 'evolve', 'lowhp', 'revive', 'victory', 'defeat'].map(e => `voice.${who}.${e}`).concat(['appear', 'rage', 'fall'].map(e => `voice.boss_${game.stage}.${e}`))); }
+function preloadRunVoices() { const who = game.character || 'keeper'; void audio.preloadVoices(['start', 'levelup', 'evolve', 'lowhp', 'revive', 'victory', 'defeat'].map(e => `voice.${who}.${e}`).concat([...new Set([game.bossPlan.mid, ...game.bossPlan.final])].flatMap(k => ['appear', 'rage', 'fall'].map(e => `voice.boss_${k}.${e}`)))); }
 // --- suspend / resume -------------------------------------------------------------------------
 const RUN_KEY = 'lastlight-pop-run-v1'; let lastSave = 0;
 function saveRun() { if (!game || ending || !['running', 'paused', 'upgrade', 'chest', 'relic'].includes(game.state)) return; try { localStorage.setItem(RUN_KEY, JSON.stringify({ v: 1, at: Date.now(), runInfo, combo: { count: combo.count, best: combo.best }, kills: lastKills, game: game.snapshot() })); lastSave = performance.now(); } catch { } }
@@ -221,8 +225,8 @@ function pollPad(now) {
   }
   pad.prev = b;
 }
-function runSummary(won) { const st = game.stats; return { mode: game.mode, won, time: game.time, kills: game.kills, level: game.level, heat: runInfo.heat, combo: combo.best, evolves: st.evolves, jackpots: st.jackpots, elites: st.elites, bossKills: st.bossKills, bossHits: st.bossHits, chests: st.chests, daily: runInfo.daily, specials: st.specials, character: game.character, stage: game.stage, relics: st.relics, curses: game.curses.length, fusions: st.fusions, codex: [...game.seen, ...UPGRADES.filter(u => game.levels[u.id] > 0).map(u => u.id), ...[...game.relics].map(id => 'relic_' + id)] }; }
-function finalizeRun(won) { if (!game || resultSaved) return runResult; clearRun(); const best = storeResult(won); runResult = { best, ...recordRun(profile, runSummary(won), runInfo.day || localDate()) }; saveProfile(); updateStars(true); return runResult; }
+function runSummary(won) { const st = game.stats; return { mode: game.mode, won, time: game.time, kills: game.kills, level: game.level, heat: runInfo.heat, combo: combo.best, evolves: st.evolves, jackpots: st.jackpots, elites: st.elites, bossKills: st.bossKills, bossHits: st.bossHits, chests: st.chests, daily: runInfo.daily, specials: st.specials, character: game.character, stage: game.stage, relics: st.relics, curses: game.curses.length, fusions: st.fusions, chapter: runInfo.campaign || 0, hits: st.hits, lowHp: st.lowHp ?? 1, bossSlowest: st.bossSlowest, dashes: st.dashes, pulses: st.pulses, codex: [...game.seen, ...UPGRADES.filter(u => game.levels[u.id] > 0).map(u => u.id), ...[...game.relics].map(id => 'relic_' + id)] }; }
+function finalizeRun(won) { if (!game || resultSaved) return runResult; clearRun(); const best = storeResult(won), summary = runSummary(won), campaign = runInfo.campaign ? recordChapter(profile, runInfo.campaign, summary) : null; runResult = { best, campaign, ...recordRun(profile, summary, runInfo.day || localDate()) }; saveProfile(); updateStars(true); return runResult; }
 function storeResult(won) {
   if (!game || resultSaved) return false; resultSaved = true;
   const best = game.time > records.bestTime || game.kills > records.bestKills || combo.best > records.bestCombo;
@@ -245,10 +249,20 @@ function renderResult() {
   $('#damage-board').innerHTML = rows.length ? `<h4><span>ダメージ内訳</span><span>DPS ${Math.round(totalDmg / Math.max(1, game.time)).toLocaleString()}</span></h4>` + rows.map(([id, v]) => { const u = UPGRADES.find(x => x.id === id); return `<div class="dmg-row" style="--c:${POP_COLORS[id] || 'var(--lemon)'}">${icon(u ? u.icon : id === 'pulse' ? 'nova' : id === 'bomb' ? 'mine' : 'light')}<span>${u ? u.name : names[id] || id}</span><div class="dmg-bar"><i data-w="${(v / rows[0][1] * 100).toFixed(1)}"></i></div><b>${Math.round(v / totalDmg * 100)}%<small> · ${(game.killsBy[id] || 0).toLocaleString()}体</small></b></div>`; }).join('') : '';
   setTimeout(() => $$('.dmg-bar i').forEach(i => i.style.width = i.dataset.w + '%'), 600);
   if (game.endless) { $('#result-title').textContent = `${formatTime(game.time)} 生き残った！`; $('#result-eyebrow').textContent = 'ENDLESS NIGHT'; $('#result-copy').textContent = `自己ベスト ${formatTime(profile.endlessBest)}`; }
-  $('#result-unlocks').innerHTML = res.newlyUnlocked.map(u => `<div class="unlock new">${icon(u.kind === 'weapon' ? UPGRADES.find(x => x.id === u.id).icon : 'user')}${u.kind === 'weapon' ? '新しい武器' : '新キャラクター'}「${u.label}」が解放された！<small>NEW!</small></div>`).join('') + (res.heatUnlocked ? `<div class="unlock heat">${icon('flame')}ヒート${res.heatUnlocked}「${HEATS[res.heatUnlocked].name}」が解放された！<small>★×${heatMultiplier(res.heatUnlocked).toFixed(2)}</small></div>` : '') + res.unlocked.map(a => `<div class="unlock">${icon('medal')}実績「${a.name}」達成！<small>★ +${a.reward}</small></div>`).join('');
+  $('#result-unlocks').innerHTML = res.newlyUnlocked.map(u => `<div class="unlock new">${icon(u.kind === 'weapon' ? UPGRADES.find(x => x.id === u.id).icon : u.kind === 'stage' ? 'book' : 'user')}${u.kind === 'weapon' ? '新しい武器' : u.kind === 'stage' ? '新ステージ' : '新キャラクター'}「${u.label}」が解放された！<small>NEW!</small></div>`).join('') + (res.heatUnlocked ? `<div class="unlock heat">${icon('flame')}ヒート${res.heatUnlocked}「${HEATS[res.heatUnlocked].name}」が解放された！<small>★×${heatMultiplier(res.heatUnlocked).toFixed(2)}</small></div>` : '') + res.unlocked.map(a => `<div class="unlock">${icon('medal')}実績「${a.name}」達成！<small>★ +${a.reward}</small></div>`).join('');
   if (res.unlocked.length) setTimeout(() => audio.effect('achieve'), 1400); if (res.newlyUnlocked.length) setTimeout(() => audio.effect('unlock'), 2000);
+  renderCampaignResult(res.campaign);
   $('#result-relics').innerHTML = UPGRADES.filter(u => u.tag === 'FUSION' && game.levels[u.id] > 0).map(u => `<span style="--c:${u.color}">${icon(u.icon)} ${u.name}</span>`).join('') + [...game.relics].map(id => `<span style="--c:${RELICS[id].color}">${icon(RELICS[id].icon)} ${RELICS[id].name}</span>`).join('');
   $('#result-build').innerHTML = UPGRADES.filter(u => u.tag === 'WEAPON' && game.levels[u.id] > 0).map(u => `<span style="--c:${POP_COLORS[u.id]}" title="${u.name}">${icon(u.icon)} ${game.levels[u.id] === 5 ? '★MAX' : 'Lv' + game.levels[u.id]}</span>`).join('');
+}
+function renderCampaignResult(c) {
+  const box = $('#camp-result'); box.hidden = !c; $('#next-chapter').hidden = true; $('#retry-button').classList.toggle('secondary-button', false); if (!c) return;
+  const ch = chapter(c.chapter), labels = starLabels(ch);
+  box.innerHTML = `<div class="camp-head"><span>第${ch.id}章</span><strong>${ch.name}</strong><em>${icon('star')} ${c.total} / ${CAMPAIGN_STARS}</em></div><div class="camp-stars">${[0, 1, 2].map(i => `<div class="cstar ${c.stars[i] ? 'on' : ''} ${c.fresh[i] ? 'new' : ''}" style="--d:${.35 + i * .35}s">${icon('star')}<span>${labels[i]}</span>${c.fresh[i] ? `<b>+${starReward(ch, i)}</b>` : c.got[i] ? '<b>✓</b>' : ''}</div>`).join('')}</div>`
+    + c.milestones.map(m => `<div class="unlock">${icon('star')}★${m.stars}個 達成ボーナス！<small>★ +${m.reward}${m.skin ? '・新スキン' : ''}</small></div>`).join('')
+    + (c.unlockedNext ? `<div class="unlock heat">${icon('book')}第${c.unlockedNext}章「${chapter(c.unlockedNext).name}」が解放された！</div>` : '');
+  const next = ch.id < CHAPTERS.length && chapterUnlocked(profile, ch.id + 1) ? ch.id + 1 : 0; const nb = $('#next-chapter'); nb.hidden = !next; nb.dataset.chapter = next; $('#retry-button').classList.toggle('secondary-button', !!next);
+  if (c.fresh.some(Boolean)) [0, 1, 2].forEach(i => c.fresh[i] && setTimeout(() => audio.effect('achieve'), 700 + i * 350));
 }
 function countUp() {
   const els = [$('#result-kills'), $('#result-combo'), $('#star-total')], begin = performance.now(), dur = renderer.reduced ? 1 : 900;
@@ -257,7 +271,7 @@ function countUp() {
 }
 function updateStars(gain = false) { $('#star-count').textContent = profile.stars.toLocaleString(); if (gain) { const c = $('.star-chip'); c.classList.remove('gain'); void c.offsetWidth; c.classList.add('gain'); } }
 function updateHome() {
-  updateStars(); const h = Math.min(settings.heat, profile.heatUnlocked), def = HEATS[h], row = $('.heat-row'); settings.heat = h;
+  updateStars(); { const n = nextChapter(profile), ch = chapter(n), t = totalStars(profile); $('#campaign-chapter').textContent = t >= CAMPAIGN_STARS ? 'コンプリート！' : `第${n}章`; $('#campaign-summary').textContent = `${ch.name}・${STAGES[ch.stage].name}`; $('#campaign-stars').textContent = t; } const h = Math.min(settings.heat, profile.heatUnlocked), def = HEATS[h], row = $('.heat-row'); settings.heat = h;
   row.dataset.heat = h; row.dataset.hot = h >= 6 ? 2 : h >= 3 ? 1 : 0; $('#heat-level').textContent = h; $('#heat-name').textContent = `ヒート${h}・${def.name}`;
   $('#heat-rule').textContent = h ? HEATS.slice(1, h + 1).map(x => x.rule).join(' / ') : profile.heatUnlocked ? 'いつもの夜（＋でヒートを上げられます）' : 'クリアするとヒート1が解放されます';
   $('#heat-mult').textContent = `★×${heatMultiplier(h).toFixed(2)}`; $('#heat-down').disabled = h <= 0; $('#heat-up').disabled = h >= profile.heatUnlocked;
@@ -268,7 +282,7 @@ function updateHome() {
   $('#achieve-count').textContent = `${Object.keys(profile.achievements).length}/${ACHIEVEMENTS.length}`;
   updateCharacter();
   const saved = savedRun(), rb = $('#resume-run'); rb.hidden = !saved;
-  if (saved) { const g = saved.game; $('#resume-detail').textContent = `${MODES[g.mode].name}・${STAGES[g.stage]?.name || ''}・${formatTime(g.time)}・Lv.${g.level}${saved.runInfo?.daily ? '・デイリー' : ''}`; }
+  if (saved) { const g = saved.game; $('#resume-detail').textContent = `${saved.runInfo?.campaign ? `第${saved.runInfo.campaign}章` : MODES[g.mode].name}・${STAGES[g.stage]?.name || ''}・${formatTime(g.time)}・Lv.${g.level}${saved.runInfo?.daily ? '・デイリー' : ''}`; }
   const st = STAGES[profile.stage], open = stageUnlocked(profile, profile.stage), srow = $('#stage-row'), anyStage = STAGE_ORDER.some(id => id !== 'wilds' && stageUnlocked(profile, id));
   srow.hidden = !anyStage; srow.dataset.locked = open ? 0 : 1; $('#stage-name').textContent = (open ? '' : '🔒 ') + st.name; const su = UNLOCKS.find(u => u.kind === 'stage' && u.id === profile.stage);
   $('#stage-rule').textContent = open ? st.rule : `実績「${ACHIEVEMENTS.find(a => a.id === su.achievement).name}」で解放`; srow.style.setProperty('--st1', STAGE_COLORS[profile.stage][0]); srow.style.setProperty('--st2', STAGE_COLORS[profile.stage][1]);
@@ -292,12 +306,18 @@ function setHeat(delta) { const next = Math.max(0, Math.min(profile.heatUnlocked
 function achievementToast(list) { list.forEach((a, i) => setTimeout(() => { const el = document.createElement('div'); el.className = 'ach-toast'; el.innerHTML = `${icon('medal')}<div>実績「${a.name}」達成！<small>★ +${a.reward}</small></div>`; document.body.append(el); audio.effect('achieve'); setTimeout(() => el.remove(), 3300); }, i * 900)); }
 function updateBest() { $('#home-best').textContent = records.bestTime ? formatTime(records.bestTime) : '--:--'; $('#home-combo').textContent = records.bestCombo.toLocaleString(); }
 
+let lastTrack = '', trackTick = 0;
+function liveStars() { const st = game.stats, p = game.player; return { won: game.state === 'won', time: game.time, hits: st.hits, lowHp: st.lowHp ?? 1, bossSlowest: Math.max(st.bossSlowest, ...game.enemies.filter(e => e.alive && e.type === 4).map(e => game.time - (e.born || 0))), dashes: st.dashes, pulses: st.pulses, hpRatio: p.hp / p.maxHP }; }
+function updateStarTrack() {
+  if (!runInfo?.campaign || !game) return; const ch = chapter(runInfo.campaign), s = star3Status(ch, liveStars()), key = s.text + s.failed; if (key === lastTrack) return; lastTrack = key;
+  const el = $('#star-track'); el.innerHTML = `${icon('star')}<b>★3</b> ${s.text}`; el.classList.toggle('failed', s.failed); el.title = starLabels(ch)[2];
+}
 function updateHUD() {
-  if (!game) return; const p = game.player;
+  if (!game) return; const p = game.player; if (++trackTick % 15 === 0 || !lastTrack) updateStarTrack();
   $('#hp-text').textContent = `${Math.ceil(p.hp)} / ${p.maxHP}`; $('#hp-bar').style.width = `${p.hp / p.maxHP * 100}%`; $('.health-track').classList.toggle('danger', p.hp < p.maxHP * .3);
   $('#level-text').textContent = `LV. ${String(game.level).padStart(2, '0')}`; if (game.level !== lastLevel) { lastLevel = game.level; const b = $('#level-text'); b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
   $('#xp-bar').style.width = `${Math.min(100, game.xp / game.xpNext * 100)}%`; $('#time-text').textContent = formatTime(game.time);
-  const overtime = !game.endless && game.time >= game.duration && !game.finalKilled; $('#time-target').textContent = game.endless ? `∞ BEST ${formatTime(profile.endlessBest)}` : overtime ? `${STAGES[game.stage].boss}をたおせ！` : '/ ' + formatTime(game.duration);
+  const overtime = !game.endless && game.time >= game.duration && !game.finalKilled; $('#time-target').textContent = game.endless ? `∞ BEST ${formatTime(profile.endlessBest)}` : overtime ? `${BOSSES[game.boss?.kind || game.stage].name}をたおせ！` : '/ ' + formatTime(game.duration);
   $('#status-chips').innerHTML = (game.freeze > 0 ? `<span class="freeze">FREEZE ${Math.ceil(game.freeze)}</span>` : '') + (game.starPower > 0 ? `<span class="star">★ STAR ${Math.ceil(game.starPower)}</span>` : '') + (game.eventKind === 'meteor' && game.eventTimer > 0 ? `<span class="event">流星群 ${Math.ceil(game.eventTimer)}</span>` : ''); $('#time-target').classList.toggle('alert', overtime);
   $('#kills-text').textContent = game.kills.toLocaleString(); $('#movement-hint').hidden = settings.hints || game.time > 7;
   for (const [key, cd, max] of [['dash', p.dashCD, 3 * (1 - game.levels.haste * .08)], ['pulse', p.pulseCD, 18]]) {
@@ -313,7 +333,7 @@ function updateHUD() {
     const supports = UPGRADES.filter(u => u.tag === 'SUPPORT' && game.levels[u.id] > 0); $('#support-slots').innerHTML = supports.map(u => `<div class="weapon-slot" style="--c:${POP_COLORS[u.id]}" title="${u.name} Lv.${game.levels[u.id]}">${icon(u.icon)}<small>${game.levels[u.id]}</small></div>`).join('') + '<div class="weapon-slot empty"></div>'.repeat(Math.max(0, SLOT_LIMIT.SUPPORT - supports.length));
   }
   const boss = game.boss; $('#boss-panel').hidden = !boss?.alive;
-  if (boss?.alive) { const face = $('#boss-face'); if (face.dataset.stage !== game.stage) { face.dataset.stage = game.stage; try { face.src = renderer.sprites['enemy4_' + game.stage].image.toDataURL(); } catch { face.removeAttribute('src'); } } $('#boss-name').textContent = `${STAGES[game.stage].boss} — ${boss.final ? '終夜' : '先触れ'}`; $('#boss-hp').textContent = `${Math.ceil(boss.hp).toLocaleString()} / ${Math.ceil(boss.maxHP).toLocaleString()}`; $('#boss-bar').style.width = `${boss.hp / boss.maxHP * 100}%`; }
+  if (boss?.alive) { const face = $('#boss-face'); const fk = boss.kind || game.stage; if (face.dataset.stage !== fk) { face.dataset.stage = fk; try { face.src = renderer.sprites['enemy4_' + fk].image.toDataURL(); } catch { face.removeAttribute('src'); } } $('#boss-name').textContent = `${BOSSES[boss.kind || game.stage].name} — ${boss.final ? '終夜' : '先触れ'}`; $('#boss-hp').textContent = `${Math.ceil(boss.hp).toLocaleString()} / ${Math.ceil(boss.maxHP).toLocaleString()}`; $('#boss-bar').style.width = `${boss.hp / boss.maxHP * 100}%`; }
 }
 function updateCombo(dt) {
   if (!game) return; const gained = game.kills - lastKills; lastKills = game.kills;
@@ -335,23 +355,23 @@ function processEvents(g, muted = false) {
     if (e.type === 'level') speak('levelup', { cooldown: 25, chance: .6 });
     if (e.type === 'evolve' || e.type === 'fusion') speak('evolve', { priority: 2, cooldown: 6 });
     if (e.type === 'revive') speak('revive', { priority: 3 });
-    if (e.type === 'boss') setTimeout(() => speak('appear', { boss: true, priority: 3 }), 650);
-    if (e.type === 'bossPhase' && e.phase >= 3) speak('rage', { boss: true, priority: 3, cooldown: 10 });
-    if (e.type === 'bossDown') speak('fall', { boss: true, priority: 3 });
+    if (e.type === 'boss') setTimeout(() => speak('appear', { boss: true, kind: e.kind, priority: 3 }), 650);
+    if (e.type === 'bossPhase' && e.phase >= 3) speak('rage', { boss: true, kind: e.kind, priority: 3, cooldown: 10 });
+    if (e.type === 'bossDown') speak('fall', { boss: true, kind: e.kind, priority: 3 });
     if (e.type === 'elite') { announce('エリート出現！宝箱を持ってるぞ！', 'combo-call'); coach('elite', '<b>王冠のエリート</b>は宝箱を落とす！優先して倒そう。'); }
-    if (e.type === 'boss') coach('boss', `<b>${STAGES[game.stage].boss}</b>が来た！弱るほど攻撃が激しくなる。<b>赤い円</b>は攻撃の予告だから離れよう。`);
+    if (e.type === 'boss') coach('boss', `<b>${BOSSES[e.kind || game.stage].name}</b>が来た！弱るほど攻撃が激しくなる。<b>赤い円</b>は攻撃の予告だから離れよう。`);
     if (e.type === 'special') coach('special', '<b>光る泡</b>は特殊アイテム。爆弾・時間停止・スターなど、拾うと一発逆転！');
     if (e.type === 'event') coach('event', '時間イベント発生！流星群の<b>赤い円</b>には近づかないで。');
     if (e.type === 'charge') coach('charge', '<b>オレンジの線</b>はイノシシの突進ルート。横に避けよう！');
     if (e.type === 'altar') { announce('呪いの祭壇が現れた…', 'danger'); coach('altar', '<b>祭壇</b>に触れるとレリックが手に入る。ただし呪い付き…。'); }
     if (e.type === 'event') { warning({ siege: 'モンスターに包囲された！', stampede: '大暴走が迫ってくる！', meteor: '流星群が降ってくる！赤い円を避けろ！' }[e.kind]); $('#warning-banner strong').textContent = EVENTS[e.kind].length > 2 ? EVENTS[e.kind] + '!!' : EVENTS[e.kind] + '！！'; }
     if (e.type === 'boss') $('#warning-banner strong').textContent = 'WARNING!!';
-    if (e.type === 'bossPhase') { const st = game?.stage || 'wilds'; announce({ wilds: e.phase >= 3 ? '夜の主が闇を呼んだ！灯火のまわりで戦え！' : '夜の主が怒った！手下を呼んだぞ！', frost: e.phase >= 3 ? '凍結床が広がる！白い円は足が鈍るぞ！' : '氷の女王が氷柱を放つ！赤い列を避けろ！', candy: e.phase >= 3 ? 'またまた分身！本物はどれ？' : 'キャンディ大王が分身した！本物を探せ！' }[st], 'danger');
-      if (e.phase >= 3 && st === 'wilds') coach('dark', '闇の中でも<b>灯火</b>の周りは見える。赤く光る<b>目</b>がボスの位置だ！'); if (st === 'candy') coach('decoys', '分身を倒すと<b>キャンディ弾</b>が飛び散る。本物にはHPバーが出るよ。'); if (st === 'frost' && e.phase >= 2) coach('spikes', '赤い円の<b>列</b>は氷柱の予告。列の横へ逃げよう！'); }
+    if (e.type === 'bossPhase') { const st = e.kind || game?.stage || 'wilds'; announce({ bat: e.phase >= 3 ? '大コウモリが荒れ狂う！紫の帯から離れろ！' : '大コウモリが仲間を呼んだ！急降下の紫の帯に注意！', snowman: e.phase >= 3 ? '将軍の総攻撃！雪玉の弾幕と足踏みに注意！' : '雪だるま将軍が足踏み！赤い円から離れろ！', donut: e.phase >= 3 ? '魔神のうずが逆回転！すき間を探せ！' : 'ドーナツ魔神がうずを広げた！すき間をくぐれ！', wilds: e.phase >= 3 ? '夜の主が闇を呼んだ！灯火のまわりで戦え！' : '夜の主が怒った！手下を呼んだぞ！', frost: e.phase >= 3 ? '凍結床が広がる！白い円は足が鈍るぞ！' : '氷の女王が氷柱を放つ！赤い列を避けろ！', candy: e.phase >= 3 ? 'またまた分身！本物はどれ？' : 'キャンディ大王が分身した！本物を探せ！' }[st], 'danger');
+      if (st === 'bat') coach('dive', '<b>紫の太い帯</b>は大コウモリの急降下ルート。横へよけよう！'); if (st === 'donut') coach('spiral', '渦巻きの弾は<b>すき間</b>をくぐればよけられる。ボスに近いほど弾の間隔がせまいよ。'); if (st === 'snowman') coach('stomp', '将軍の足元の<b>赤い大きな円</b>は足踏みの予告。すぐに離れよう！'); if (e.phase >= 3 && st === 'wilds') coach('dark', '闇の中でも<b>灯火</b>の周りは見える。赤く光る<b>目</b>がボスの位置だ！'); if (st === 'candy') coach('decoys', '分身を倒すと<b>キャンディ弾</b>が飛び散る。本物にはHPバーが出るよ。'); if (st === 'frost' && e.phase >= 2) coach('spikes', '赤い円の<b>列</b>は氷柱の予告。列の横へ逃げよう！'); }
     if (e.type === 'special') announce({ magnet: 'ぜんぶ吸い寄せ！', bomb: 'ドカーン！画面の敵を一掃！', freeze: '時間よ止まれ！', star: 'スターパワー！無敵＆パワーアップ！' }[e.kind], 'evolve');
     if (e.type === 'revive') { announce('もういっかい！復活！！', 'evolve'); slowmo = renderer.reduced ? 0 : .8; }
-    if (e.type === 'boss') { const name = STAGES[game.stage].boss, text = e.final ? `${name}が現れた — 最後の灯火を守れ！` : `${name}が接近中！`; if (!renderer.bossCutin(game.stage, name, text, e.final)) warning(text); renderer.celebrate('boss', g); }
-    if (e.type === 'bossDown') { announce(`${STAGES[game.stage].boss}をたおした！`, 'evolve'); slowmo = renderer.reduced ? 0 : .9; }
+    if (e.type === 'boss') { const name = BOSSES[e.kind || game.stage].name, text = e.final ? `${name}が現れた — 最後の灯火を守れ！` : `${name}が接近中！`; if (!renderer.bossCutin(e.kind || game.stage, name, text, e.final)) warning(text); renderer.celebrate('boss', g); }
+    if (e.type === 'bossDown') { announce(`${BOSSES[e.kind || game.stage].name}をたおした！`, 'evolve'); slowmo = renderer.reduced ? 0 : .9; }
     if (e.type === 'fusion') { const u = UPGRADES.find(x => x.id === e.id); announce(`合体！「${u ? u.name : ''}」`, 'evolve'); slowmo = renderer.reduced ? 0 : .7; coach('fusion', '<b>合体武器</b>は2つの進化武器の力をかけ合わせた究極の武器！'); }
     if (e.type === 'evolve') { announce('武器が進化した！！', 'evolve'); renderer.celebrate('evolve', g); slowmo = renderer.reduced ? 0 : .45; }
     if (e.type === 'hurt' && settings.vibration && navigator.vibrate) navigator.vibrate(22);
@@ -397,7 +417,8 @@ $('#relic-cards').addEventListener('click', e => { const b = e.target.closest('[
 $('#coach-close').addEventListener('click', nextCoach);
 $('#stage-prev').addEventListener('click', () => cycleStage(-1)); $('#stage-next').addEventListener('click', () => cycleStage(1));
 window.addEventListener('gamepadconnected', () => toast('ゲームパッドを接続しました。左スティックで移動、Aでダッシュ、Bでパルス。'));
-$('#chest-claim').addEventListener('click', e => { e.stopPropagation(); claimChest(); }); $('#chest-screen').addEventListener('click', () => { if (!chestDone) finishChest(); }); $('#retry-button').addEventListener('click', () => start({ daily: runInfo.daily })); $('#result-home').addEventListener('click', home);
+$('#chest-claim').addEventListener('click', e => { e.stopPropagation(); claimChest(); }); $('#chest-screen').addEventListener('click', () => { if (!chestDone) finishChest(); }); $('#retry-button').addEventListener('click', () => start(runInfo.campaign ? { chapter: runInfo.campaign } : { daily: runInfo.daily })); $('#next-chapter').addEventListener('click', e => start({ chapter: Number(e.currentTarget.dataset.chapter) }));
+$('#campaign-button').addEventListener('click', () => openDialog('campaign')); $('#result-home').addEventListener('click', home);
 $('#resume-button').addEventListener('click', () => { game?.resume(); accumulator = 0; transition(); });
 $('#pause-button').addEventListener('click', () => { game?.pause(); transition(); saveRun(); });
 $('#quit-button').addEventListener('click', () => { if (game) { game.state = 'dead'; game.emit('dead'); transition(); } });
@@ -442,7 +463,28 @@ function codexVisual(c) {
   if (c.group === 'relic') { const r = RELICS[c.id.slice(6)]; return `<span class="ci" style="--c:${r.color}">${icon(r.icon)}</span>`; }
   const u = UPGRADES.find(x => x.id === c.id); return `<span class="ci" style="--c:${POP_COLORS[u.id] || u.color}">${icon(u.icon)}</span>`;
 }
-function codexText(c) { if (c.group === 'relic') return RELICS[c.id.slice(6)].desc; if (c.group === 'monster' || c.group === 'boss') return c.id === 'elite' ? '王冠をかぶった強敵。宝箱を落とす' : c.group === 'boss' ? STAGES[c.id.slice(5)].name + 'のボス' : ''; const u = UPGRADES.find(x => x.id === c.id); return u.description; }
+function codexText(c) { if (c.group === 'relic') return RELICS[c.id.slice(6)].desc; if (c.group === 'monster' || c.group === 'boss') return c.id === 'elite' ? '王冠をかぶった強敵。宝箱を落とす' : c.group === 'boss' ? STAGES[BOSSES[c.id.slice(5)].stage].name + 'のボス' + (c.id.slice(5) in STAGES ? '' : '（キャンペーンに登場）') : ''; const u = UPGRADES.find(x => x.id === c.id); return u.description; }
+const ACTS = [['第1幕', 'wilds'], ['第2幕', 'frost'], ['第3幕', 'candy']];
+function bossFace(kind) { try { return `<img src="${renderer.sprites['enemy4_' + kind].image.toDataURL()}" alt="">`; } catch { return ''; } }
+function renderCampaign(selected) {
+  const content = $('#dialog-content'), ch = chapter(selected), act = Math.floor((ch.id - 1) / 10), total = totalStars(profile), stars = id => profile.campaign.stars[id] || [false, false, false];
+  const starRow = (v, cls = '') => `<span class="cstars ${cls}">${v.map(x => `<i class="${x ? 'on' : ''}">${icon('star')}</i>`).join('')}</span>`;
+  const open = chapterUnlocked(profile, ch.id), labels = starLabels(ch), got = stars(ch.id), bosses = [...new Set([ch.bosses.mid, ...ch.bosses.final])];
+  content.innerHTML = `<h2 id="dialog-title">キャンペーン <small>${icon('star')} ${total} / ${CAMPAIGN_STARS}</small></h2>
+    <div class="camp-milestones"><i style="width:${total / CAMPAIGN_STARS * 100}%"></i>${MILESTONES.map(m => `<span class="${total >= m.stars ? 'done' : ''}" style="left:${m.stars / CAMPAIGN_STARS * 100}%" title="★${m.stars}: ★+${m.reward}${m.skin ? '・スキン' : ''}">${m.skin ? icon('user') : icon('star')}<b>${m.stars}</b></span>`).join('')}</div>
+    <div class="codex-tabs camp-acts">${ACTS.map(([n, st], i) => `<button data-act="${i}" aria-pressed="${i === act}">${n} ${STAGES[st].name} <small>★${CHAPTERS.slice(i * 10, i * 10 + 10).reduce((a, c) => a + stars(c.id).filter(Boolean).length, 0)}/30</small></button>`).join('')}</div>
+    <div class="camp-grid">${CHAPTERS.slice(act * 10, act * 10 + 10).map(c => { const ok = chapterUnlocked(profile, c.id); return `<button class="camp-tile ${c.id === ch.id ? 'selected' : ''} ${ok ? '' : 'locked'} ${c.id % 10 === 0 ? 'finale' : ''}" data-chapter="${c.id}" ${ok ? '' : 'aria-disabled="true"'}><b>${c.id}</b>${ok ? starRow(stars(c.id)) : icon('banish')}${c.id % 10 === 0 ? '<em>決戦</em>' : ''}</button>`; }).join('')}</div>
+    <div class="camp-detail">
+      <div class="camp-bosses">${bosses.map(k => `<figure>${bossFace(k)}<figcaption>${BOSSES[k].name}</figcaption></figure>`).join('')}</div>
+      <div class="camp-info"><span class="eyebrow">第${ch.id}章・${STAGES[ch.stage].name}</span><h3>${ch.name}</h3>
+        <p class="camp-meta"><span>${icon('clock')} ${formatTime(ch.duration)}</span>${ch.heat ? `<span>${icon('flame')} ヒート${ch.heat}</span>` : ''}${ch.mutators.map(id => `<span>${MUTATORS[id].name}</span>`).join('')}${ch.bosses.final.length > 1 ? `<span>${icon('crown')} ボス2体</span>` : ''}</p>
+        <ul class="camp-goals">${labels.map((l, i) => `<li class="${got[i] ? 'on' : ''}">${icon('star')}<span>${l}</span><b>${got[i] ? '獲得済み' : '★+' + starReward(ch, i)}</b></li>`).join('')}</ul>
+        <button id="camp-start" class="primary-button" ${open ? '' : 'disabled'}>${open ? `第${ch.id}章へ出撃` : `第${ch.id - 1}章をクリアで解放`} <svg><use href="#i-arrow"/></svg></button></div>
+    </div>`;
+  content.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => { const a = Number(b.dataset.act), first = CHAPTERS.slice(a * 10, a * 10 + 10).find(c => !stars(c.id)[1] && chapterUnlocked(profile, c.id)) || CHAPTERS[a * 10]; audio.effect('ui'); renderCampaign(first.id); content.querySelector(`[data-act="${a}"]`)?.focus(); }));
+  content.querySelectorAll('[data-chapter]').forEach(b => b.addEventListener('click', () => { audio.effect('ui'); renderCampaign(Number(b.dataset.chapter)); content.querySelector(`[data-chapter="${b.dataset.chapter}"]`)?.focus(); }));
+  $('#camp-start').addEventListener('click', () => { if (!open) return; $('#app-dialog').close(); start({ chapter: ch.id }); });
+}
 function renderCodex(group) {
   const content = $('#dialog-content'), prog = codexProgress(profile), groups = [['monster', 'モンスター'], ['boss', 'ボス'], ['weapon', '武器'], ['support', '支援'], ['fusion', '合体'], ['relic', 'レリック']];
   content.innerHTML = `<h2 id="dialog-title">図鑑 ${prog.found} / ${prog.total}（${Math.round(prog.ratio * 100)}%）</h2><div class="achieve-progress"><i style="width:${prog.ratio * 100}%"></i></div><div class="codex-tabs">${groups.map(([g, n]) => `<button data-group="${g}" aria-pressed="${g === group}">${n} ${CODEX.filter(c => c.group === g && profile.codex[c.id]).length}/${CODEX.filter(c => c.group === g).length}</button>`).join('')}</div><div class="codex-grid">${CODEX.filter(c => c.group === group).map(c => { const known = profile.codex[c.id]; return `<div class="codex-item ${known ? '' : 'unknown'}">${codexVisual(c)}<strong>${known ? c.name : '？？？'}</strong><small>${known ? codexText(c) : 'まだ出会っていない'}</small></div>`; }).join('')}</div><p class="record-note">出撃で出会った敵・使った強化・手に入れたレリックが記録されます。50%と100%で実績とスキンが解放！</p>`;
@@ -482,6 +524,8 @@ function openDialog(type) {
     content.innerHTML = `<h2 id="dialog-title">だれで出撃する？</h2><div class="settings-group">スキン（見た目だけ）</div><div class="skin-row">${Object.entries(SKINS).map(([id, k]) => { const open = skinUnlocked(profile, id), a = k.achievement && ACHIEVEMENTS.find(x => x.id === k.achievement); return `<button class="skin-swatch ${profile.skin === id ? 'selected' : ''}" data-skin="${id}" ${open ? '' : 'disabled'} title="${open ? k.name : '実績「' + a.name + '」で解放'}"><i class="${k.colors === 'rainbow' ? 'rainbow' : ''}" style="--c:${Array.isArray(k.colors) ? k.colors[0] : 'var(--coral)'}"></i>${open ? k.name : '🔒'}</button>`; }).join('')}</div><div class="char-grid">${Object.entries(CHARACTERS).map(([id, c]) => { const open = characterUnlocked(profile, id), u = UNLOCKS.find(x => x.id === id), a = u && ACHIEVEMENTS.find(x => x.id === u.achievement); const start = UPGRADES.find(x => x.id === c.start); return `<button class="char-card ${profile.character === id ? 'selected' : ''}" data-char="${id}" ${open ? '' : 'disabled'}><img src="${charImage(id, renderer.skin)}" alt=""><strong>${c.name}</strong><small>${c.title}</small><p>${c.perk.split('・')[0]}<br>初期武器：${start.name}</p>${open ? (profile.charClears[id] ? '<span class="clear">★ CLEAR</span>' : '') : `<span class="lock">実績「${a.name}」で解放</span>`}</button>`; }).join('')}</div><p class="record-note">新しい武器も実績で解放されます：${UNLOCKS.filter(u => u.kind === 'weapon').map(u => `${u.label}${characterUnlocked(profile, 'keeper') && profile.achievements[u.achievement] ? '✓' : '（' + ACHIEVEMENTS.find(a => a.id === u.achievement).name + '）'}`).join('・')}</p>`;
     content.querySelectorAll('[data-skin]').forEach(b => b.addEventListener('click', () => { profile.skin = b.dataset.skin; saveProfile(); applyRenderOptions(); audio.effect('choose'); updateHome(); openDialog('characters'); }));
     content.querySelectorAll('[data-char]').forEach(b => b.addEventListener('click', () => { profile.character = b.dataset.char; saveProfile(); audio.effect('choose'); updateHome(); $('#app-dialog').close(); }));
+  } else if (type === 'campaign') {
+    $('#dialog-kicker').textContent = 'CAMPAIGN'; renderCampaign(nextChapter(profile));
   } else if (type === 'codex') {
     $('#dialog-kicker').textContent = 'CODEX'; renderCodex('monster');
   } else if (type === 'daily') {
