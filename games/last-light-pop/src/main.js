@@ -1,6 +1,7 @@
 import { Game, MODES, UPGRADES, HEATS, MUTATORS, EVOLVE_PAIRS, SLOT_LIMIT, CHARACTERS, EVENTS, STAGES, RELICS, CURSES, BOSSES, formatTime } from './core.js';
 import { CHAPTERS, chapter, chapterOptions, chapterUnlocked, nextChapter, totalStars, CAMPAIGN_STARS, MILESTONES, recordChapter, starLabels, starReward, star3Status, bossNames } from './campaign.js';
-import { SHOP, shopCost, ACHIEVEMENTS, sanitizeProfile, buy, refundAll, recordRun, checkProfileAchievements, CODEX, codexProgress, SKINS, skinUnlocked, UNLOCKS, lockedWeapons, characterUnlocked, stageUnlocked, dailyConfig, describeDaily, heatMultiplier, localDate } from './meta.js';
+import { GEAR_SLOTS, GEAR_ITEMS, RARITIES, MAX_RARITY, INVENTORY_CAP, itemText, gearModifiers, rollLoot, addItems, equip, unequip, merge, mergeAll, mergeFodder, mergeableCount, isEquipped } from './gear.js';
+import { SHOP, shopCost, ACHIEVEMENTS, sanitizeProfile, buy, refundAll, recordRun, checkProfileAchievements, GEAR_ACHIEVEMENTS, CODEX, codexProgress, SKINS, skinUnlocked, UNLOCKS, lockedWeapons, characterUnlocked, stageUnlocked, dailyConfig, describeDaily, heatMultiplier, localDate } from './meta.js';
 import { Renderer } from './render.js';
 import { AudioEngine, MUSIC_BPM } from './audio.js';
 import { EndingSequence } from './ending.js';
@@ -8,7 +9,7 @@ import { ComboMeter, rankFor, musicIntensity } from './hype.js';
 
 const $ = s => document.querySelector(s); const $$ = s => [...document.querySelectorAll(s)];
 const icon = (name, cls = '') => `<svg class="${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
-const APP_VERSION = 'V 2.8.0';
+const APP_VERSION = 'V 2.9.0';
 const SETTINGS_KEY = 'lastlight-pop-settings-v1', RECORDS_KEY = 'lastlight-pop-records-v1', PROFILE_KEY = 'lastlight-pop-profile-v1';
 const DEFAULT_SETTINGS = { sound: true, music: 0.42, sfx: 0.6, quality: 'auto', vibration: true, heat: 0, shake: 1, flash: true, numbers: true, largeText: false, hints: true, voice: .9, subtitles: true, keyDash: 'Space', keyPulse: 'KeyQ' };
 const EMPTY_RECORDS = { runs: 0, wins: 0, totalKills: 0, bestKills: 0, bestTime: 0, bestCombo: 0, modes: {} };
@@ -45,9 +46,9 @@ function primeAudio() { if (audioPrimed || !settings.sound) return; audioPrimed 
 let lastStart = {};
 function start(opts = {}) {
   const daily = !!opts.daily; lastStart = opts;
-  if (opts.chapter) { const ch = chapter(opts.chapter); runInfo = { daily: false, campaign: ch.id, heat: ch.heat, mutators: ch.mutators, day: '' }; game = new Game('campaign', Date.now(), { ...chapterOptions(ch), meta: profile.meta, character: characterUnlocked(profile, profile.character) ? profile.character : 'keeper', locked: lockedWeapons(profile) }); }
+  if (opts.chapter) { const ch = chapter(opts.chapter); runInfo = { daily: false, campaign: ch.id, heat: ch.heat, mutators: ch.mutators, day: '' }; game = new Game('campaign', Date.now(), { ...chapterOptions(ch), meta: profile.meta, gear: gearModifiers(profile.gear), character: characterUnlocked(profile, profile.character) ? profile.character : 'keeper', locked: lockedWeapons(profile) }); }
   else if (daily) { const cfg = dailyConfig(); runInfo = { daily: true, heat: cfg.heat, mutators: cfg.mutators, day: cfg.day }; game = new Game(cfg.mode, cfg.seed, { heat: cfg.heat, mutators: cfg.mutators }); }
-  else { runInfo = { daily: false, heat: settings.heat, mutators: [], day: '' }; game = new Game(mode, Date.now(), { stage: stageUnlocked(profile, profile.stage) ? profile.stage : 'wilds', heat: settings.heat, meta: profile.meta, character: characterUnlocked(profile, profile.character) ? profile.character : 'keeper', locked: lockedWeapons(profile) }); }
+  else { runInfo = { daily: false, heat: settings.heat, mutators: [], day: '' }; game = new Game(mode, Date.now(), { stage: stageUnlocked(profile, profile.stage) ? profile.stage : 'wilds', heat: settings.heat, meta: profile.meta, gear: gearModifiers(profile.gear), character: characterUnlocked(profile, profile.character) ? profile.character : 'keeper', locked: lockedWeapons(profile) }); }
   game.start(); clearRun(); enterRun(false);
 }
 // Shared run setup for a fresh start and for resuming a suspended run.
@@ -226,7 +227,7 @@ function pollPad(now) {
   pad.prev = b;
 }
 function runSummary(won) { const st = game.stats; return { mode: game.mode, won, time: game.time, kills: game.kills, level: game.level, heat: runInfo.heat, combo: combo.best, evolves: st.evolves, jackpots: st.jackpots, elites: st.elites, bossKills: st.bossKills, bossHits: st.bossHits, chests: st.chests, daily: runInfo.daily, specials: st.specials, character: game.character, stage: game.stage, relics: st.relics, curses: game.curses.length, fusions: st.fusions, chapter: runInfo.campaign || 0, hits: st.hits, lowHp: st.lowHp ?? 1, bossSlowest: st.bossSlowest, dashes: st.dashes, pulses: st.pulses, codex: [...game.seen, ...UPGRADES.filter(u => game.levels[u.id] > 0).map(u => u.id), ...[...game.relics].map(id => 'relic_' + id)] }; }
-function finalizeRun(won) { if (!game || resultSaved) return runResult; clearRun(); const best = storeResult(won), summary = runSummary(won), campaign = runInfo.campaign ? recordChapter(profile, runInfo.campaign, summary) : null; runResult = { best, campaign, ...recordRun(profile, summary, runInfo.day || localDate()) }; saveProfile(); updateStars(true); return runResult; }
+function finalizeRun(won) { if (!game || resultSaved) return runResult; clearRun(); const best = storeResult(won), summary = runSummary(won), campaign = runInfo.campaign ? recordChapter(profile, runInfo.campaign, summary) : null; runResult = { best, campaign, ...recordRun(profile, summary, runInfo.day || localDate()) }; const loot = addItems(profile.gear, rollLoot(summary)); profile.stars += loot.refund; profile.earned += loot.refund; runResult.loot = loot; runResult.unlocked.push(...checkProfileAchievements(profile, GEAR_ACHIEVEMENTS)); saveProfile(); updateStars(true); return runResult; }
 function storeResult(won) {
   if (!game || resultSaved) return false; resultSaved = true;
   const best = game.time > records.bestTime || game.kills > records.bestKills || combo.best > records.bestCombo;
@@ -251,9 +252,16 @@ function renderResult() {
   if (game.endless) { $('#result-title').textContent = `${formatTime(game.time)} 生き残った！`; $('#result-eyebrow').textContent = 'ENDLESS NIGHT'; $('#result-copy').textContent = `自己ベスト ${formatTime(profile.endlessBest)}`; }
   $('#result-unlocks').innerHTML = res.newlyUnlocked.map(u => `<div class="unlock new">${icon(u.kind === 'weapon' ? UPGRADES.find(x => x.id === u.id).icon : u.kind === 'stage' ? 'book' : 'user')}${u.kind === 'weapon' ? '新しい武器' : u.kind === 'stage' ? '新ステージ' : '新キャラクター'}「${u.label}」が解放された！<small>NEW!</small></div>`).join('') + (res.heatUnlocked ? `<div class="unlock heat">${icon('flame')}ヒート${res.heatUnlocked}「${HEATS[res.heatUnlocked].name}」が解放された！<small>★×${heatMultiplier(res.heatUnlocked).toFixed(2)}</small></div>` : '') + res.unlocked.map(a => `<div class="unlock">${icon('medal')}実績「${a.name}」達成！<small>★ +${a.reward}</small></div>`).join('');
   if (res.unlocked.length) setTimeout(() => audio.effect('achieve'), 1400); if (res.newlyUnlocked.length) setTimeout(() => audio.effect('unlock'), 2000);
-  renderCampaignResult(res.campaign);
+  renderCampaignResult(res.campaign); renderLoot(res.loot);
   $('#result-relics').innerHTML = UPGRADES.filter(u => u.tag === 'FUSION' && game.levels[u.id] > 0).map(u => `<span style="--c:${u.color}">${icon(u.icon)} ${u.name}</span>`).join('') + [...game.relics].map(id => `<span style="--c:${RELICS[id].color}">${icon(RELICS[id].icon)} ${RELICS[id].name}</span>`).join('');
   $('#result-build').innerHTML = UPGRADES.filter(u => u.tag === 'WEAPON' && game.levels[u.id] > 0).map(u => `<span style="--c:${POP_COLORS[u.id]}" title="${u.name}">${icon(u.icon)} ${game.levels[u.id] === 5 ? '★MAX' : 'Lv' + game.levels[u.id]}</span>`).join('');
+}
+function gearIcon(id, r, extra = '') { const def = GEAR_ITEMS[id]; return `<span class="gear-ico r${r} ${extra}" style="--ic:${def.color};--rc:${RARITIES[r].color}">${icon(GEAR_SLOTS[def.slot].icon)}<i>${RARITIES[r].short}</i></span>`; }
+function renderLoot(loot) {
+  const box = $('#result-loot'); box.hidden = !loot?.added.length; if (box.hidden) return;
+  const best = Math.max(...loot.added.map(i => i.r));
+  box.innerHTML = `<h4>${icon('chest')} 戦利品 <small>${loot.added.length}個</small></h4><div class="loot-row">${loot.added.map((it, i) => `<div class="loot-item" style="--d:${.4 + i * .18}s">${gearIcon(it.id, it.r)}<span>${GEAR_ITEMS[it.id].name}<small style="color:${it.r ? RARITIES[it.r].color : 'inherit'}">${RARITIES[it.r].name}</small></span></div>`).join('')}</div>` + (loot.refund ? `<p class="loot-note">持ち物がいっぱいのため、古いノーマル装備を ★${loot.refund} に変換しました</p>` : '') + (mergeableCount(profile.gear) ? '<p class="loot-note merge">合成できる装備があります！ホームの「装備」から</p>' : '');
+  if (best >= 2) setTimeout(() => audio.effect('jackpot'), 1200);
 }
 function renderCampaignResult(c) {
   const box = $('#camp-result'); box.hidden = !c; $('#next-chapter').hidden = true; $('#retry-button').classList.toggle('secondary-button', false); if (!c) return;
@@ -271,7 +279,7 @@ function countUp() {
 }
 function updateStars(gain = false) { $('#star-count').textContent = profile.stars.toLocaleString(); if (gain) { const c = $('.star-chip'); c.classList.remove('gain'); void c.offsetWidth; c.classList.add('gain'); } }
 function updateHome() {
-  updateStars(); { const n = nextChapter(profile), ch = chapter(n), t = totalStars(profile); $('#campaign-chapter').textContent = t >= CAMPAIGN_STARS ? 'コンプリート！' : `第${n}章`; $('#campaign-summary').textContent = `${ch.name}・${STAGES[ch.stage].name}`; $('#campaign-stars').textContent = t; } const h = Math.min(settings.heat, profile.heatUnlocked), def = HEATS[h], row = $('.heat-row'); settings.heat = h;
+  updateStars(); $('#gear-badge').hidden = !mergeableCount(profile.gear); { const n = nextChapter(profile), ch = chapter(n), t = totalStars(profile); $('#campaign-chapter').textContent = t >= CAMPAIGN_STARS ? 'コンプリート！' : `第${n}章`; $('#campaign-summary').textContent = `${ch.name}・${STAGES[ch.stage].name}`; $('#campaign-stars').textContent = t; } const h = Math.min(settings.heat, profile.heatUnlocked), def = HEATS[h], row = $('.heat-row'); settings.heat = h;
   row.dataset.heat = h; row.dataset.hot = h >= 6 ? 2 : h >= 3 ? 1 : 0; $('#heat-level').textContent = h; $('#heat-name').textContent = `ヒート${h}・${def.name}`;
   $('#heat-rule').textContent = h ? HEATS.slice(1, h + 1).map(x => x.rule).join(' / ') : profile.heatUnlocked ? 'いつもの夜（＋でヒートを上げられます）' : 'クリアするとヒート1が解放されます';
   $('#heat-mult').textContent = `★×${heatMultiplier(h).toFixed(2)}`; $('#heat-down').disabled = h <= 0; $('#heat-up').disabled = h >= profile.heatUnlocked;
@@ -464,6 +472,46 @@ function codexVisual(c) {
   const u = UPGRADES.find(x => x.id === c.id); return `<span class="ci" style="--c:${POP_COLORS[u.id] || u.color}">${icon(u.icon)}</span>`;
 }
 function codexText(c) { if (c.group === 'relic') return RELICS[c.id.slice(6)].desc; if (c.group === 'monster' || c.group === 'boss') return c.id === 'elite' ? '王冠をかぶった強敵。宝箱を落とす' : c.group === 'boss' ? STAGES[BOSSES[c.id.slice(5)].stage].name + 'のボス' + (c.id.slice(5) in STAGES ? '' : '（キャンペーンに登場）') : ''; const u = UPGRADES.find(x => x.id === c.id); return u.description; }
+// --- equipment dialog -------------------------------------------------------------------------
+let gearView = { filter: 'all', key: null };
+function gearGroups() {
+  const groups = new Map();
+  for (const it of profile.gear.items) { const k = it.id + ':' + it.r; if (!groups.has(k)) groups.set(k, { key: k, id: it.id, r: it.r, items: [] }); groups.get(k).items.push(it); }
+  return [...groups.values()].filter(g => gearView.filter === 'all' || GEAR_ITEMS[g.id].slot === gearView.filter).sort((a, b) => b.r - a.r || Object.keys(GEAR_SLOTS).indexOf(GEAR_ITEMS[a.id].slot) - Object.keys(GEAR_SLOTS).indexOf(GEAR_ITEMS[b.id].slot) || a.id.localeCompare(b.id));
+}
+function renderGear() {
+  const content = $('#dialog-content'), gear = profile.gear, groups = gearGroups(), all = mergeableCount(gear);
+  const selected = groups.find(g => g.key === gearView.key) || null, base = selected ? selected.items.find(i => isEquipped(gear, i.uid)) || selected.items[0] : null;
+  const slotCard = slot => { const uid = gear.equipped[slot], it = profile.gear.items.find(i => i.uid === uid); return `<button class="gear-slot ${it ? '' : 'empty'}" data-slot="${slot}" ${it ? `data-key="${it.id}:${it.r}"` : ''}>${it ? gearIcon(it.id, it.r) : `<span class="gear-ico empty">${icon(GEAR_SLOTS[slot].icon)}</span>`}<span><small>${GEAR_SLOTS[slot].name}</small><strong>${it ? GEAR_ITEMS[it.id].name : 'なし'}</strong><em>${it ? itemText(it.id, it.r) + (it.r === MAX_RARITY ? '・' + GEAR_ITEMS[it.id].perkText : '') : '持ち物から装備しよう'}</em></span></button>`; };
+  let detail = '<p class="gear-hint">アイテムを選ぶと、装備や合成ができます。<br><b>同じ部位・同じレア度の装備3つ</b>で、1段上のレア度に合成できます。</p>';
+  if (base) {
+    const def = GEAR_ITEMS[base.id], fodder = mergeFodder(gear, base.uid), same = gear.items.filter(i => i.uid !== base.uid && i.r === base.r && GEAR_ITEMS[i.id].slot === def.slot && !isEquipped(gear, i.uid)).length, eq = isEquipped(gear, base.uid);
+    detail = `<div class="gear-detail-head">${gearIcon(base.id, base.r, 'big')}<div><small style="--rc:${RARITIES[base.r].color}" class="rar">${RARITIES[base.r].name}</small><h3>${def.name}</h3><p>${GEAR_SLOTS[def.slot].name}・${itemText(base.id, base.r)}</p></div></div>
+      ${base.r < MAX_RARITY ? `<p class="gear-next">${icon('arrow')} ${RARITIES[base.r + 1].name}：${itemText(base.id, base.r + 1)}</p>` : ''}
+      <p class="gear-perk ${base.r === MAX_RARITY ? 'on' : ''}">${icon('star')} レジェンド特典：${def.perkText}</p>
+      <div class="gear-actions"><button class="secondary-button" id="gear-equip">${eq ? 'はずす' : '装備する'}</button><button class="primary-button" id="gear-merge" ${fodder ? '' : 'disabled'}>${base.r >= MAX_RARITY ? '最大レア度' : fodder ? '合成する' : `合成にはあと${2 - same}個`}</button></div>
+      ${base.r < MAX_RARITY ? `<small class="gear-rule">同じ部位（${GEAR_SLOTS[def.slot].name}）の${RARITIES[base.r].name}を2つ使います。同じ装備から優先して使い、装備中のものは使いません。</small>` : ''}`;
+  }
+  content.innerHTML = `<h2 id="dialog-title">装備 <small>${gear.items.length} / ${INVENTORY_CAP}</small></h2>
+    <div class="gear-slots">${Object.keys(GEAR_SLOTS).map(slotCard).join('')}</div>
+    <div class="gear-tools"><div class="codex-tabs">${[['all', 'すべて'], ...Object.entries(GEAR_SLOTS).map(([k, v]) => [k, v.name])].map(([k, n]) => `<button data-gfilter="${k}" aria-pressed="${gearView.filter === k}">${n}</button>`).join('')}</div><button id="merge-all" class="primary-button small" ${all ? '' : 'disabled'}>まとめて合成${all ? `（${all}回）` : ''}</button></div>
+    <div class="gear-body"><div class="gear-grid">${groups.length ? groups.map(g => `<button class="gear-tile ${g.key === gearView.key ? 'selected' : ''}" data-key="${g.key}" title="${GEAR_ITEMS[g.id].name}（${RARITIES[g.r].name}）">${gearIcon(g.id, g.r)}${g.items.length > 1 ? `<b>×${g.items.length}</b>` : ''}${g.items.some(i => isEquipped(gear, i.uid)) ? '<em>E</em>' : ''}</button>`).join('') : '<p class="gear-hint">まだ装備がありません。出撃すると戦利品として手に入ります（1分以上の出撃・デイリー以外）。</p>'}</div>
+    <div class="gear-detail">${detail}</div></div><div class="merge-fx" id="merge-fx" hidden></div>`;
+  content.querySelectorAll('[data-gfilter]').forEach(b => b.addEventListener('click', () => { gearView.filter = b.dataset.gfilter; audio.effect('ui'); renderGear(); }));
+  content.querySelectorAll('[data-key]').forEach(b => b.addEventListener('click', () => { gearView.key = b.dataset.key; audio.effect('ui'); renderGear(); content.querySelector(`.gear-detail button`)?.focus(); }));
+  $('#gear-equip')?.addEventListener('click', () => { if (isEquipped(gear, base.uid)) unequip(gear, GEAR_ITEMS[base.id].slot); else equip(gear, base.uid); saveProfile(); audio.effect('choose'); renderGear(); });
+  $('#gear-merge')?.addEventListener('click', () => { const res = merge(gear, base.uid); if (!res) return; afterMerge([res]); });
+  $('#merge-all').addEventListener('click', () => { const res = mergeAll(gear); if (res.length) afterMerge(res); });
+}
+function afterMerge(results) {
+  profile.stats.merges += results.length; const top = results.reduce((a, b) => b.item.r > a.item.r ? b : a); gearView.key = top.item.id + ':' + top.item.r;
+  const got = checkProfileAchievements(profile, GEAR_ACHIEVEMENTS); saveProfile(); updateHome();
+  const fx = $('#merge-fx'), parts = [top.item, ...top.consumed].map((it, i) => `<span class="mf-in" style="--i:${i}">${gearIcon(it.id, i ? it.r : top.item.r - 1)}</span>`).join('');
+  fx.innerHTML = `<div class="mf-stage">${parts}<span class="mf-out">${gearIcon(top.item.id, top.item.r, 'big')}</span><strong class="mf-label" style="--rc:${RARITIES[top.item.r].color}">${RARITIES[top.item.r].name}！</strong>${results.length > 1 ? `<small class="mf-more">ほか ${results.length - 1}回の合成</small>` : ''}</div>`;
+  fx.hidden = false; audio.effect(top.item.r >= 3 ? 'jackpot' : 'evolve'); if (navigator.vibrate && settings.vibration) navigator.vibrate(30);
+  const done = () => { fx.hidden = true; renderGear(); if (got.length) achievementToast(got); };
+  fx.onclick = done; setTimeout(() => { if (!fx.hidden) done(); }, renderer.reduced ? 500 : 1700);
+}
 const ACTS = [['第1幕', 'wilds'], ['第2幕', 'frost'], ['第3幕', 'candy']];
 function bossFace(kind) { try { return `<img src="${renderer.sprites['enemy4_' + kind].image.toDataURL()}" alt="">`; } catch { return ''; } }
 function renderCampaign(selected) {
@@ -524,6 +572,8 @@ function openDialog(type) {
     content.innerHTML = `<h2 id="dialog-title">だれで出撃する？</h2><div class="settings-group">スキン（見た目だけ）</div><div class="skin-row">${Object.entries(SKINS).map(([id, k]) => { const open = skinUnlocked(profile, id), a = k.achievement && ACHIEVEMENTS.find(x => x.id === k.achievement); return `<button class="skin-swatch ${profile.skin === id ? 'selected' : ''}" data-skin="${id}" ${open ? '' : 'disabled'} title="${open ? k.name : '実績「' + a.name + '」で解放'}"><i class="${k.colors === 'rainbow' ? 'rainbow' : ''}" style="--c:${Array.isArray(k.colors) ? k.colors[0] : 'var(--coral)'}"></i>${open ? k.name : '🔒'}</button>`; }).join('')}</div><div class="char-grid">${Object.entries(CHARACTERS).map(([id, c]) => { const open = characterUnlocked(profile, id), u = UNLOCKS.find(x => x.id === id), a = u && ACHIEVEMENTS.find(x => x.id === u.achievement); const start = UPGRADES.find(x => x.id === c.start); return `<button class="char-card ${profile.character === id ? 'selected' : ''}" data-char="${id}" ${open ? '' : 'disabled'}><img src="${charImage(id, renderer.skin)}" alt=""><strong>${c.name}</strong><small>${c.title}</small><p>${c.perk.split('・')[0]}<br>初期武器：${start.name}</p>${open ? (profile.charClears[id] ? '<span class="clear">★ CLEAR</span>' : '') : `<span class="lock">実績「${a.name}」で解放</span>`}</button>`; }).join('')}</div><p class="record-note">新しい武器も実績で解放されます：${UNLOCKS.filter(u => u.kind === 'weapon').map(u => `${u.label}${characterUnlocked(profile, 'keeper') && profile.achievements[u.achievement] ? '✓' : '（' + ACHIEVEMENTS.find(a => a.id === u.achievement).name + '）'}`).join('・')}</p>`;
     content.querySelectorAll('[data-skin]').forEach(b => b.addEventListener('click', () => { profile.skin = b.dataset.skin; saveProfile(); applyRenderOptions(); audio.effect('choose'); updateHome(); openDialog('characters'); }));
     content.querySelectorAll('[data-char]').forEach(b => b.addEventListener('click', () => { profile.character = b.dataset.char; saveProfile(); audio.effect('choose'); updateHome(); $('#app-dialog').close(); }));
+  } else if (type === 'gear') {
+    $('#dialog-kicker').textContent = 'EQUIPMENT'; gearView = { filter: 'all', key: null }; renderGear();
   } else if (type === 'campaign') {
     $('#dialog-kicker').textContent = 'CAMPAIGN'; renderCampaign(nextChapter(profile));
   } else if (type === 'codex') {

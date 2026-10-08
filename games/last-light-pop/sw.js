@@ -1,9 +1,9 @@
 /* Bump VERSION for every published release, including MP3/config replacements. */
 const BASE=new URL('./',self.location.href);
 const PREFIX='last-light-pop-'+encodeURIComponent(BASE.pathname)+'-';
-const VERSION=PREFIX+'2.8.0';
+const VERSION=PREFIX+'2.9.0';
 const AUDIO_FETCH_TIMEOUT=30_000;
-const ASSETS=['./','./index.html','./style.css','./src/main.js','./src/core.js','./src/render.js','./src/audio.js','./src/ending.js','./src/hype.js','./src/meta.js','./src/songs.js','./src/bosses.js','./src/campaign.js','./manifest.webmanifest','./assets/audio-config.json','./assets/voice/voices.json','./assets/icon.svg','./assets/icon-192.png','./assets/icon-512.png','./assets/icon-maskable.png'];
+const ASSETS=['./','./index.html','./style.css','./src/main.js','./src/core.js','./src/render.js','./src/audio.js','./src/ending.js','./src/hype.js','./src/meta.js','./src/songs.js','./src/bosses.js','./src/campaign.js','./src/gear.js','./manifest.webmanifest','./assets/audio-config.json','./assets/voice/voices.json','./assets/icon.svg','./assets/icon-192.png','./assets/icon-512.png','./assets/icon-maskable.png'];
 self.addEventListener('install',event=>event.waitUntil((async()=>{
   const cache=await caches.open(VERSION);
   await cache.addAll(ASSETS.map(path=>new Request(new URL(path,BASE),{cache:'reload'})));

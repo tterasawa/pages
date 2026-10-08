@@ -116,7 +116,7 @@ export const MUTATORS = Object.freeze({
 // Workshop ranks grow convexly so the last ranks still matter.
 export const META_CURVES = Object.freeze({ hp: [0, 6, 12, 20, 32, 50], power: [0, .02, .05, .09, .15, .25], speed: [0, .02, .04, .07, .11, .16], growth: [0, .03, .06, .11, .18, .28] });
 export const META_DEFAULT = Object.freeze({ hp:0, power:0, speed:0, magnet:0, growth:0, regen:0, reroll:0, banish:0, luck:0, revive:0 });
-export function runModifiers({ heat = 0, meta = {}, mutators = [] } = {}) {
+export function runModifiers({ heat = 0, meta = {}, mutators = [], gear = null } = {}) {
   const r = n => Math.max(0, Math.floor(Number(meta[n]) || 0));
   const m = { taken:1, pulseCD:18, pulseDmg:1, tempo:1, eliteHP:1, enemyHP:1, enemySpeed:1, enemyDamage:1, xp:1, heal:1, elite:1, bulletSpeed:1, bossRate:1, spawn:1, finalBosses:1,
     damage:1 + META_CURVES.power[Math.min(5, r('power'))], playerHP:META_CURVES.hp[Math.min(5, r('hp'))], hpScale:1, speed:1 + META_CURVES.speed[Math.min(5, r('speed'))], dashCD:1, magnet:1 + r('magnet') * .15, regen:r('regen') * .15,
@@ -131,6 +131,10 @@ export function runModifiers({ heat = 0, meta = {}, mutators = [] } = {}) {
     case 'frenzy': m.enemySpeed *= 1.15; m.speed *= 1.15; break; case 'treasure': m.elite *= 2; m.luck += 3; break; case 'tank': m.enemyHP *= 1.35; m.xp *= 1.25; break;
     case 'swift': m.speed *= 1.2; m.dashCD *= .7; break; case 'fragile': m.enemyHP *= .75; m.enemyDamage *= 1.4; break;
   }
+  // Equipment (see gear.js gearModifiers): additive bonuses from the equipped items.
+  if (gear) { const g = k => Number(gear[k]) || 0;
+    m.damage *= 1 + g('damage'); m.xp *= 1 + g('xp'); m.playerHP += g('hp'); m.taken *= 1 - Math.min(.5, g('guard')); m.speed *= 1 + g('speed'); m.dashCD *= 1 - Math.min(.5, g('dash'));
+    m.luck += g('luck'); m.magnet *= 1 + g('magnet'); m.regen += g('regen'); m.rerolls += g('rerolls'); m.banishes += g('banishes'); m.revives += g('revives'); m.pulseCD *= 1 - Math.min(.5, g('pulseCD')); m.heal *= 1 + g('heal'); m.startLevel = Math.min(2, g('startLevel')); }
   m.heat = heat; return m;
 }
 export const SNAPSHOT_VERSION = 1;
@@ -154,7 +158,7 @@ export class Game {
     this.enemies=[];this.bullets=[];this.gems=[];this.particles=[];this.enemyPool=[];this.bulletPool=[];this.gemPool=[];this.particlePool=[];
     this.hash=new SpatialHash();this.events=[];this.timers={bolt:0,orbit:0,arc:0,frost:0,drone:0,nova:0};this.spawnTimer=0;this.midSpawned=false;this.finalSpawned=false;this.finalKilled=false;this.nextId=1;this.shake=0;this.flash=0;this.viewRadius=480;this.effects=true;this.boss=null;this.bossAlert=0;this.fx=[];
     this.options=options;this.mods=runModifiers(options);const md=this.mods,p=this.player;
-    this.character=CHARACTERS[options.character]?options.character:'keeper';const ch=CHARACTERS[this.character];this.levels.bolt=0;this.levels[ch.start]=1;md.damage*=ch.damage;md.speed*=ch.speed;md.xp*=ch.xp;
+    this.character=CHARACTERS[options.character]?options.character:'keeper';const ch=CHARACTERS[this.character];this.levels.bolt=0;this.levels[ch.start]=1+(md.startLevel||0);md.damage*=ch.damage;md.speed*=ch.speed;md.xp*=ch.xp;
     p.maxHP=Math.round((110+md.playerHP)*md.hpScale*ch.hp);p.hp=p.maxHP;this.locked=new Set((options.locked||[]).filter(id=>id!==ch.start));this.endless=!!this.config.endless;
     this.stage=STAGES[options.stage]?options.stage:'wilds';this.stageDef=STAGES[this.stage];const bp=options.bosses||{};this.bossPlan={mid:BOSSES[bp.mid]?bp.mid:this.stage,final:[].concat(bp.final||this.stage).filter(k=>BOSSES[k])};if(!this.bossPlan.final.length)this.bossPlan.final=[this.stage];this.relics=new Set();this.healPulses=[];this.seen=new Set();this.iceZones=[];this.darkness=0;this.curses=[];this.relicOffer=null;this.fires=[];this.fireTick=0;this.gravityTimer=15;this.altarAt=this.endless?200:this.duration*.35;this.puddles=[];this.vel={x:0,y:0};
     if(this.stageDef.gimmick==='syrup'){const r=seeded32(this.seed^0x5eed);for(let i=0;i<20;i++){const a=r()*Math.PI*2,d=180+r()*1000;this.puddles.push({x:Math.cos(a)*d,y:Math.sin(a)*d,r:60+r()*60});}}

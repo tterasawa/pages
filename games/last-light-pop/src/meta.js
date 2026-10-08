@@ -2,6 +2,7 @@
 // heat unlocks and the daily challenge. Pure functions over a plain profile object.
 import { MODES, HEATS, MUTATORS, META_DEFAULT, META_CURVES, CHARACTERS, STAGES, ENEMY_TYPES, UPGRADES, RELICS, BOSSES } from './core.js';
 import { sanitizeCampaign, totalStars } from './campaign.js';
+import { emptyGear, sanitizeGear, MAX_RARITY } from './gear.js';
 
 export const SHOP = Object.freeze([
   { id: 'hp', name: 'がんじょう', icon: 'heart', color: 'var(--coral)', max: 5, base: 72, step: 54, effect: r => `最大HP +${META_CURVES.hp[r]}` },
@@ -56,6 +57,9 @@ export const ACHIEVEMENTS = Object.freeze([
   { id: 'camp-30', name: '最後の夜明け', desc: 'キャンペーン第30章をクリア', reward: 400, test: (r, p) => !!p.campaign?.stars?.[30]?.[1] },
   { id: 'camp-45s', name: '★あつめ', desc: 'キャンペーンの★を45個集める', reward: 200, test: (r, p) => totalStars(p) >= 45 },
   { id: 'camp-90s', name: '★コンプリート', desc: 'キャンペーンの★を90個すべて集める', reward: 600, test: (r, p) => totalStars(p) >= 90 },
+  { id: 'merge-1', name: 'はじめての合成', desc: '装備を合成する', reward: 40, test: (r, p) => p.stats.merges >= 1 },
+  { id: 'gear-ultra', name: 'ウルトラ装備', desc: 'ウルトラ以上の装備を手に入れる', reward: 150, test: (r, p) => p.gear.items.some(i => i.r >= MAX_RARITY - 1) },
+  { id: 'gear-legend', name: '伝説の装備', desc: 'レジェンド装備を作る', reward: 400, test: (r, p) => p.gear.items.some(i => i.r >= MAX_RARITY) },
   { id: 'codex-50', name: '図鑑はんぶん', desc: '図鑑を50%うめる', reward: 120, test: (r, p) => codexProgress(p).ratio >= .5 },
   { id: 'codex-100', name: '図鑑コンプリート', desc: '図鑑を100%うめる', reward: 500, test: (r, p) => codexProgress(p).ratio >= 1 },
   { id: 'workshop', name: '工房マスター', desc: '工房の強化をすべて最大にする', reward: 300, test: (r, p) => SHOP.every(i => (p.meta[i.id] || 0) >= i.max) }
@@ -99,7 +103,7 @@ export const SKINS = Object.freeze({
   dawn: { name: 'ドーン', colors: ['#ff7eb6', '#ffd23f'], achievement: 'camp-90s' }
 });
 export const skinUnlocked = (p, id) => !!SKINS[id] && (!SKINS[id].achievement || !!p.achievements[SKINS[id].achievement]);
-export function emptyProfile() { return { stars: 0, earned: 0, meta: { ...META_DEFAULT }, achievements: {}, heatUnlocked: 0, stats: { runs: 0, wins: 0, kills: 0, chests: 0, evolves: 0 }, daily: {}, dailyStreak: 0, lastDaily: '', charClears: {}, endlessBest: 0, character: 'keeper', stage: 'wilds', tips: {}, seen: {}, codex: {}, skin: 'classic', campaign: { stars: {} } }; }
+export function emptyProfile() { return { stars: 0, earned: 0, meta: { ...META_DEFAULT }, achievements: {}, heatUnlocked: 0, stats: { runs: 0, wins: 0, kills: 0, chests: 0, evolves: 0, merges: 0 }, daily: {}, dailyStreak: 0, lastDaily: '', charClears: {}, endlessBest: 0, character: 'keeper', stage: 'wilds', tips: {}, seen: {}, codex: {}, skin: 'classic', campaign: { stars: {} }, gear: emptyGear() }; }
 const int = (v, min = 0, max = 1e9) => Number.isFinite(v) ? Math.max(min, Math.min(max, Math.floor(v))) : min;
 export function sanitizeProfile(raw) {
   const p = emptyProfile(); if (!raw || typeof raw !== 'object') return p;
@@ -112,7 +116,7 @@ export function sanitizeProfile(raw) {
   if (raw.codex && typeof raw.codex === 'object') for (const c of CODEX) if (raw.codex[c.id] === true) p.codex[c.id] = true; p.skin = SKINS[raw.skin] ? raw.skin : 'classic';
   for (const k of ['tips', 'seen']) if (raw[k] && typeof raw[k] === 'object') for (const [id, v] of Object.entries(raw[k]).slice(0, 100)) if (v === true && /^[\w-]{1,32}$/.test(id)) p[k][id] = true;
   if (raw.daily && typeof raw.daily === 'object') for (const [d, v] of Object.entries(raw.daily).slice(-60)) if (/^\d{4}-\d{2}-\d{2}$/.test(d) && v && typeof v === 'object') p.daily[d] = { best: Number.isFinite(v.best) ? Math.max(0, v.best) : 0, won: v.won === true, kills: int(v.kills) };
-  p.campaign = sanitizeCampaign(raw.campaign);
+  p.campaign = sanitizeCampaign(raw.campaign); p.gear = sanitizeGear(raw.gear);
   return p;
 }
 export function buy(profile, id) {
@@ -148,7 +152,9 @@ export function recordRun(profile, r, today = localDate()) {
   const newlyUnlocked = UNLOCKS.filter(u => !before.has(u.achievement) && profile.achievements[u.achievement]);
   return { stars, unlocked, heatUnlocked, newlyUnlocked };
 }
-export function checkProfileAchievements(profile) { const unlocked = []; for (const a of ACHIEVEMENTS) if (!profile.achievements[a.id] && ['workshop', 'veteran'].includes(a.id) && a.test({}, profile)) { profile.achievements[a.id] = Date.now(); profile.stars += a.reward; unlocked.push(a); } return unlocked; }
+// Achievements that depend only on the profile, checked outside of a run (workshop, equipment).
+export const GEAR_ACHIEVEMENTS = ['merge-1', 'gear-ultra', 'gear-legend'];
+export function checkProfileAchievements(profile, ids = ['workshop', 'veteran']) { const unlocked = []; for (const a of ACHIEVEMENTS) if (!profile.achievements[a.id] && ids.includes(a.id) && a.test({}, profile)) { profile.achievements[a.id] = Date.now(); profile.stars += a.reward; unlocked.push(a); } return unlocked; }
 
 // --- daily challenge -----------------------------------------------------------------------------
 export function localDate(d = new Date()) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
