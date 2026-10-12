@@ -18,7 +18,10 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2
 [hidden] { display: none !important; }
 kbd { display: inline-block; font-family: var(--num); font-size: 11px; font-weight: 900; padding: 2px 6px; border-radius: 7px; background: var(--cream); color: var(--ink); border: 2px solid var(--ink); box-shadow: 0 2px 0 var(--ink); line-height: 1.2; }
 
-.app-shell { height: 100dvh; display: flex; flex-direction: column; background: var(--night); }
+/* Sized to the area that is actually visible (main.js sets --app-h): on some Android Chrome setups 100dvh is
+   taller than the screen and would push the tab bar out of view. */
+.app-shell { position: fixed; top: 0; left: 0; width: 100%; height: var(--app-h, 100dvh); display: flex; flex-direction: column; background: var(--night); }
+#vp-probe { position: fixed; left: 0; top: 0; width: 0; height: 100dvh; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); visibility: hidden; pointer-events: none; }
 .topbar { position: relative; z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 18px; padding-top: max(10px, env(safe-area-inset-top)); background: var(--ink); border-bottom: 4px solid #170a35; }
 .top-actions { display: flex; align-items: center; gap: 8px; }
 .sound-toggle { background: var(--mint); color: var(--ink); }
