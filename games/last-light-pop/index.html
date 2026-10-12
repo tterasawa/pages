@@ -60,14 +60,10 @@
 </defs></svg>
 <div class="app-shell">
   <header class="topbar">
-    <button class="brand" id="nav-home" aria-label="ホーム" title="ホーム"><span class="brand-star"><svg><use href="#i-light"/></svg></span><span class="brand-word">LAST LIGHT <b>POP</b></span></button>
+    <button class="profile-chip" id="char-button" aria-label="キャラクターとスキンを選ぶ"><span class="avatar"><img id="char-img" alt=""></span><span class="profile-text"><strong id="char-name">ランタン</strong><small id="char-perk">灯火の番人</small></span></button>
     <div class="top-actions">
-      <button class="star-chip" data-dialog="shop" aria-label="スターと工房" title="工房"><span>★</span><b id="star-count">0</b></button>
-      <span class="connection" id="connection"><i></i><span>LOCAL / READY</span></span>
-      <button class="chip-button" data-dialog="help" aria-label="遊び方" title="遊び方"><svg><use href="#i-help"/></svg><span>遊び方</span></button>
-      <button class="chip-button" data-dialog="records" aria-label="戦績" title="戦績"><svg><use href="#i-chart"/></svg><span>戦績</span></button>
-      <button class="chip-button" data-dialog="settings" aria-label="設定" title="設定"><svg><use href="#i-settings"/></svg><span>設定</span></button>
-      <button class="chip-button sound-toggle" aria-label="音を切り替える" title="音を切り替える"><svg class="on"><use href="#i-sound"/></svg><svg class="off"><use href="#i-mute"/></svg><span class="sound-label">SOUND OFF</span></button>
+      <span class="star-chip" title="スター（工房で使えます）"><span aria-hidden="true">★</span><b id="star-count">0</b></span>
+      <button class="round-button top-menu" data-dialog="settings" aria-label="設定・遊び方" title="設定・遊び方"><svg><use href="#i-settings"/></svg></button>
     </div>
   </header>
   <main class="main">
@@ -75,33 +71,23 @@
       <canvas id="game-canvas" aria-label="LAST LIGHT POPのゲーム画面。移動はWASD、矢印キー、または画面をドラッグ。"></canvas>
       <div class="scene-vignette" aria-hidden="true"></div>
       <div id="home-screen" class="home-screen">
-        <div class="hero">
-          <div class="eyebrow"><span>★</span> 138 BPM TRANCE SURVIVOR <span>★</span></div>
+        <div class="home-title">
           <h1 class="logo" aria-label="LAST LIGHT POP"><span class="logo-row"><b style="--c:var(--coral)">L</b><b style="--c:var(--yellow)">A</b><b style="--c:var(--mint)">S</b><b style="--c:var(--sky)">T</b><span class="logo-badge">POP!</span></span><span class="logo-row"><b style="--c:var(--purple)">L</b><b style="--c:var(--pink)">I</b><b style="--c:var(--orange)">G</b><b style="--c:var(--yellow)">H</b><b style="--c:var(--coral)">T</b></span></h1>
-          <h2>夜明けまで、ぶっとばせ！</h2>
-          <p class="hero-copy">押し寄せるモンスター。どんどん進化する武器。<br>ちいさな灯火で、夜をパーティーに変えよう。</p>
-          <div class="hero-tags"><span style="--c:var(--yellow)">自動攻撃</span><span style="--c:var(--mint)">ランダム強化</span><span style="--c:var(--sky)">オフライン対応</span></div>
-          <button class="text-button hero-help" data-dialog="help">はじめての方へ <svg><use href="#i-arrow"/></svg></button>
+          <p class="tagline">夜明けまで、ぶっとばせ！</p>
         </div>
-        <div class="mission-card">
-          <div class="card-kicker"><span>SELECT STAGE</span><span class="tiny-dot"></span></div>
-          <button id="campaign-button" class="campaign-button"><svg><use href="#i-book"/></svg><span><strong>キャンペーン <b id="campaign-chapter">第1章</b></strong><small id="campaign-summary">—</small></span><em><svg><use href="#i-star"/></svg><b id="campaign-stars">0</b>/90</em></button>
+        <div class="home-events">
+          <button id="daily-button" class="event-chip daily"><svg><use href="#i-calendar"/></svg><span><strong>今日のチャレンジ</strong><small id="daily-summary">—</small></span><em id="daily-badge"></em></button>
+          <button id="free-button" class="event-chip free"><svg><use href="#i-infinity"/></svg><span><strong>フリープレイ</strong><small>ステージ・作戦・ヒートを選ぶ</small></span></button>
+        </div>
+        <div class="battle-panel">
           <button id="resume-run" class="resume-run" hidden><svg><use href="#i-arrow"/></svg><span><strong>つづきから</strong><small id="resume-detail"></small></span></button>
-          <div class="stage-row" id="stage-row"><button id="stage-prev" class="heat-step" aria-label="前のステージ">‹</button><div class="stage-info"><strong id="stage-name">夜の荒野</strong><small id="stage-rule"></small></div><button id="stage-next" class="heat-step" aria-label="次のステージ">›</button></div>
-          <button id="char-button" class="char-chip" aria-label="キャラクターを選ぶ"><img id="char-img" alt=""><span><strong id="char-name">ランタン</strong><small id="char-perk"></small></span><em>変更</em></button>
-          <div class="mode-tabs" role="group" aria-label="作戦を選択">
-            <button data-mode="patrol" aria-pressed="false"><strong>巡回</strong><small>3分</small></button>
-            <button data-mode="guard" class="selected" aria-pressed="true"><strong>防衛</strong><small>6分</small></button>
-            <button data-mode="eclipse" aria-pressed="false"><strong>極夜</strong><small>HARD</small></button>
-            <button data-mode="endless" aria-pressed="false"><strong>∞</strong><small>ENDLESS</small></button>
-          </div>
-          <div class="mission-text"><h3 id="mode-title">灯火防衛</h3><p id="mode-description">武器を育て、夜の主を迎え撃つ。</p></div>
-          <div class="heat-row" role="group" aria-label="ヒート（難易度）"><button id="heat-down" class="heat-step" aria-label="ヒートを下げる">−</button><div class="heat-info"><span class="heat-flame"><svg><use href="#i-flame"/></svg><b id="heat-level">0</b></span><div><strong id="heat-name">ノーマル</strong><small id="heat-rule">いつもの夜</small></div><span class="heat-mult" id="heat-mult">★×1.00</span></div><button id="heat-up" class="heat-step" aria-label="ヒートを上げる">＋</button></div>
-          <button id="start-button" class="primary-button"><span>出撃する</span><svg><use href="#i-arrow"/></svg></button>
-          <button id="daily-button" class="daily-button"><svg><use href="#i-calendar"/></svg><span><strong>今日のチャレンジ</strong><small id="daily-summary">—</small></span><em id="daily-badge"></em></button>
-          <div class="mission-foot"><span><kbd>WASD</kbd> / タッチで移動</span><span>攻撃は自動！</span></div>
+          <button id="campaign-button" class="chapter-card" aria-label="キャンペーンの章を選ぶ">
+            <span class="chapter-top"><b id="campaign-chapter">第1章</b><span id="campaign-stage">夜の荒野</span><em><svg><use href="#i-star"/></svg><b id="campaign-stars">0</b>/90</em></span>
+            <strong id="campaign-name">はじまりの灯</strong>
+            <span class="chapter-meta"><span class="chapter-bosses" id="campaign-bosses"></span><span class="cstars" id="campaign-goal"></span><span class="chapter-more">章を選ぶ <svg><use href="#i-arrow"/></svg></span></span>
+          </button>
+          <button id="start-button" class="battle-button"><span>出撃！</span><small id="start-sub">第1章</small></button>
         </div>
-        <div class="home-bottom"><button class="home-sticker" data-dialog="shop" aria-label="工房" style="--c:var(--yellow)"><svg><use href="#i-shop"/></svg><span>工房</span><em id="shop-badge" hidden>!</em></button><button class="home-sticker" data-dialog="gear" aria-label="装備" style="--c:var(--pink)"><svg><use href="#i-lamp"/></svg><span>装備</span><em id="gear-badge" hidden>!</em></button><button class="home-sticker" data-dialog="codex" aria-label="図鑑" style="--c:var(--sky)"><svg><use href="#i-book"/></svg><span>図鑑 <small id="codex-count">0%</small></span></button><button class="home-sticker" data-dialog="achievements" aria-label="実績" style="--c:var(--mint)"><svg><use href="#i-medal"/></svg><span>実績 <small id="achieve-count">0/0</small></span></button><div class="best-record"><svg><use href="#i-clock"/></svg><small>BEST</small><span id="home-best">--:--</span></div><div class="best-record combo-best"><svg><use href="#i-light"/></svg><small>MAX COMBO</small><span id="home-combo">0</span></div></div>
       </div>
       <div id="hud" class="hud" hidden>
         <div class="hud-top">
@@ -138,9 +124,16 @@
       </div>
       <div class="screen-overlay" id="result-screen" hidden><div class="compact-card result-card"><div class="rank-stamp" id="result-rank">A</div><span class="eyebrow" id="result-eyebrow">NEXT NIGHT</span><h2 id="result-title">次の夜へ！</h2><p id="result-copy">その灯火は、まだあなたの中に。</p><div class="result-stats"><div><small>生存時間</small><strong id="result-time">00:00</strong></div><div><small>撃破数</small><strong id="result-kills">0</strong></div><div><small>レベル</small><strong id="result-level">1</strong></div><div><small>最大コンボ</small><strong id="result-combo">0</strong></div></div><div id="result-build" class="result-build"></div><div id="result-relics" class="result-build"></div><div class="damage-board" id="damage-board"></div><div class="camp-result" id="camp-result" hidden></div><div class="loot-result" id="result-loot" hidden></div><div class="star-earned" id="star-earned"><div class="star-total">★ <b id="star-total">0</b><small id="star-mult"></small></div><ul id="star-lines"></ul></div><div class="unlocks" id="result-unlocks"></div><div class="new-record" id="new-record" hidden>★ NEW RECORD! 自己ベスト更新 ★</div><button id="next-chapter" class="primary-button" hidden>次の章へ <svg><use href="#i-arrow"/></svg></button><button id="retry-button" class="primary-button">もう一回！ <svg><use href="#i-arrow"/></svg></button><button id="result-home" class="secondary-button">ホームへ</button></div></div>
       <div class="pwa-update" id="pwa-update" hidden><span>新しいバージョンがあります</span><button id="update-button">更新</button></div>
-      <div class="corner-meta"><button class="text-button" id="install-button" hidden><svg><use href="#i-install"/></svg> インストール</button><span id="performance">CANVAS 2D</span><span class="version">V 2.9.0</span></div>
+      <div class="corner-meta"><span id="performance">CANVAS 2D</span></div>
     </section>
   </main>
+  <nav class="tabbar" id="tabbar" aria-label="メニュー">
+    <button data-tab="shop"><svg><use href="#i-shop"/></svg><span>工房</span><em id="shop-badge" hidden>!</em></button>
+    <button data-tab="gear"><svg><use href="#i-lamp"/></svg><span>装備</span><em id="gear-badge" hidden>!</em></button>
+    <button data-tab="home" class="tab-battle" aria-current="page"><span class="tab-orb"><svg><use href="#i-light"/></svg></span><span>バトル</span></button>
+    <button data-tab="codex"><svg><use href="#i-book"/></svg><span>図鑑</span></button>
+    <button data-tab="achievements"><svg><use href="#i-medal"/></svg><span>実績</span></button>
+  </nav>
 </div>
 <dialog id="app-dialog" aria-labelledby="dialog-title"><div class="dialog-header"><span class="eyebrow" id="dialog-kicker">HOW TO PLAY</span><button class="round-button" id="dialog-close" aria-label="閉じる"><svg><use href="#i-close"/></svg></button></div><div id="dialog-content"></div></dialog>
 <div id="toast" class="toast" role="status" hidden></div>

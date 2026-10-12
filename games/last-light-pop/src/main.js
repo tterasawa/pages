@@ -9,7 +9,7 @@ import { ComboMeter, rankFor, musicIntensity } from './hype.js';
 
 const $ = s => document.querySelector(s); const $$ = s => [...document.querySelectorAll(s)];
 const icon = (name, cls = '') => `<svg class="${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
-const APP_VERSION = 'V 2.9.0';
+const APP_VERSION = 'V 3.0.0';
 const SETTINGS_KEY = 'lastlight-pop-settings-v1', RECORDS_KEY = 'lastlight-pop-records-v1', PROFILE_KEY = 'lastlight-pop-profile-v1';
 const DEFAULT_SETTINGS = { sound: true, music: 0.42, sfx: 0.6, quality: 'auto', vibration: true, heat: 0, shake: 1, flash: true, numbers: true, largeText: false, hints: true, voice: .9, subtitles: true, keyDash: 'Space', keyPulse: 'KeyQ' };
 const EMPTY_RECORDS = { runs: 0, wins: 0, totalKills: 0, bestKills: 0, bestTime: 0, bestCombo: 0, modes: {} };
@@ -94,7 +94,7 @@ function home() {
   audio.stopVoice(); $('#subtitle').hidden = true;
   if (game && ['running', 'paused', 'upgrade', 'chest', 'relic'].includes(game.state)) finalizeRun(false); hideCoach(); clearRun();
   game = null; ending = null; endingResultShown = false; audio.setStage(homeSong()); audio.setScene('home'); clearInput(); prevState = 'home'; hideScreens(); $('#home-screen').hidden = false;
-  document.body.classList.remove('playing'); $('#announcement').hidden = true; $('#warning-banner').hidden = true; $('#boss-panel').hidden = true; renderer.resize(); demo = makeDemo(); updateBest(); updateHome(); $('#start-button').focus({ preventScroll: true });
+  document.body.classList.remove('playing'); $('#announcement').hidden = true; $('#warning-banner').hidden = true; $('#boss-panel').hidden = true; renderer.resize(); demo = makeDemo(); updateHome(); $('#start-button').focus({ preventScroll: true });
 }
 let shownChoices = '';
 function transition() {
@@ -199,8 +199,9 @@ function hideCoach() { clearTimeout(coachTimer); coachQueue.length = 0; $('#coac
 const pad = { prev: [], move: { x: 0, y: 0 }, navAt: 0, active: false };
 function padButtons() { const gp = [...(navigator.getGamepads?.() || [])].find(g => g && g.connected); if (!gp) { pad.move.x = pad.move.y = 0; return null; } return gp; }
 function visibleButtons() {
-  const layer = $('#app-dialog').open ? $('#app-dialog') : [...$$('.screen-overlay:not([hidden]), #ending-screen:not([hidden])')].pop() || (game ? $('#hud') : $('#home-screen'));
-  return [...layer.querySelectorAll('button:not(:disabled), input, select')].filter(b => { const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== 'hidden'; });
+  const dlg = $('#app-dialog'), layers = dlg.open ? (dlg.classList.contains('as-page') ? [dlg, $('#tabbar')] : [dlg]) : [[...$$('.screen-overlay:not([hidden]), #ending-screen:not([hidden])')].pop() || (game ? $('#hud') : null)].filter(Boolean);
+  if (!layers.length) layers.push($('.topbar'), $('#home-screen'), $('#tabbar'));
+  return layers.flatMap(l => [...l.querySelectorAll('button:not(:disabled), input, select')]).filter(b => { const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== 'hidden'; });
 }
 function navigate(dx, dy) {
   const list = visibleButtons(); if (!list.length) return; const cur = list.includes(document.activeElement) ? document.activeElement : null;
@@ -279,40 +280,54 @@ function countUp() {
 }
 function updateStars(gain = false) { $('#star-count').textContent = profile.stars.toLocaleString(); if (gain) { const c = $('.star-chip'); c.classList.remove('gain'); void c.offsetWidth; c.classList.add('gain'); } }
 function updateHome() {
-  updateStars(); $('#gear-badge').hidden = !mergeableCount(profile.gear); { const n = nextChapter(profile), ch = chapter(n), t = totalStars(profile); $('#campaign-chapter').textContent = t >= CAMPAIGN_STARS ? 'コンプリート！' : `第${n}章`; $('#campaign-summary').textContent = `${ch.name}・${STAGES[ch.stage].name}`; $('#campaign-stars').textContent = t; } const h = Math.min(settings.heat, profile.heatUnlocked), def = HEATS[h], row = $('.heat-row'); settings.heat = h;
-  row.dataset.heat = h; row.dataset.hot = h >= 6 ? 2 : h >= 3 ? 1 : 0; $('#heat-level').textContent = h; $('#heat-name').textContent = `ヒート${h}・${def.name}`;
-  $('#heat-rule').textContent = h ? HEATS.slice(1, h + 1).map(x => x.rule).join(' / ') : profile.heatUnlocked ? 'いつもの夜（＋でヒートを上げられます）' : 'クリアするとヒート1が解放されます';
-  $('#heat-mult').textContent = `★×${heatMultiplier(h).toFixed(2)}`; $('#heat-down').disabled = h <= 0; $('#heat-up').disabled = h >= profile.heatUnlocked;
-  $('#heat-up').title = h >= profile.heatUnlocked ? (h < HEATS.length - 1 ? `ヒート${h}でクリアすると解放` : '最高ヒートです') : 'ヒートを上げる';
+  updateStars(); updateCharacter();
+  // Badges on the tab bar: something to buy in the workshop / gear that can be merged.
+  $('#gear-badge').hidden = !mergeableCount(profile.gear); $('#shop-badge').hidden = !SHOP.some(i => (profile.meta[i.id] || 0) < i.max && profile.stars >= shopCost(i, profile.meta[i.id] || 0));
+  // The battle card: the next campaign chapter is the main thing to do.
+  const n = nextChapter(profile), ch = chapter(n), t = totalStars(profile), got = profile.campaign.stars[n] || [false, false, false];
+  $('#campaign-chapter').textContent = `第${n}章`; $('#campaign-stage').textContent = STAGES[ch.stage].name; $('#campaign-name').textContent = t >= CAMPAIGN_STARS ? 'すべての★を集めた！' : ch.name; $('#campaign-stars').textContent = t;
+  $('#campaign-goal').innerHTML = got.map(x => `<i class="${x ? 'on' : ''}">${icon('star')}</i>`).join('');
+  $('#campaign-bosses').innerHTML = [...new Set([ch.bosses.mid, ...ch.bosses.final])].map(k => bossFace(k)).join('');
+  $('.chapter-card').dataset.stage = ch.stage; $('#start-sub').textContent = `第${n}章・${formatTime(ch.duration)}`;
+  // Side events: the daily challenge and free play open after the first night.
   const cfg = dailyConfig(), d = describeDaily(cfg), rec = profile.daily[cfg.day];
   $('#daily-summary').textContent = `${d.mode}・${d.mutators.map(m => m.name).join('＋')}${cfg.heat ? `・ヒート${cfg.heat}` : ''}`;
-  const badge = $('#daily-badge'); badge.textContent = rec?.won ? 'CLEAR' : rec ? formatTime(rec.best) : 'NEW'; badge.className = rec?.won ? 'done' : '';
-  $('#achieve-count').textContent = `${Object.keys(profile.achievements).length}/${ACHIEVEMENTS.length}`;
-  updateCharacter();
+  const badge = $('#daily-badge'); badge.textContent = rec?.won ? 'CLEAR' : rec ? formatTime(rec.best) : ''; badge.className = rec?.won ? 'done' : ''; // first sight is marked by the NEW sticker
+  const veteran = profile.stats.runs >= 1; $('#daily-button').hidden = !veteran; $('#free-button').hidden = !veteran; $('.home-events').hidden = !veteran;
+  markNew($('#daily-button'), 'daily', veteran); markNew($('#free-button'), 'free', veteran);
+  const anyChar = Object.keys(CHARACTERS).some(id => id !== 'keeper' && characterUnlocked(profile, id)); markNew($('#char-button'), 'chars', anyChar);
   const saved = savedRun(), rb = $('#resume-run'); rb.hidden = !saved;
   if (saved) { const g = saved.game; $('#resume-detail').textContent = `${saved.runInfo?.campaign ? `第${saved.runInfo.campaign}章` : MODES[g.mode].name}・${STAGES[g.stage]?.name || ''}・${formatTime(g.time)}・Lv.${g.level}${saved.runInfo?.daily ? '・デイリー' : ''}`; }
-  const st = STAGES[profile.stage], open = stageUnlocked(profile, profile.stage), srow = $('#stage-row'), anyStage = STAGE_ORDER.some(id => id !== 'wilds' && stageUnlocked(profile, id));
-  srow.hidden = !anyStage; srow.dataset.locked = open ? 0 : 1; $('#stage-name').textContent = (open ? '' : '🔒 ') + st.name; const su = UNLOCKS.find(u => u.kind === 'stage' && u.id === profile.stage);
-  $('#stage-rule').textContent = open ? st.rule : `実績「${ACHIEVEMENTS.find(a => a.id === su.achievement).name}」で解放`; srow.style.setProperty('--st1', STAGE_COLORS[profile.stage][0]); srow.style.setProperty('--st2', STAGE_COLORS[profile.stage][1]);
-  $('#start-button').disabled = !open; markNew(srow, 'stage', anyStage);
-  $('.heat-row').hidden = profile.heatUnlocked < 1; markNew($('.heat-row'), 'heat', profile.heatUnlocked >= 1);
-  $('#daily-button').hidden = profile.stats.runs < 1; markNew($('#daily-button'), 'daily', profile.stats.runs >= 1);
-  const endlessOpen = !!profile.achievements['first-clear'], et = $('[data-mode="endless"]'); et.disabled = !endlessOpen; et.title = endlessOpen ? 'エンドレス' : '初クリアで解放'; markNew(et, 'endless', endlessOpen); if (!endlessOpen && mode === 'endless') $('[data-mode="guard"]').click();
-  const anyChar = Object.keys(CHARACTERS).some(id => id !== 'keeper' && characterUnlocked(profile, id)); $('#char-button').hidden = !anyChar; markNew($('#char-button'), 'chars', anyChar);
-  $('#codex-count').textContent = Math.round(codexProgress(profile).ratio * 100) + '%';
-  $('#shop-badge').hidden = !SHOP.some(i => profile.stars >= shopCost(i, profile.meta[i.id] || 0));
+  document.body.classList.toggle('has-resume', !!saved);
 }
 function applyRenderOptions() { renderer.opts = { shake: settings.shake, flash: settings.flash, numbers: settings.numbers }; renderer.skinColors = Object.fromEntries(Object.entries(SKINS).filter(([, v]) => Array.isArray(v.colors)).map(([k, v]) => [k, v.colors])); renderer.skin = skinUnlocked(profile, profile.skin) ? profile.skin : 'classic'; }
 function charImage(id, skin = 'classic') { try { return renderer.sprites[renderer.hero(id, skin === 'rainbow' ? 'classic' : skin)].image.toDataURL(); } catch { return ''; } }
-function updateCharacter() { const id = characterUnlocked(profile, profile.character) ? profile.character : 'keeper', c = CHARACTERS[id]; $('#char-img').src = charImage(id, renderer.skin); $('#char-name').textContent = `${c.name}・${c.title}`; $('#char-perk').textContent = c.perk; }
+function updateCharacter() { const id = characterUnlocked(profile, profile.character) ? profile.character : 'keeper', c = CHARACTERS[id]; $('#char-img').src = charImage(id, renderer.skin); $('#char-name').textContent = c.name; $('#char-perk').textContent = c.title; }
 const STAGE_ORDER = Object.keys(STAGES), STAGE_COLORS = { wilds: ['#3a2a7c', '#7b5cd6'], frost: ['#2c4f86', '#4cc9f0'], candy: ['#7a2f6e', '#ff8fc7'] };
-function cycleStage(delta) { const i = STAGE_ORDER.indexOf(profile.stage), next = STAGE_ORDER[(i + delta + STAGE_ORDER.length) % STAGE_ORDER.length]; profile.stage = next; saveProfile(); audio.effect('ui'); demo = makeDemo(); audio.setStage(homeSong()); updateHome(); }
+function selectStage(id) { if (!stageUnlocked(profile, id)) return; profile.stage = id; saveProfile(); audio.effect('ui'); demo = makeDemo(); audio.setStage(homeSong()); }
+// --- free play sheet: stage, mode and heat in one place --------------------------------------------
+const MODE_TABS = { patrol: ['巡回', '3分'], guard: ['防衛', '6分'], eclipse: ['極夜', 'HARD'], endless: ['∞', 'ENDLESS'] };
+function renderFree(focus = null) {
+  const content = $('#dialog-content'), h = Math.min(settings.heat, profile.heatUnlocked), def = HEATS[h], endlessOpen = !!profile.achievements['first-clear']; settings.heat = h;
+  if (mode === 'endless' && !endlessOpen) mode = 'guard'; if (!stageUnlocked(profile, profile.stage)) profile.stage = 'wilds';
+  const stageCard = id => { const st = STAGES[id], open = stageUnlocked(profile, id), u = UNLOCKS.find(x => x.kind === 'stage' && x.id === id); return `<button class="stage-card ${profile.stage === id ? 'selected' : ''}" data-stage="${id}" aria-pressed="${profile.stage === id}" ${open ? '' : 'disabled'} style="--st1:${STAGE_COLORS[id][0]};--st2:${STAGE_COLORS[id][1]}"><strong>${open ? '' : '🔒 '}${st.name}</strong><small>${open ? st.rule : `実績「${ACHIEVEMENTS.find(a => a.id === u.achievement).name}」で解放`}</small></button>`; };
+  content.innerHTML = `<h2 id="dialog-title">フリープレイ</h2>
+    <div class="settings-group">ステージ</div><div class="stage-cards">${STAGE_ORDER.map(stageCard).join('')}</div>
+    <div class="settings-group">作戦</div><div class="mode-tabs four" role="group" aria-label="作戦を選択">${Object.entries(MODE_TABS).map(([m, [n, sub]]) => `<button data-mode="${m}" class="${mode === m ? 'selected' : ''}" aria-pressed="${mode === m}" ${m === 'endless' && !endlessOpen ? 'disabled title="初クリアで解放"' : ''}><strong>${n}</strong><small>${m === 'endless' && !endlessOpen ? '🔒' : sub}</small></button>`).join('')}</div>
+    <p class="mode-desc" id="mode-description"><b>${MODES[mode].name}</b>：${MODES[mode].description}${profile.stats.runs === 0 && mode === 'patrol' ? '（はじめての方におすすめ）' : ''}</p>
+    ${profile.heatUnlocked >= 1 ? `<div class="settings-group">ヒート（難しさの追加）</div><div class="heat-row" data-heat="${h}" data-hot="${h >= 6 ? 2 : h >= 3 ? 1 : 0}" role="group" aria-label="ヒート"><button id="heat-down" class="heat-step" aria-label="ヒートを下げる" ${h <= 0 ? 'disabled' : ''}>−</button><div class="heat-info"><span class="heat-flame">${icon('flame')}<b id="heat-level">${h}</b></span><div><strong id="heat-name">ヒート${h}・${def.name}</strong><small id="heat-rule">${h ? HEATS.slice(1, h + 1).map(x => x.rule).join(' / ') : 'いつもの夜（＋でヒートを上げられます）'}</small></div><span class="heat-mult" id="heat-mult">★×${heatMultiplier(h).toFixed(2)}</span></div><button id="heat-up" class="heat-step" aria-label="ヒートを上げる" ${h >= profile.heatUnlocked ? `disabled title="${h < HEATS.length - 1 ? `ヒート${h}でクリアすると解放` : '最高ヒートです'}"` : ''}>＋</button></div>` : '<p class="mode-desc">クリアすると「ヒート」（難しさの追加）が解放されます。</p>'}
+    <button id="free-start" class="primary-button">出撃する <svg><use href="#i-arrow"/></svg></button>`;
+  content.querySelectorAll('[data-stage]').forEach(b => b.addEventListener('click', () => { selectStage(b.dataset.stage); renderFree(`[data-stage="${b.dataset.stage}"]`); }));
+  content.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => { mode = b.dataset.mode; audio.effect('choose'); renderFree(`[data-mode="${mode}"]`); }));
+  $('#heat-down')?.addEventListener('click', () => setHeat(-1)); $('#heat-up')?.addEventListener('click', () => setHeat(1));
+  $('#free-start').addEventListener('click', () => { $('#app-dialog').close(); start(); });
+  if (focus) content.querySelector(focus)?.focus({ preventScroll: true });
+}
 // The title screen previews the selected stage's song (locked stages fall back to the wilds).
 function homeSong() { return stageUnlocked(profile, profile.stage) ? profile.stage : 'wilds'; }
 function markNew(el, key, show) { if (!el) return; const fresh = show && !profile.seen[key]; el.classList.toggle('new-badge', fresh); if (fresh && !el.dataset.seenHook) { el.dataset.seenHook = '1'; el.addEventListener('click', () => { profile.seen[key] = true; saveProfile(); el.classList.remove('new-badge'); }, { capture: true }); } }
-function setHeat(delta) { const next = Math.max(0, Math.min(profile.heatUnlocked, settings.heat + delta)); if (next === settings.heat) return; settings.heat = next; save(SETTINGS_KEY, settings); audio.effect(delta > 0 ? 'elite' : 'ui'); updateHome(); }
+function setHeat(delta) { const next = Math.max(0, Math.min(profile.heatUnlocked, settings.heat + delta)); if (next === settings.heat) return; settings.heat = next; save(SETTINGS_KEY, settings); audio.effect(delta > 0 ? 'elite' : 'ui'); renderFree(delta > 0 ? (next < profile.heatUnlocked ? '#heat-up' : '#heat-down') : (next > 0 ? '#heat-down' : '#heat-up')); }
 function achievementToast(list) { list.forEach((a, i) => setTimeout(() => { const el = document.createElement('div'); el.className = 'ach-toast'; el.innerHTML = `${icon('medal')}<div>実績「${a.name}」達成！<small>★ +${a.reward}</small></div>`; document.body.append(el); audio.effect('achieve'); setTimeout(() => el.remove(), 3300); }, i * 900)); }
-function updateBest() { $('#home-best').textContent = records.bestTime ? formatTime(records.bestTime) : '--:--'; $('#home-combo').textContent = records.bestCombo.toLocaleString(); }
 
 let lastTrack = '', trackTick = 0;
 function liveStars() { const st = game.stats, p = game.player; return { won: game.state === 'won', time: game.time, hits: st.hits, lowHp: st.lowHp ?? 1, bossSlowest: Math.max(st.bossSlowest, ...game.enemies.filter(e => e.alive && e.type === 4).map(e => game.time - (e.born || 0))), dashes: st.dashes, pulses: st.pulses, hpRatio: p.hp / p.maxHP }; }
@@ -417,28 +432,24 @@ function frame(now) {
 
 $('#stage').tabIndex = -1;
 $('#ending-skip').addEventListener('click', skipEnding);
-$('#start-button').addEventListener('click', () => start());
-$('#heat-down').addEventListener('click', () => setHeat(-1)); $('#heat-up').addEventListener('click', () => setHeat(1));
+$('#start-button').addEventListener('click', () => start({ chapter: nextChapter(profile) })); // the big 出撃 button plays the next campaign chapter
+$('#free-button').addEventListener('click', () => openDialog('free'));
 $('#daily-button').addEventListener('click', () => openDialog('daily')); $('#resume-run').addEventListener('click', resumeRun); $('#char-button').addEventListener('click', () => openDialog('characters'));
 $('#reroll-button').addEventListener('click', reroll); $('#banish-button').addEventListener('click', toggleBanish); $('#skip-button').addEventListener('click', skipUpgrade);
 $('#relic-cards').addEventListener('click', e => { const b = e.target.closest('[data-relic]'); if (b) takeRelic(b.dataset.relic); }); $('#relic-decline').addEventListener('click', declineRelic);
 $('#coach-close').addEventListener('click', nextCoach);
-$('#stage-prev').addEventListener('click', () => cycleStage(-1)); $('#stage-next').addEventListener('click', () => cycleStage(1));
 window.addEventListener('gamepadconnected', () => toast('ゲームパッドを接続しました。左スティックで移動、Aでダッシュ、Bでパルス。'));
 $('#chest-claim').addEventListener('click', e => { e.stopPropagation(); claimChest(); }); $('#chest-screen').addEventListener('click', () => { if (!chestDone) finishChest(); }); $('#retry-button').addEventListener('click', () => start(runInfo.campaign ? { chapter: runInfo.campaign } : { daily: runInfo.daily })); $('#next-chapter').addEventListener('click', e => start({ chapter: Number(e.currentTarget.dataset.chapter) }));
 $('#campaign-button').addEventListener('click', () => openDialog('campaign')); $('#result-home').addEventListener('click', home);
 $('#resume-button').addEventListener('click', () => { game?.resume(); accumulator = 0; transition(); });
 $('#pause-button').addEventListener('click', () => { game?.pause(); transition(); saveRun(); });
 $('#quit-button').addEventListener('click', () => { if (game) { game.state = 'dead'; game.emit('dead'); transition(); } });
-$('#nav-home').addEventListener('click', () => { if (game?.state === 'running') { game.pause(); transition(); } else if (game && ['paused', 'upgrade'].includes(game.state)) toast('作戦を終了するには、一時停止画面から終了してください。'); else if (game && hasUnfinishedRun()) skipEnding(); else home(); });
 for (const [id, fn] of [['#dash-button', () => game?.dash()], ['#pulse-button', () => game?.pulse()]]) { $(id).addEventListener('pointerdown', e => { e.preventDefault(); fn(); }); $(id).addEventListener('click', fn); }
 $('#upgrade-cards').addEventListener('click', e => { const b = e.target.closest('[data-upgrade]'); if (b) choose(b.dataset.upgrade); });
-$$('[data-mode]').forEach(b => b.addEventListener('click', () => { mode = b.dataset.mode; $$('[data-mode]').forEach(x => { x.classList.toggle('selected', x === b); x.setAttribute('aria-pressed', String(x === b)); }); $('#mode-title').textContent = MODES[mode].name; $('#mode-description').textContent = MODES[mode].description; audio.effect('choose'); }));
-$$('.sound-toggle').forEach(b => b.addEventListener('click', () => setSound(!settings.sound)));
 document.addEventListener('pointerover', e => { if (e.pointerType === 'mouse' && e.target.closest?.('button:not(:disabled)') && !e.target.closest('.ability')) audio.effect('ui'); });
 window.addEventListener('pointerdown', primeAudio, { capture: true }); window.addEventListener('keydown', primeAudio, { capture: true });
 window.addEventListener('keydown', e => {
-  if ($('#app-dialog').open) return;
+  if ($('#app-dialog').open) { if (e.code === 'Escape' && $('#app-dialog').classList.contains('as-page')) $('#app-dialog').close(); return; }
   if (ending && !endingResultShown) { if (['Enter', 'Space', 'Escape'].includes(e.code)) { e.preventDefault(); if (!e.repeat) skipEnding(); } return; }
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault(); if (e.repeat) return;
   if (game?.state === 'relic') { if (['Digit1', 'Digit2', 'Digit3'].includes(e.code)) { const id = game.relicOffer.choices[Number(e.code.at(-1)) - 1]; if (id) takeRelic(id); } if (e.code === 'Escape') declineRelic(); return; }
@@ -545,9 +556,9 @@ function openDialog(type) {
     content.innerHTML = `<h2 id="dialog-title">灯火を守って、夜をこえろ！</h2><p>攻撃はぜんぶ自動。モンスターをかわしながらキラキラを集めてレベルアップ、武器を育てよう。制限時間を生きのびて、最後に現れる「夜の主」をたおせば作戦成功！</p><div class="control-row"><span>移動</span><span><kbd>W A S D</kbd> / <kbd>↑ ↓ ← →</kbd></span></div><div class="control-row"><span>スマートフォン</span><span>画面をドラッグ</span></div><div class="control-row"><span>ダッシュ（一瞬むてき）</span><span><kbd>SPACE</kbd> / 右下ボタン</span></div><div class="control-row"><span>パルス（周りを攻撃・キラキラ回収）</span><span><kbd>Q</kbd> / 右下ボタン</span></div><div class="control-row"><span>一時停止</span><span><kbd>P</kbd> / <kbd>ESC</kbd></span></div><div class="control-row"><span>強化をえらぶ</span><span><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> / タップ</span></div><h3>アイテムと敵の弾</h3><div class="legend"><span style="--c:var(--mint)"><i></i>キラキラ＝経験値</span><span style="--c:var(--yellow)"><i></i>星＝大きな経験値</span><span style="--c:var(--coral)"><i></i>ハート＝回復</span><span style="--c:var(--tomato)"><i></i>赤い玉＝敵の弾</span></div><h3>武器は4つ、支援も4つまで</h3><p>持てる武器・支援はそれぞれ4つまで。何を育てるかが勝負の分かれ目。実績を達成すると新しい武器やキャラクターが解放されます。光る泡は特殊アイテム（全部吸い寄せ・画面一掃の爆弾・時間停止・無敵のスター）。赤い円は攻撃の予告なのですぐに離れて！</p><h3>宝箱・工房・ヒート</h3><p>王冠をかぶったエリートや夜の主をたおすと宝箱が出現。開けると1〜5個の強化が当たります。出撃するとスターがたまり、工房で恒久強化を買えます。クリアするとヒート（難易度）が解放され、高ヒートほどスター倍率がアップ。毎日変わる「今日のチャレンジ」もあります。</p><h3>進化とカードの操作</h3><p>武器はLv.5で進化しますが、相棒の支援強化が必要です（カードに表示）。強化カードはリロール（R）・除外（X）・スキップ（S）できます。</p><h3>コンボでアガれ！</h3><p>途切れずにたおし続けるとコンボが伸びて、効果音もどんどん高くなります。武器はLv.5で進化。パルスはピンチの切り札！</p><h3>アプリとして遊ぶ</h3><p>対応ブラウザではインストールできます。iPhone / iPadはSafariの共有メニューから「ホーム画面に追加」。初回読み込み後はオフラインでも遊べます。</p>`;
   } else if (type === 'settings') {
     $('#dialog-kicker').textContent = 'SETTINGS';
-    content.innerHTML = `<h2 id="dialog-title">せってい</h2><div class="settings-row"><div><label for="setting-sound">サウンド</label><small>BGMと効果音</small></div><input id="setting-sound" type="checkbox" ${settings.sound ? 'checked' : ''}></div><div class="settings-row"><label for="setting-music">音楽</label><input id="setting-music" type="range" min="0" max="100" value="${Math.round(settings.music * 100)}"></div><div class="settings-row"><label for="setting-sfx">効果音</label><input id="setting-sfx" type="range" min="0" max="100" value="${Math.round(settings.sfx * 100)}"></div><div class="settings-row"><label for="setting-voice">ボイス</label><input id="setting-voice" type="range" min="0" max="100" value="${Math.round(settings.voice * 100)}"></div><div class="settings-row"><div><label for="setting-subtitles">字幕</label><small>キャラクターのセリフを文字でも表示</small></div><input id="setting-subtitles" type="checkbox" ${settings.subtitles ? 'checked' : ''}></div><div class="settings-row"><div><label for="setting-quality">描画品質</label><small>低品質は電池と処理負荷をおさえます</small></div><select id="setting-quality"><option value="auto">自動</option><option value="high">高品質</option><option value="low">低品質</option></select></div><div class="settings-row"><div><label for="setting-vibration">ダメージ時の振動</label><small>対応する端末のみ</small></div><input id="setting-vibration" type="checkbox" ${settings.vibration ? 'checked' : ''}></div><p class="settings-note">設定はこの端末に保存されます。画面を離れると自動で一時停止します。端末の「視差効果を減らす」を有効にすると、画面の揺れやフラッシュを抑えます。</p>`;
+    content.innerHTML = `<h2 id="dialog-title">せってい</h2><div class="quick-row"><button class="quick-tile" data-dialog="help">${icon('help')}<span>遊び方</span></button><button class="quick-tile sound-toggle" id="quick-sound">${icon('sound', 'on')}${icon('mute', 'off')}<span class="sound-label"></span></button><button class="quick-tile" id="install-button" ${installPrompt ? '' : 'hidden'}>${icon('install')}<span>ホーム画面に追加</span></button></div><div class="settings-row"><div><label for="setting-sound">サウンド</label><small>BGMと効果音</small></div><input id="setting-sound" type="checkbox" ${settings.sound ? 'checked' : ''}></div><div class="settings-row"><label for="setting-music">音楽</label><input id="setting-music" type="range" min="0" max="100" value="${Math.round(settings.music * 100)}"></div><div class="settings-row"><label for="setting-sfx">効果音</label><input id="setting-sfx" type="range" min="0" max="100" value="${Math.round(settings.sfx * 100)}"></div><div class="settings-row"><label for="setting-voice">ボイス</label><input id="setting-voice" type="range" min="0" max="100" value="${Math.round(settings.voice * 100)}"></div><div class="settings-row"><div><label for="setting-subtitles">字幕</label><small>キャラクターのセリフを文字でも表示</small></div><input id="setting-subtitles" type="checkbox" ${settings.subtitles ? 'checked' : ''}></div><div class="settings-row"><div><label for="setting-quality">描画品質</label><small>低品質は電池と処理負荷をおさえます</small></div><select id="setting-quality"><option value="auto">自動</option><option value="high">高品質</option><option value="low">低品質</option></select></div><div class="settings-row"><div><label for="setting-vibration">ダメージ時の振動</label><small>対応する端末のみ</small></div><input id="setting-vibration" type="checkbox" ${settings.vibration ? 'checked' : ''}></div><p class="settings-note">設定はこの端末に保存されます。画面を離れると自動で一時停止します。端末の「視差効果を減らす」を有効にすると、画面の揺れやフラッシュを抑えます。</p>`;
     $('#setting-quality').value = settings.quality;
-    $('#setting-sound').addEventListener('change', e => setSound(e.target.checked));
+    $('#setting-sound').addEventListener('change', e => setSound(e.target.checked)); $('#quick-sound').addEventListener('click', () => { setSound(!settings.sound); $('#setting-sound').checked = settings.sound; }); $('#install-button').addEventListener('click', installApp); syncSound();
     $('#setting-music').addEventListener('input', e => { settings.music = e.target.value / 100; audio.musicVolume = settings.music; audio.applyVolumes(); save(SETTINGS_KEY, settings); });
     $('#setting-voice').addEventListener('input', e => { settings.voice = e.target.value / 100; audio.voiceVolume = settings.voice; audio.applyVolumes(); save(SETTINGS_KEY, settings); });
     $('#setting-subtitles').addEventListener('change', e => { settings.subtitles = e.target.checked; save(SETTINGS_KEY, settings); if (!settings.subtitles) $('#subtitle').hidden = true; });
@@ -574,6 +585,8 @@ function openDialog(type) {
     content.querySelectorAll('[data-char]').forEach(b => b.addEventListener('click', () => { profile.character = b.dataset.char; saveProfile(); audio.effect('choose'); updateHome(); $('#app-dialog').close(); }));
   } else if (type === 'gear') {
     $('#dialog-kicker').textContent = 'EQUIPMENT'; gearView = { filter: 'all', key: null }; renderGear();
+  } else if (type === 'free') {
+    $('#dialog-kicker').textContent = 'FREE PLAY'; renderFree();
   } else if (type === 'campaign') {
     $('#dialog-kicker').textContent = 'CAMPAIGN'; renderCampaign(nextChapter(profile));
   } else if (type === 'codex') {
@@ -586,17 +599,25 @@ function openDialog(type) {
     $('#dialog-kicker').textContent = 'RECORDS';
     content.innerHTML = `<h2 id="dialog-title">これまでの記録</h2><div class="record-grid"><div class="record-tile"><small>最長生存</small><strong>${formatTime(records.bestTime)}</strong></div><div class="record-tile"><small>最多撃破</small><strong>${records.bestKills.toLocaleString()}</strong></div><div class="record-tile"><small>最大コンボ</small><strong>${records.bestCombo.toLocaleString()}</strong></div><div class="record-tile"><small>エンドレス最長</small><strong>${formatTime(profile.endlessBest)}</strong></div><div class="record-tile"><small>獲得スター累計</small><strong>${profile.earned.toLocaleString()}</strong></div><div class="record-tile"><small>出撃 / 成功</small><strong>${records.runs} / ${records.wins}</strong></div></div><div class="record-list">${Object.entries(MODES).map(([id, m]) => `<div><span>${m.name} ${records.modes[id]?.won ? '★' : ''}</span><span>${records.modes[id] ? formatTime(records.modes[id].time) : '--:--'}</span></div>`).join('')}</div><p class="record-note">記録はこのブラウザに保存されます。端末間の同期はありません。</p>`;
   }
-  $('#app-dialog').showModal();
+  if (type === 'achievements' || type === 'records') content.insertAdjacentHTML('afterbegin', `<div class="codex-tabs page-tabs"><button data-dialog="achievements" aria-pressed="${type === 'achievements'}">${icon('medal')} 実績</button><button data-dialog="records" aria-pressed="${type === 'records'}">${icon('chart')} 記録</button></div>`);
+  // Tab pages (工房・装備・図鑑・実績・キャンペーン) sit between the top bar and the tab bar so the tabs stay usable;
+  // everything else is a modal sheet. During a run every dialog is modal.
+  const dlg = $('#app-dialog'), tab = PAGE_TABS[type], asPage = !!tab && !game;
+  if (dlg.open && asPage && dlg.classList.contains('as-page')) { updateTabs(tab); dlg.scrollTop = 0; return; } // switching tabs: content already replaced
+  if (dlg.open) { dlg.close(); dialogReturn = dialogReturnFor(type); }
+  dlg.classList.toggle('as-page', asPage); if (asPage) { dlg.show(); updateTabs(tab); content.scrollTop = 0; dlg.scrollTop = 0; } else dlg.showModal();
 }
-$$('[data-dialog]').forEach(b => b.addEventListener('click', () => openDialog(b.dataset.dialog)));
+const PAGE_TABS = { shop: 'shop', gear: 'gear', codex: 'codex', achievements: 'achievements', records: 'achievements', campaign: 'home' };
+function dialogReturnFor(type) { return $(`#tabbar [data-tab="${PAGE_TABS[type] || 'home'}"]`) || $('#start-button'); }
+document.addEventListener('click', e => { const b = e.target.closest('[data-dialog]'); if (b && !b.disabled) openDialog(b.dataset.dialog); });
+$$('#tabbar [data-tab]').forEach(b => b.addEventListener('click', () => { const t = b.dataset.tab; if (t === 'home') { if ($('#app-dialog').open) $('#app-dialog').close(); else updateTabs(); audio.effect('ui'); } else openDialog(t); }));
+function updateTabs(active = null) { for (const b of $$('#tabbar [data-tab]')) { const on = b.dataset.tab === (active || 'home'); b.classList.toggle('active', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); } }
 $('#dialog-close').addEventListener('click', () => $('#app-dialog').close());
 $('#app-dialog').addEventListener('click', e => { if (e.target === $('#app-dialog')) { const r = $('#app-dialog').getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) $('#app-dialog').close(); } });
-$('#app-dialog').addEventListener('close', () => { clearInput(); dialogReturn?.focus({ preventScroll: true }); previous = performance.now(); accumulator = 0; });
-function connection() { $('#connection span').textContent = navigator.onLine ? 'LOCAL / READY' : 'OFFLINE / READY'; }
-window.addEventListener('online', connection); window.addEventListener('offline', connection);
-window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; $('#install-button').hidden = false; });
-$('#install-button').addEventListener('click', async () => { if (!installPrompt) return; await installPrompt.prompt(); const result = await installPrompt.userChoice; if (result.outcome === 'accepted') $('#install-button').hidden = true; installPrompt = null; });
-window.addEventListener('appinstalled', () => { $('#install-button').hidden = true; toast('ホーム画面に追加しました！'); });
+$('#app-dialog').addEventListener('close', () => { if ($('#app-dialog').open) return; /* already reopened as another tab */ $('#app-dialog').classList.remove('as-page'); updateTabs(); clearInput(); dialogReturn?.focus({ preventScroll: true }); previous = performance.now(); accumulator = 0; });
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; const b = $('#install-button'); if (b) b.hidden = false; });
+async function installApp() { if (!installPrompt) return; await installPrompt.prompt(); const result = await installPrompt.userChoice; if (result.outcome === 'accepted') { const b = $('#install-button'); if (b) b.hidden = true; } installPrompt = null; }
+window.addEventListener('appinstalled', () => { const b = $('#install-button'); if (b) b.hidden = true; toast('ホーム画面に追加しました！'); });
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
@@ -616,8 +637,8 @@ if ('serviceWorker' in navigator) {
   });
 }
 $('#update-button').addEventListener('click', () => { if (hasUnfinishedRun()) { game.pause(); transition(); toast('結果画面で更新してください。'); return; } if (pendingReload) location.reload(); else waitingSW?.postMessage({ type: 'SKIP_WAITING' }); });
-if (profile.stats.runs === 0) { mode = 'patrol'; $$('[data-mode]').forEach(x => { x.classList.toggle('selected', x.dataset.mode === 'patrol'); x.setAttribute('aria-pressed', String(x.dataset.mode === 'patrol')); }); $('#mode-title').textContent = MODES.patrol.name; $('#mode-description').textContent = MODES.patrol.description + '（はじめての方におすすめ）'; }
+if (profile.stats.runs === 0) mode = 'patrol';
 document.body.classList.toggle('large-text', settings.largeText); applyRenderOptions(); void audio.loadVoiceIndex(); audio.setStage(homeSong());
-syncSound(); updateBest(); updateHome(); connection(); requestAnimationFrame(frame);
+syncSound(); updateHome(); requestAnimationFrame(frame);
 // Live module bindings are available to development tools without global hooks.
 export { game, renderer, audio, settings, records, combo, profile, updateHome };
